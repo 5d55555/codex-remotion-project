@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Offline, deterministic 120 BPM trailer score; stdlib and NumPy only."""
+"""Deterministic cartoon score. Only NumPy and the standard library; no assets."""
 import json
 import time
 import wave
 from pathlib import Path
-
 import numpy as np
 
 SR = 48000
-BPM = 120
-BEAT = 60 / BPM
+BEAT = 60 / 108
 ROOT = Path(__file__).resolve().parents[1]
 SEED = 20261026
 
@@ -18,195 +16,255 @@ def main():
     started = time.perf_counter()
     rng = np.random.default_rng(SEED)
     timeline = json.loads((ROOT / 'src/timeline.json').read_text())
+    assert timeline['fps'] == 30
     segments = timeline['segments']
     cursor = 0
-    for i, segment in enumerate(segments):
-        segment['start'] = (cursor - timeline['overlap'] * i) / timeline['fps']
-        segment['end'] = segment['start'] + segment['frames'] / timeline['fps']
-        cursor += segment['frames']
-    duration = (cursor - timeline['overlap'] * (len(segments) - 1)) / timeline['fps']
-    n = round(duration * SR)
-    if abs(n / SR - duration) > 1e-9:
-        raise ValueError('Timeline duration cannot be represented at 48 kHz')
-    chapters = [s for s in segments if s['kind'] == 'chapter']
-    origin = chapters[0]['start']
-    outro = next((s['start'] for s in segments if s['kind'] == 'logo' and s['start'] > origin), duration)
+    for i, s in enumerate(segments):
+        s['start'] = (cursor - timeline['overlap'] * i) / 30
+        cursor += s['frames']
+    frames = cursor - timeline['overlap'] * (len(segments) - 1)
+    n = frames * 1600
+    duration = n / SR
+    starts = {s['id']: s['start'] for s in segments}
     mix = np.zeros((n, 2), np.float32)
-    send = np.zeros_like(mix)
 
-    def add(sound, start, gain=1., pan=0., wet=.2):
-        offset = round(start * SR)
-        lo, hi = max(0, offset), min(n, offset + len(sound))
-        if hi <= lo:
-            return
-        sound = sound[lo - offset:hi - offset]
-        for channel, balance in enumerate((np.sqrt((1-pan)/2), np.sqrt((1+pan)/2))):
-            signal = (sound * (gain * balance)).astype(np.float32)
-            mix[lo:hi, channel] += signal
-            send[lo:hi, channel] += signal * wet
+    def clock(d):
+        return np.arange(round(d * SR), dtype=np.float64) / SR
 
-    def clock(seconds):
-        return np.arange(round(seconds * SR), dtype=np.float64) / SR
+    def hz(m):
+        return 440 * 2 ** ((m - 69) / 12)
 
-    def hz(midi):
-        return 440 * 2 ** ((midi - 69) / 12)
+    def env(t, d, attack=.006, release=.035):
+        return (1 - np.exp(-t / attack)) * np.minimum((d-t)/release, 1)
 
-    def noise(seconds, low, high):
-        t = clock(seconds)
+    def tone(m, d, kind='pluck'):
+        t = clock(d)
+        f = hz(m)
+        phase = 2*np.pi*f*t + .025*np.sin(2*np.pi*5.3*t)
+        if kind == 'pluck':
+            a = sum(np.sin(h*phase) * np.exp(-t*(7+4*h)) / h**1.2
+                    for h in range(1, 7))
+            a += rng.standard_normal(len(t))*.035*np.exp(-t/.009)
+        elif kind == 'bassoon':
+            a = sum(np.sin(h*phase) / h**1.5 for h in (1, 3, 5, 7))
+            a *= np.exp(-t/ .16)
+        elif kind == 'brass':
+            a = sum(np.sin(h*phase + .04*h*np.sin(2*np.pi*5*t))
+                    / h**1.15 for h in range(1, 9)) * .52
+        elif kind == 'choir':
+            # Harmonic source with vowel-like resonances at 650 and 1150 Hz.
+            a = sum(np.sin(h*phase) * (.05 + np.exp(-((h*f-650)/180)**2)
+                    + .6*np.exp(-((h*f-1150)/220)**2)) / h**.6
+                    for h in range(1, min(35, int(7000/f)))) * .5
+        else:  # Inharmonic, fast-decaying glockenspiel.
+            a = sum(v*np.sin(phase*r)*np.exp(-t/tau)
+                    for r, v, tau in ((1, 1, .4), (2.76, .28, .18), (5.4, .08, .09)))
+        return (a * env(t, d)).astype(np.float32)
+
+    def noise(d, low, high):
+        t = clock(d)
         f = np.fft.rfftfreq(len(t), 1/SR)
-        response = (1 - np.exp(-(f / low)**4)) / np.sqrt(1 + (f/high)**8)
-        a = np.fft.irfft(np.fft.rfft(rng.standard_normal(len(t))) * response, n=len(t))
-        return a / (np.sqrt(np.mean(a*a)) + 1e-12)
+        a = np.fft.irfft(np.fft.rfft(rng.standard_normal(len(t))) *
+                        (1-np.exp(-(f/low)**4)) / np.sqrt(1+(f/high)**8), n=len(t))
+        return a / (np.sqrt(np.mean(a*a))+1e-12)
 
-    def strings(midi, seconds, bright=1600, attack=.012):
-        t = clock(seconds)
-        f = hz(midi)
-        out = np.zeros(len(t))
-        # Band-limited detuned saw harmonics, with low-pass response and vibrato.
-        for detune in (-.0035, 0., .0035):
-            phase = 2*np.pi*f*(1+detune)*t + .035*np.sin(2*np.pi*5.2*t)
-            cutoff = bright * (.5 + .5 * (1-np.exp(-t/.12)))
-            for h in range(1, min(17, int((SR/2-1)/(f*(1+abs(detune))))+1)):
-                out += np.sin(h*phase) / (h * np.sqrt(1+(h*f/cutoff)**6))
-        env = (1-np.exp(-t/attack)) * np.minimum((seconds-t)/min(.16, seconds/2), 1)
-        return (out * env / 3).astype(np.float32)
-
-    def bell(midi):
-        t = clock(3.5)
-        a = sum(level*np.sin(2*np.pi*hz(midi)*ratio*t)*np.exp(-t/decay)
-                for ratio, level, decay in ((1, 1, 1.2), (2.71, .3, .65), (4.13, .12, .35)))
-        return (a * (1-np.exp(-t/.003))).astype(np.float32)
-
-    t = clock(1.4)
-    kick = (np.sin(2*np.pi*(43*t + 65*.035*(1-np.exp(-t/.035)))) * np.exp(-t/.32)
-            + .15*noise(1.4, 120, 2300)*np.exp(-t/.018)) * (1-np.exp(-t/.0015))
-    t = clock(.28)
-    snare = (noise(.28, 650, 6500)*np.exp(-t/.055) + .25*np.sin(2*np.pi*185*t)*np.exp(-t/.045))*(1-np.exp(-t/.001))
-    t = clock(.065)
-    tick = (noise(.065, 5500, 14000)*.65 + .35*np.sin(2*np.pi*3900*t))*np.exp(-t/.009)*(1-np.exp(-t/.0005))
-    t = clock(3)
-    boom = np.sin(2*np.pi*(32*t+38*.12*(1-np.exp(-t/.12))))*np.exp(-t/.7)*(1-np.exp(-t/.006))
-    t = clock(2.5)
-    crash = noise(2.5, 3100, 15500)*np.exp(-t/.55)*(1-np.exp(-t/.003))
-    chords = ((38, 50, 53, 57), (34, 50, 53, 58), (41, 48, 53, 57), (36, 48, 52, 55))
-    arp_cache = {m: strings(m, .22) for chord in chords for m in chord[1:]}
-    high_cache = {m: strings(m+12, .19, 2600) for m in arp_cache}
-    bass_cache = {}
-    for chord in chords:
-        midi = chord[0]
-        t = clock(.32)
-        bass_cache[midi] = ((np.sin(2*np.pi*hz(midi)*t)+.22*np.sin(4*np.pi*hz(midi)*t))
-                            *(1-np.exp(-t/.007))*np.exp(-t/.15)*np.minimum((.32-t)/.04, 1)).astype(np.float32)
-
-    def chapter_level(at):
-        return sum(s['start'] <= at for s in chapters)
-
-    def card(at):
-        return any(s['start'] <= at < s['end'] for s in chapters)
-
-    # Constant global grid: a new chord every eight beats (two bars).
-    for step, at in enumerate(np.arange(origin, outro, BEAT/4)):
-        level = chapter_level(at)
-        chord = chords[(step//64) % len(chords)]
-        accent = (1., .62, .78, .66)[step % 4]
-        strength = .76 + .08*level
-        space = 1.18 if card(at) else .83
-        add(arp_cache[chord[1+(step % 6 if step % 6 < 3 else 5-step % 6)]], at,
-            .105*accent*strength*space, -.28, .27)
-        if level >= 2:
-            add(high_cache[chord[1+step % 3]], at, .044*accent*space*(1.25 if level == 4 else 1), .38, .3)
-        add(tick, at, .028*accent*strength, .42*(-1)**step, .025)
-        if step % 2 == 0:
-            add(bass_cache[chord[0]], at, .29*strength, 0, .035)
-        if step % 4 == 0:
-            beat = (step//4) % 4
-            if beat in (0, 2):
-                add(kick, at, .65*strength*space, 0, .045)
-            else:
-                add(snare, at, .19*strength*space, -.08, .075)
-        if level >= 3 and step % 32 == 0:
-            for midi in chord[1:]:
-                add(strings(midi, min(3.9, outro-at), 950, .22), at,
-                    .048*(1.6 if level == 4 else 1)*space, .15, .32)
-        if level == 4 and step % 16 == 0:
-            add(crash, at, .045, -.4, .18)
-
-    # Sparse, dark pad throughout; no rhythmic layers under the closing logo.
-    for at in np.arange(0, duration, 4):
-        index = max(0, int((at-origin)//4)) % len(chords)
-        chord = chords[index] if origin <= at < outro else chords[0]
-        for midi in (chord[0]+12, chord[2]):
-            add(strings(midi, min(5.5, duration-at), 350, .6), at, .065, -.3 if midi % 2 else .3, .38)
-    for at in np.arange(0, origin-1, 1.5):
-        add(kick, at, .22, 0, .06)
-        add(kick, at+.23, .11, 0, .04)
-    add(bell(74), .7, .13, -.25, .32)
-    add(bell(81), 3.1, .075, .3, .32)
-
-    for index, segment in enumerate(chapters):
-        at = segment['start']
-        t = clock(2)
-        # Rising high-pass and opening low-pass, applied with FFT in short blocks.
-        rise = noise(2, 350, 11000)
-        phase = 2*np.pi*(300*t+1100*t*t)
-        rise = (rise*.65 + .35*np.sin(phase))*(t/2)**2*np.sin(np.minimum(t/.04,1)*np.pi/2)
-        add(rise, at-2, .19, .1, .22)
-        for roll in range(24):
-            progress = roll/24
-            add(snare, at-2+2*progress, .018+.15*progress**2, .18*(-1)**roll, .08)
-        chord = chords[int(max(0, (at-origin)//4)) % len(chords)]
-        for midi in chord[1:]:
-            add(strings(midi, 3.8, 3200, .07), at, .28+.025*index, .22*(midi % 3-1), .34)
-            add(strings(midi+12, 2.6, 2500, .12), at, .065, -.2, .38)
-        add(boom, at, 1., 0, .04)
-        add(crash, at, .24, -.35, .25)
-    scale = (74, 77, 79, 81, 82, 84, 86)
-    for index, segment in enumerate(s for s in segments if s['kind'] == 'figure'):
-        add(bell(scale[index % len(scale)]), segment['start'], .16, .3*(-1)**index, .3)
-    if outro < duration:
-        for midi in (50, 53, 57, 62):
-            add(strings(midi, min(5.5, duration-outro), 1800, .10), outro, .20, .1, .4)
-        add(boom, outro, .65, 0, .04)
-        add(crash, outro, .12, .3, .25)
-
-    # Two-second synthetic stereo room, block FFT overlap-add; sends keep drums dry.
-    ir_t = clock(2)
-    block = 131072
-    fft_size = 1 << (block + len(ir_t) - 2).bit_length()
-    for channel in range(2):
-        ir = noise(2, 180, 4800)*np.exp(-ir_t/.40)*np.minimum(ir_t/.025, 1)
-        ir[:round(.018*SR)] = 0
-        ir /= np.sqrt(np.sum(ir*ir))
-        transfer = np.fft.rfft(ir, n=fft_size)
-        for offset in range(0, n, block):
-            dry = send[offset:offset+block, channel]
-            wet = np.fft.irfft(np.fft.rfft(dry, n=fft_size)*transfer, n=fft_size)
-            count = min(n-offset, len(dry)+len(ir)-1)
-            mix[offset:offset+count, channel] += wet[:count].astype(np.float32)
-    del send
-    mix -= np.mean(mix, axis=0)
-    mix[:SR] *= np.linspace(0, 1, SR, dtype=np.float32)[:, None]
-    fade = min(n, 4*SR)
-    mix[-fade:] *= (np.cos(np.linspace(0, np.pi/2, fade))**2).astype(np.float32)[:, None]
-    mix[-1] = 0
-    # Solve soft-saturation drive for -15 dBFS RMS after -1 dBFS peak normalization.
-    peak_target, rms_target = 10**(-1/20), 10**(-15/20)
-    peak = float(np.max(np.abs(mix)))
-    probe = mix[::16].astype(np.float64)
-    low, high = .00001, 1000.
-    for _ in range(32):
-        drive = (low+high)/2
-        rms = np.sqrt(np.mean(np.tanh(probe*drive)**2))
-        if rms*peak_target/np.tanh(peak*drive) < rms_target:
-            low = drive
+    def percussion(kind):
+        d = {'wood': .12, 'snare': .19, 'cymbal': .8, 'gong': 2.8,
+             'clank': .65, 'thud': .6, 'timpani': .6}[kind]
+        t = clock(d)
+        if kind in ('wood', 'timpani', 'thud'):
+            f = {'wood': 950, 'timpani': 78, 'thud': 49}[kind]
+            a = np.sin(2*np.pi*(f*t+f*.055*(1-np.exp(-t/.025))))
+            a *= np.exp(-t/({'wood': .025, 'timpani': .18, 'thud': .12}[kind]))
+        elif kind == 'snare':
+            a = noise(d, 1800, 9000)*np.exp(-t/.04)*.45
+        elif kind == 'cymbal':
+            a = noise(d, 4500, 15000)*np.exp(-t/.18)*.4
         else:
-            high = drive
-    mix *= (low+high)/2
+            a = sum(np.sin(2*np.pi*f*t)*np.exp(-t/(d*.3)) for f in
+                    ((73, 121, 197, 311, 499, 817) if kind == 'gong'
+                     else (93, 287, 731, 1523, 2489))) / 3
+            a += noise(d, 1700, 11000)*np.exp(-t/.075)*.25
+        return (a*env(t, d, .001, .025)).astype(np.float32)
+
+    drums = {k: percussion(k) for k in ('wood', 'snare', 'cymbal', 'gong', 'clank', 'thud', 'timpani')}
+    cache = {}
+
+    def note(m, d, kind):
+        key = (m, d, kind)
+        if key not in cache:
+            cache[key] = tone(m, d, kind)
+        return cache[key]
+
+    def add(a, at, gain=.1, pan=0, room=True):
+        # Short, quiet stereo reflections leave the centre clear for explanation.
+        for delay, level, p in ((0, 1, pan), (.071, .065, -pan-.15), (.113, .045, pan+.15)):
+            if delay and not room:
+                continue
+            offset = round((at+delay)*SR)
+            lo, hi = max(0, offset), min(n, offset+len(a))
+            if hi <= lo:
+                continue
+            p = np.clip(p, -.9, .9)
+            balances = np.sqrt(np.array([1-p, 1+p])/2)
+            mix[lo:hi] += (a[lo-offset:hi-offset, None] *
+                           (gain*level*balances)).astype(np.float32)
+
+    def slide(d, low, high, curve=1, vibrato=0):
+        t = clock(d)
+        x = t/d
+        f = low*(high/low)**(x**curve)
+        f *= 2**(vibrato*np.sin(2*np.pi*6.7*t)/12)
+        phase = 2*np.pi*np.cumsum(f)/SR
+        return (np.sin(phase)*env(t, d, .018, .08)).astype(np.float32)
+
+    # Logo: ominous little pizzicati, bells, then a raised cartoon eyebrow.
+    for j, m in enumerate((38, 45, 41, 44)):
+        add(note(m, .5, 'pluck'), .3+j*1.15, .28, -.2)
+    add(note(86, 1, 'bell'), 1.1, .09, .35)
+    add(note(85, 1, 'bell'), 3.35, .065, -.3)
+    add(slide(.6, 420, 1050, 1.8), starts['ch1']-.85, .17, .2)
+
+    # Swing eighths: 2:1 timing, sparse upper register, comic chromatic neighbours.
+    minor = ((38, 62, 65, 69), (43, 62, 67, 70), (45, 61, 64, 69), (38, 62, 65, 68))
+    melody = (0, 2, 1, 2, 0, 1, 2, 1, 0, 2, 1, 0, 2, 1, 0, 1)
+    for b, at in enumerate(np.arange(starts['ch1'], starts['ch3']-.3, BEAT)):
+        chord = minor[(b//8) % 4]
+        add(note(chord[0]+(7 if b%2 else 0), .24, 'bassoon'), at, .23, -.13)
+        add(drums['wood'], at+BEAT*2/3, .055, .48*(-1)**b)
+        if b%4 in (1, 3):
+            add(drums['snare'], at, .055, -.3)
+        for sub, off in enumerate((0, BEAT*2/3)):
+            if (b*2+sub)%8 == 5:
+                continue
+            m = chord[1+melody[(b*2+sub)%16]]+12
+            if b%16 == 14 and sub:
+                m += 1
+            add(note(m, .26, 'pluck'), at+off, .14 if sub == 0 else .10, .28)
+        if b%8 == 6:
+            add(note(chord[2]+24, .65, 'bell'), at+BEAT*2/3, .045, -.4)
+
+    # Abrupt, deliberately pompous D-major march, with breathing room between stabs.
+    major = ((38, 62, 66, 69), (43, 62, 67, 71), (45, 61, 64, 69), (38, 62, 66, 74))
+    for b, at in enumerate(np.arange(starts['ch3'], starts['f17']-.3, BEAT)):
+        chord = major[(b//8)%4]
+        add(note(chord[0], .28, 'bassoon'), at, .22, -.2)
+        if b%2 == 0:
+            add(drums['timpani'], at, .23)
+            for m in chord[1:]:
+                add(note(m, .34 if b%4 else .58, 'brass'), at, .095, .3*(m%3-1))
+        else:
+            add(drums['snare'], at, .15, -.35)
+        if b%8 == 7:
+            for r in range(6):
+                add(drums['snare'], at+r*BEAT/6, .035+.007*r, -.3)
+        if b%4 == 2:
+            add(note(chord[3]+12, .22, 'brass'), at+BEAT*.66, .09, .35)
+
+    # Chapter punchlines are two short brass hits, without a preceding build.
+    for s in segments:
+        at = s['start']
+        if s['kind'] == 'chapter':
+            for off, g in ((0, .17), (.25, .23)):
+                for m in (50, 57, 66 if s['id'] == 'ch3' else 65):
+                    add(note(m, .19, 'brass'), at+off, g)
+                add(drums['cymbal'], at+off, .2, -.4)
+        elif s['kind'] == 'figure':
+            add(note(86 if at < starts['ch3'] else 90, .55, 'bell'), at, .045, .4)
+
+    cues = [
+        ('f03', 90, 1.0, 'table ding + falling whistle'),
+        ('f04', 150, 2.6, 'sad trombone'),
+        ('f09', 100, 1.5, 'theremin resurrection'),
+        ('f10', 190, 1.0, 'thud + falling whistle'),
+        ('f10', 240, 2.0, 'tiptoe escape'),
+        ('f12', 140, 1.0, 'metal clank'),
+        ('f16', 150, 2.6, 'ancestral brass choir + gong'),
+        ('f17', 60, 4.4, 'curve whistle + victory trumpet'),
+    ]
+    # Duck existing accompaniment locally; effects are added afterwards.
+    for sid, frame, length, _ in cues:
+        at = starts[sid]+frame/30
+        lo, hi = max(0, round((at-.06)*SR)), min(n, round((at+length+.22)*SR))
+        t = np.arange(hi-lo)/SR + lo/SR-at
+        duck = 1-.62*np.minimum(np.clip((t+.06)/.06, 0, 1),
+                                 np.clip((length+.22-t)/.22, 0, 1))
+        mix[lo:hi] *= duck.astype(np.float32)[:, None]
+
+    at = starts['f03']+90/30
+    add(note(98, .8, 'bell'), at, .42)
+    add(slide(.52, 1300, 310), at+.13, .30, .2)
+    at = starts['f04']+150/30
+    for j, m in enumerate((58, 57, 56, 55)):
+        d = .37 if j < 3 else 1.35
+        t = clock(d)
+        f = hz(m)*2**((-.25*t/d+.19*np.sin(2*np.pi*5.5*t)*(j == 3))/12)
+        phase = 2*np.pi*np.cumsum(f)/SR
+        a = sum(np.sin(h*phase)/h**1.25 for h in range(1, 7))*.6*env(t, d, .035, .09)
+        add(a, at+j*.41, .40, -.16)
+    add(slide(1.5, 240, 820, .65, 1.25), starts['f09']+100/30, .42, .25)
+    at = starts['f10']+190/30
+    add(drums['thud'], at, .72)
+    add(slide(.68, 880, 110), at+.03, .35, -.2)
+    at = starts['f10']+240/30
+    for j, m in enumerate((74, 50, 77, 53, 73, 49, 74, 50)):
+        add(note(m, .22, 'pluck'), at+j*.24, .42*.82**j, .3*(-1)**j)
+    at = starts['f12']+140/30
+    add(drums['clank'], at, .72)
+    add(drums['thud'], at, .6)
+    at = starts['f16']+150/30
+    for m in (38, 50, 62, 66, 69, 74):
+        add(note(m, 1.3, 'brass'), at, .18, .16*(m%3-1))
+        add(note(m+12, 2.35, 'choir'), at+.04, .12, .4*(m%3-1))
+    add(drums['gong'], at, .49, -.2)
+
+    # Curve: exactly 60 frames after f17, for exactly 90 frames.
+    # First 60% rises only 3%; the remaining 40% climbs more than three octaves.
+    at = starts['f17']+60/30
+    t = clock(3)
+    x = t/3
+    progress = .012*np.minimum(x/.6, 1) + .988*np.clip((x-.6)/.4, 0, 1)**2.2
+    f = 210*(2400/210)**progress
+    whistle = np.sin(2*np.pi*np.cumsum(f)/SR)*env(t, 3, .02, .035)
+    add(whistle, at, .43, .1)
+    for off, m, d in ((0, 74, .18), (.22, 78, .18), (.44, 81, .2), (.72, 86, .58)):
+        add(note(m, d, 'brass'), at+3+off, .36, -.15)
+    # A few self-satisfied plucks after the curve, leaving the ending space.
+    for j in range(4):
+        add(note((62, 69, 66, 74)[j], .3, 'pluck'), at+5+j*.65, .12, .25)
+
+    # Shave and a haircut, two bits: seven notes, with the answering pair delayed.
+    at = starts['outro']+.15
+    for beat, m in zip((0, 1, 1.5, 2, 3, 5, 6), (74, 69, 69, 71, 69, 73, 74)):
+        when = at+beat*.44
+        add(note(m, .23 if beat != 6 else .5, 'brass'), when, .27)
+        add(drums['wood'], when, .13, -.2)
+    # Only a quiet high bell tail remains, fading to silence for the final two seconds.
+    add(note(86, 2.8, 'bell'), duration-3.3, .025, .35)
+    fade = 2*SR
+    mix[-fade:] *= (np.cos(np.linspace(0, np.pi/2, fade))**2).astype(np.float32)[:, None]
+    mix[:480] *= np.linspace(0, 1, 480, dtype=np.float32)[:, None]
+    mix[-1] = 0
+
+    # Smooth peak control, never hard clipping. Solve drive on the entire signal's
+    # amplitude distribution, then measure the actual quantized stereo output.
+    peak_target, rms_target = 10**(-1/20), 10**(-17/20)
+    peak = float(np.max(np.abs(mix)))
+    hist, edges = np.histogram(np.abs(mix), bins=32768, range=(0, peak))
+    centres = (edges[:-1]+edges[1:])*.5
+    lo, hi = 1e-6, 1e4
+    for _ in range(50):
+        drive = (lo+hi)/2
+        rms = np.sqrt(np.sum(hist*np.tanh(centres*drive)**2)/mix.size)
+        if rms*peak_target/np.tanh(peak*drive) < rms_target:
+            lo = drive
+        else:
+            hi = drive
+    mix *= (lo+hi)/2
     np.tanh(mix, out=mix)
     mix *= peak_target/np.max(np.abs(mix))
-    pcm = np.rint(mix*32767).astype('<i2')
+    pcm = np.rint(mix*32768).astype('<i2')
     output = ROOT / 'public/audio/score.wav'
-    output.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(output), 'wb') as wav:
         wav.setnchannels(2)
         wav.setsampwidth(2)
@@ -214,12 +272,17 @@ def main():
         wav.writeframes(pcm.tobytes())
     peak_pcm = max(abs(int(pcm.min())), abs(int(pcm.max())))/32768
     rms_pcm = np.sqrt(np.mean(np.square(pcm, dtype=np.float64)))/32768
-    print(f'Total duration: {n/SR:.6f} s ({n} samples)')
+    assert len(pcm) == n and peak_pcm < 1
+    assert abs(20*np.log10(rms_pcm)+17) < .15
+    print(f'Total duration: {duration:.6f} s ({frames} frames; {n} samples)')
     print(f'Peak: {20*np.log10(peak_pcm):.3f} dBFS')
     print(f'RMS: {20*np.log10(rms_pcm):.3f} dBFS')
-    for segment in chapters:
-        print(f"Chapter {segment['id']}: {segment['start']:.6f} s")
+    for sid, frame, _, name in cues:
+        print(f'{sid} + {frame:3d} frames: {starts[sid]+frame/30:.6f} s — {name}')
     print(f'Generated {output.relative_to(ROOT)} in {time.perf_counter()-started:.2f} s')
+    print('Structure: mysterious plucked logo → swung D-minor tiptoeing → abrupt D-major mock-epic march.')
+    print('Comic brass chapter stings; quiet figure bells; ducked cartoon effects; accelerating curve whistle.')
+    print('Ending: victory trumpet → shave-and-a-haircut → quiet two-second fade.')
 
 
 if __name__ == '__main__':

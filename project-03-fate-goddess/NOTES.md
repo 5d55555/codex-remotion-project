@@ -33,7 +33,7 @@
 ```bash
 npm install
 npm run textures   # 生成底纹
-npm run score      # 生成配乐（激昂版，约 45 秒）
+npm run score      # 生成配乐（戏谑版，带卡点音效，几秒）
 npm run qa -- 595 1830
 npm run build      # 渲染 out/fate-goddess.mp4
 ```
