@@ -1,0 +1,56 @@
+{
+ "fps": 30,
+ "overlap": 0,
+ "segments": [
+  {
+   "id": "cold",
+   "kind": "figure",
+   "frames": 180
+  },
+  {
+   "id": "title",
+   "kind": "figure",
+   "frames": 180
+  },
+  {
+   "id": "p1",
+   "kind": "figure",
+   "frames": 390
+  },
+  {
+   "id": "p2",
+   "kind": "figure",
+   "frames": 390
+  },
+  {
+   "id": "round1",
+   "kind": "figure",
+   "frames": 480
+  },
+  {
+   "id": "ko",
+   "kind": "figure",
+   "frames": 300
+  },
+  {
+   "id": "analysis",
+   "kind": "figure",
+   "frames": 450
+  },
+  {
+   "id": "sim",
+   "kind": "figure",
+   "frames": 600
+  },
+  {
+   "id": "verdict",
+   "kind": "figure",
+   "frames": 450
+  },
+  {
+   "id": "gameover",
+   "kind": "figure",
+   "frames": 360
+  }
+ ]
+}
