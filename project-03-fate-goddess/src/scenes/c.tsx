@@ -186,7 +186,7 @@ const Outro: React.FC = () => (
     question="先当孙子，再当祖宗。"
     under={
       <>
-        <Txt x={960} y={900} a="c" width={1500} fade at={110} size={16} color={C.soft} lh={1.6} text="资料：诡秘之主 Wiki「命运女神途径」「战士途径」（转录作者公众号设定）；《宿命之环》第三卷第81章《拳套》；百度贴吧讨论。" />
+        <Txt x={960} y={900} a="c" width={1500} fade at={110} size={16} color={C.soft} lh={1.6} text="资料：诡秘之主 Wiki「命运女神途径」「战士途径」（转录作者公众号设定）；《宿命之环》第三卷《拳套》《灾祸巨人》；百度贴吧讨论。" />
         <Txt x={960} y={948} a="c" width={1500} fade at={120} size={16} color={C.soft} lh={1.6} text="辈分、星级与战力曲线为个人锐评，不是官方设定；“二手整理”来自 Wiki 与论坛。本片为同人科普作品。" />
       </>
     }

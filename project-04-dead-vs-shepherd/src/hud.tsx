@@ -135,7 +135,7 @@ export const Typer: React.FC<Pos & {text: string; at: number; size?: number; col
   );
 };
 
-export const Label: React.FC<Pos & {text: string; at: number; size?: number; color?: string; font?: string; w?: number; ls?: number}> = ({x, y, a = 'l', text, at, size = 22, color = H.ink, font = HF.heavy, w = 700, ls}) => {
+export const Label: React.FC<Pos & {text: string; at: number; size?: number; color?: string; font?: string; w?: number; ls?: number; width?: number}> = ({x, y, a = 'l', text, at, size = 22, color = H.ink, font = HF.heavy, w = 700, ls, width}) => {
   const f = useCurrentFrame();
   const p = prog(f, at, 10);
   return (
@@ -150,7 +150,10 @@ export const Label: React.FC<Pos & {text: string; at: number; size?: number; col
         fontWeight: w,
         fontSize: size,
         color,
-        whiteSpace: 'nowrap',
+        whiteSpace: width ? 'normal' : 'nowrap',
+        width,
+        lineHeight: 1.4,
+        textAlign: a === 'c' ? 'center' : a === 'r' ? 'right' : 'left',
         letterSpacing: ls ? `${ls}em` : undefined,
       }}
     >
@@ -197,19 +200,18 @@ export const Stamp: React.FC<Pos & {text: string; at: number; size: number; colo
   const o = interpolate(t, [0, 2], [0, 1], {extrapolateRight: 'clamp'});
   return (
     <div style={{position: 'absolute', left: x, top: y, transform: `translate(${tx(a)}, -50%) rotate(${rot}deg) scale(${s})`, opacity: o}}>
-      {[0, 1, 2, 3, 4, 5].map((i) => (
+      {[0, 1, 2, 3].map((i) => (
         <div
           key={i}
           style={{
             position: 'absolute',
-            left: `${20 + rnd(i + size) * 60}%`,
-            top: `${10 + rnd(i * 3 + size) * 80}%`,
-            width: 10 + rnd(i * 5) * 26,
-            height: 10 + rnd(i * 5) * 26,
+            left: `${8 + i * 26 + rnd(i + size) * 10}%`,
+            top: i % 2 ? '104%' : '-14%',
+            width: 6 + rnd(i * 5) * 12,
+            height: 6 + rnd(i * 5) * 12,
             borderRadius: '50%',
             background: color,
-            opacity: 0.85 * interpolate(t, [2, 8], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}),
-            transform: `translate(${(rnd(i * 11) - 0.5) * size}px, ${(rnd(i * 13) - 0.5) * size * 0.6}px)`,
+            opacity: 0.8 * interpolate(t, [2, 8], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}),
           }}
         />
       ))}
@@ -228,8 +230,8 @@ export const Caption: React.FC<{lines: {at: number; text: string}[]; who?: strin
   return (
     <div style={{position: 'absolute', left: 160, right: 160, top: 946, height: 76, transform: `translateY(${(1 - p) * 30}px)`, opacity: p, display: 'flex', alignItems: 'center', gap: 22}}>
       <div style={{background: H.hit, color: '#0d0e12', fontFamily: HF.heavy, fontWeight: 900, fontSize: 22, padding: '8px 14px', transform: 'skewX(-10deg)'}}>{who}</div>
-      <div style={{flex: 1, height: 56, background: 'rgba(0,0,0,0.72)', borderLeft: `4px solid ${H.hit}`, display: 'flex', alignItems: 'center', paddingLeft: 22}}>
-        <Typer key={current.at} x={0} y={0} text={current.text} at={current.at} size={28} cps={1.2} w={700} cursor={false} />
+      <div style={{position: 'relative', flex: 1, height: 56, background: 'rgba(0,0,0,0.72)', borderLeft: `4px solid ${H.hit}`}}>
+        <Typer key={current.at} x={22} y={28} text={current.text} at={current.at} size={28} cps={1.2} w={700} cursor={false} />
       </div>
     </div>
   );
@@ -320,67 +322,6 @@ export const Skill: React.FC<{x: number; y: number; at: number; glyph: string; n
         <div style={{fontFamily: HF.heavy, fontWeight: 500, fontSize: 19, color: H.dim, marginTop: 4, maxWidth: 460}}>{desc}</div>
       </div>
     </div>
-  );
-};
-
-/* ---------- 角色（SVG 线稿） ---------- */
-
-const draw = (f: number, at: number, dur = 24) => {
-  const p = prog(f, at, dur);
-  return {pathLength: 1, strokeDasharray: '1 1', strokeDashoffset: 1 - p, opacity: p > 0 ? 1 : 0};
-};
-
-export const DeadOne: React.FC<{x: number; y: number; s?: number; at: number; color?: string; fallen?: number}> = ({x, y, s = 1, at, color = H.dead, fallen = 0}) => {
-  const f = useCurrentFrame();
-  const bob = Math.sin(f / 12) * 6 * (1 - fallen);
-  return (
-    <svg width={1920} height={1080} style={{position: 'absolute', inset: 0, overflow: 'visible'}}>
-      <g transform={`translate(${x} ${y + bob}) rotate(${-90 * fallen} 0 160) scale(${s})`} fill="none" stroke={color} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" style={{filter: `drop-shadow(0 0 12px ${color})`}}>
-        <path d="M-60 -120 Q-62 -200 0 -210 Q62 -200 60 -120 Q58 -60 40 -40" {...draw(f, at)} />
-        <path d="M-60 -120 Q-58 -60 -40 -40" {...draw(f, at + 4)} />
-        <path d="M-40 -40 L-90 160 L90 160 L40 -40" {...draw(f, at + 8, 30)} />
-        <ellipse cx={0} cy={-130} rx={30} ry={38} fill="#05070a" stroke={color} {...draw(f, at + 12, 16)} />
-        <path d="M-12 -135 L-6 -128 M12 -135 L6 -128" {...draw(f, at + 24, 8)} />
-        <path d="M-70 20 Q-110 60 -96 110 M70 20 Q110 60 96 110" {...draw(f, at + 18, 20)} />
-      </g>
-    </svg>
-  );
-};
-
-export const Shepherd: React.FC<{x: number; y: number; s?: number; at: number; color?: string}> = ({x, y, s = 1, at, color = H.shep}) => {
-  const f = useCurrentFrame();
-  return (
-    <svg width={1920} height={1080} style={{position: 'absolute', inset: 0, overflow: 'visible'}}>
-      <g transform={`translate(${x} ${y}) scale(${s})`} fill="none" stroke={color} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" style={{filter: `drop-shadow(0 0 12px ${color})`}}>
-        <path d="M-90 -150 L90 -150" {...draw(f, at, 12)} />
-        <path d="M-50 -150 Q-48 -210 0 -214 Q48 -210 50 -150" {...draw(f, at + 4, 16)} />
-        <circle cx={0} cy={-115} r={32} {...draw(f, at + 8, 16)} />
-        <path d="M-50 -70 L-80 160 L80 160 L50 -70 Q0 -90 -50 -70 Z" {...draw(f, at + 12, 30)} />
-        <path d="M110 160 L110 -200 Q110 -250 150 -250 Q190 -250 190 -210 Q190 -180 160 -182" {...draw(f, at + 16, 30)} />
-        <path d="M50 -40 L110 -60" {...draw(f, at + 26, 10)} />
-      </g>
-    </svg>
-  );
-};
-
-export const Sheep: React.FC<{x: number; y: number; at: number; label?: string; color?: string; s?: number}> = ({x, y, at, label, color = H.shep, s = 1}) => {
-  const f = useCurrentFrame();
-  const p = prog(f, at, 14);
-  if (p <= 0) return null;
-  const bob = Math.sin((f + x) / 9) * 5;
-  return (
-    <>
-      <svg width={1920} height={1080} style={{position: 'absolute', inset: 0, overflow: 'visible'}}>
-        <g transform={`translate(${x} ${y + bob}) scale(${s * interpolate(p, [0, 0.7, 1], [0.2, 1.15, 1])})`} opacity={p} fill="rgba(255,179,64,0.12)" stroke={color} strokeWidth={3} style={{filter: `drop-shadow(0 0 10px ${color})`}}>
-          {[[-26, 0], [0, -14], [26, 0], [12, 16], [-14, 16]].map(([cx, cy], i) => (
-            <circle key={i} cx={cx} cy={cy} r={20} />
-          ))}
-          <ellipse cx={-48} cy={-6} rx={14} ry={11} fill="#0d0e12" />
-          <path d="M-14 30 L-14 46 M14 30 L14 46" />
-        </g>
-      </svg>
-      {label && <Label x={x} y={y + 74} a="c" text={label} at={at + 6} size={18} color={color} />}
-    </>
   );
 };
 

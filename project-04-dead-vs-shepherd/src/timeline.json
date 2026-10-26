@@ -23,19 +23,19 @@
    "frames": 390
   },
   {
+   "id": "record",
+   "kind": "figure",
+   "frames": 450
+  },
+  {
    "id": "round1",
    "kind": "figure",
-   "frames": 480
+   "frames": 510
   },
   {
    "id": "ko",
    "kind": "figure",
-   "frames": 300
-  },
-  {
-   "id": "analysis",
-   "kind": "figure",
-   "frames": 450
+   "frames": 360
   },
   {
    "id": "sim",

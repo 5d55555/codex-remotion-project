@@ -154,13 +154,13 @@ const F09: React.FC = () => {
     <SeqFigure
       seq={5}
       name="逝者"
-      sub="打不过，但会装死"
+      sub="先“死”一次，才不受限制"
       rank="孙子"
       power={1}
       fig={9}
-      abilities={['以假死脱离原本的命运', '摆脱此前的限制', '较正常地窥视、影响命运', '假死瞒过占卜与预言']}
+      abilities={['完成假死，脱离原本的命运', '摆脱前面几级的限制', '较正常地窥视、影响命运', '可“说出命运”直接影响对手']}
       source={WIKI}
-      note={{text: '正文：卢米安回忆“正义”女士说过，“逝者”能利用死亡脱离原本的命运', kind: '正文', src: '第三卷第81章《拳套》'}}
+      note={{text: '正文：腓力将军是确认的逝者，曾“说出命运”让安东尼陷入恐惧、失去行动力', kind: '正文', src: '第三卷《灾祸巨人》'}}
     >
       <Svg>
         <P d="M990 660 L1290 660" at={8} dur={20} w={2} />
@@ -175,28 +175,27 @@ const F09: React.FC = () => {
   );
 };
 
-/* 图10 逝者 vs 战士序列9 */
+/* 图10 逝者 vs 战士序列9：说出命运，吓住就跑 */
 const F10: React.FC = () => {
   const f = useCurrentFrame();
-  const fall = prog(f, 190, 18);
-  const sneak = prog(f, 240, 60);
+  const kneel = prog(f, 190, 14);
+  const sneak = prog(f, 240, 70);
+  const tremble = f > 140 && f < 320 ? Math.sin(f * 1.7) * 4 : 0;
   const L = ['超越常人的力量', '超越常人的敏捷', '精通武器与格斗'];
-  const R = ['未见身体加成记载', '未列直接攻击技能', '会假死'];
+  const R = ['未见身体加成记载', '能“说出命运”吓住对手', '吓得住，但打不死'];
   return (
     <Figure theme="navy" rays={{cx: 1290, cy: 470}} chrome={{section: '孙子', value: '5 vs 战士9', node: 4, prev: 4, fig: 10, total: TOTAL}} tag={['逝者', 'vs', '战士途径序列9']} title="高四级，打不过" sub="逝者（序列5）vs 战士（序列9）">
       <Svg>
-        <Person x={1100} y={620} at={20} pose="reach" s={1.25} c={C.cream} />
-        <P d="M1165 500 L1212 452" at={50} dur={10} c={C.gold} w={4} />
-        <g transform={`rotate(${fall * -85} 1470 682)`}>
+        <g transform={`translate(${tremble} ${kneel * 40}) rotate(${kneel * -14} 1100 682)`}>
+          <Person x={1100} y={620} at={20} pose="reach" s={1.25} c={C.cream} />
+          <P d="M1165 500 L1212 452" at={50} dur={10} c={C.gold} w={4} />
+        </g>
+        <g transform={`translate(${sneak * 330} 0)`} opacity={1 - 0.5 * sneak}>
           <Person x={1470} y={620} at={30} pose="stand" s={1.25} c={C.cream} />
         </g>
-        {sneak > 0 && (
-          <g opacity={0.7 * (1 - 0.6 * sneak)} transform={`translate(${sneak * 300} 0)`}>
-            <circle cx={1500} cy={482} r={22} fill="none" stroke={C.cream} strokeWidth={2} strokeDasharray="4 5" />
-            <path d="M1500 504 L1500 600 M1500 530 L1470 570 M1500 530 L1530 570 M1500 600 L1478 680 M1500 600 L1522 680" stroke={C.cream} strokeWidth={2} strokeDasharray="4 5" fill="none" />
-          </g>
-        )}
+        {f > 110 && f < 240 && <path d="M1340 422 L1600 422 L1600 378 L1340 378 Z M1440 422 L1430 448 L1460 422" fill="rgba(13,14,18,0.85)" stroke={C.gold} strokeWidth={2} opacity={prog(f, 110, 10)} />}
       </Svg>
+      {f > 110 && f < 240 && <Txt x={1470} y={400} a="c" text="我看见你的命运了……" at={114} size={18} font={F.serif} w={900} color={C.gold} stagger={1.5} />}
       <Txt x={1100} y={300} a="c" text="序列9 · 战士" at={14} size={30} font={F.serif} w={900} color={C.gold} />
       <Txt x={1470} y={300} a="c" text="序列5 · 逝者" at={20} size={30} font={F.serif} w={900} />
       <Txt x={1290} y={480} a="c" text="VS" at={40} size={84} font={F.serif} w={900} color={C.red} />
@@ -204,10 +203,10 @@ const F10: React.FC = () => {
         <Txt key={t} x={1100} y={730 + i * 34} a="c" text={t} at={70 + i * 8} size={20} color="#d2c9b4" />
       ))}
       {R.map((t, i) => (
-        <Txt key={t} x={1470} y={730 + i * 34} a="c" text={t} at={80 + i * 8} size={20} color={i === 2 ? C.gold : '#d2c9b4'} />
+        <Txt key={t} x={1470} y={730 + i * 34} a="c" text={t} at={80 + i * 8} size={20} color={i === 1 ? C.gold : '#d2c9b4'} />
       ))}
-      <Txt x={1290} y={866} a="c" text="正面打：战士大概率赢 —— 但逝者可以躺下装死，然后溜了" at={200} size={26} font={F.serif} w={900} color={C.gold} stagger={0.8} />
-      <Badge x={1290} y={920} a="c" at={250} kind="观点" src="依据两条途径的序列描述推演，并非原作中的对战" />
+      <Txt x={1290} y={866} a="c" text="正面硬打：战士大概率赢 —— 逝者能“说出命运”把他吓住，然后趁机溜走" at={200} size={25} font={F.serif} w={900} color={C.gold} stagger={0.8} />
+      <Badge x={1290} y={920} a="c" at={250} kind="观点" src="依据两条途径的能力与腓力战例推演，并非原作中的对战" />
     </Figure>
   );
 };
