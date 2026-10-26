@@ -1,0 +1,11 @@
+{
+ "fps": 30,
+ "overlap": 0,
+ "segments": [
+  {
+   "id": "cold",
+   "kind": "figure",
+   "frames": 180
+  }
+ ]
+}
