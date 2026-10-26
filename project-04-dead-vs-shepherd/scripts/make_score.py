@@ -258,6 +258,12 @@ for _ in range(23):
     else:
         high = mid
 mix = np.tanh(mix*((low+high)/2))
+# Saturated noise bursts (the K.O. hit) end up near full scale right at Nyquist,
+# which makes AAC overshoot past 0 dBFS. Band-limit to 15 kHz before normalizing.
+k = np.arange(-48, 49)
+taps = 2*15000/SR*np.sinc(2*15000/SR*k)*np.blackman(len(k))
+taps /= taps.sum()
+mix = np.stack([np.convolve(mix[:, c], taps, mode='same') for c in range(2)], axis=1).astype(np.float32)
 mix *= peak_target/float(np.max(np.abs(mix)))
 pcm = np.rint(mix*32767).astype('<i2')
 output = ROOT/'public/audio/score.wav'
