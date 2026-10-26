@@ -1,7 +1,7 @@
 import React from 'react';
-import {LogoCard} from '../kit';
+import {SCENES_A} from './a';
+import {SCENES_B} from './b';
+import {SCENES_C} from './c';
 
-// 各段场景按 timeline.json 的 id 注册；分镜确定后在这里补全。
-const Logo: React.FC = () => <LogoCard question="序列2之前，都是孙子？" />;
-
-export const SCENES: Record<string, React.FC> = {logo: Logo};
+// 各段场景按 timeline.json 的 id 注册。
+export const SCENES: Record<string, React.FC> = {...SCENES_A, ...SCENES_B, ...SCENES_C};

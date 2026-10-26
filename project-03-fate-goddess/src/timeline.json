@@ -2,6 +2,115 @@
  "fps": 30,
  "overlap": 15,
  "segments": [
-  {"id": "logo", "kind": "logo", "frames": 210}
+  {
+   "id": "logo",
+   "kind": "logo",
+   "frames": 210
+  },
+  {
+   "id": "ch1",
+   "kind": "chapter",
+   "frames": 135
+  },
+  {
+   "id": "f01",
+   "kind": "figure",
+   "frames": 360
+  },
+  {
+   "id": "f02",
+   "kind": "figure",
+   "frames": 390
+  },
+  {
+   "id": "f03",
+   "kind": "figure",
+   "frames": 390
+  },
+  {
+   "id": "ch2",
+   "kind": "chapter",
+   "frames": 135
+  },
+  {
+   "id": "f04",
+   "kind": "figure",
+   "frames": 390
+  },
+  {
+   "id": "f05",
+   "kind": "figure",
+   "frames": 270
+  },
+  {
+   "id": "f06",
+   "kind": "figure",
+   "frames": 270
+  },
+  {
+   "id": "f07",
+   "kind": "figure",
+   "frames": 270
+  },
+  {
+   "id": "f08",
+   "kind": "figure",
+   "frames": 270
+  },
+  {
+   "id": "f09",
+   "kind": "figure",
+   "frames": 300
+  },
+  {
+   "id": "f10",
+   "kind": "figure",
+   "frames": 390
+  },
+  {
+   "id": "f11",
+   "kind": "figure",
+   "frames": 270
+  },
+  {
+   "id": "f12",
+   "kind": "figure",
+   "frames": 300
+  },
+  {
+   "id": "ch3",
+   "kind": "chapter",
+   "frames": 135
+  },
+  {
+   "id": "f13",
+   "kind": "figure",
+   "frames": 300
+  },
+  {
+   "id": "f14",
+   "kind": "figure",
+   "frames": 300
+  },
+  {
+   "id": "f15",
+   "kind": "figure",
+   "frames": 300
+  },
+  {
+   "id": "f16",
+   "kind": "figure",
+   "frames": 360
+  },
+  {
+   "id": "f17",
+   "kind": "figure",
+   "frames": 360
+  },
+  {
+   "id": "outro",
+   "kind": "logo",
+   "frames": 240
+  }
  ]
 }
