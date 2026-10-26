@@ -46,7 +46,7 @@ export const Film: React.FC = () => {
           </Sequence>
         );
       })}
-      {hasScore && <Audio src={staticFile('audio/score.wav')} />}
+      {hasScore && <Audio src={staticFile('audio/score.wav')} volume={0.87} />}
     </AbsoluteFill>
   );
 };
