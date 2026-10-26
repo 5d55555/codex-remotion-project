@@ -5,7 +5,67 @@
   {
    "id": "cold",
    "kind": "figure",
+   "frames": 270
+  },
+  {
+   "id": "title",
+   "kind": "figure",
    "frames": 180
+  },
+  {
+   "id": "origin",
+   "kind": "figure",
+   "frames": 450
+  },
+  {
+   "id": "tz",
+   "kind": "figure",
+   "frames": 420
+  },
+  {
+   "id": "god",
+   "kind": "figure",
+   "frames": 420
+  },
+  {
+   "id": "r1",
+   "kind": "figure",
+   "frames": 300
+  },
+  {
+   "id": "r2",
+   "kind": "figure",
+   "frames": 780
+  },
+  {
+   "id": "r3",
+   "kind": "figure",
+   "frames": 720
+  },
+  {
+   "id": "r4",
+   "kind": "figure",
+   "frames": 420
+  },
+  {
+   "id": "fall",
+   "kind": "figure",
+   "frames": 540
+  },
+  {
+   "id": "legacy",
+   "kind": "figure",
+   "frames": 450
+  },
+  {
+   "id": "ledger",
+   "kind": "figure",
+   "frames": 360
+  },
+  {
+   "id": "end",
+   "kind": "figure",
+   "frames": 240
   }
  ]
 }
