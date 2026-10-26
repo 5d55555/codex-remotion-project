@@ -1,14 +1,5 @@
 import React from 'react';
-import {registerRoot, Composition} from 'remotion';
-import {DancerPathway, DANCER_PATHWAY_DURATION} from './DancerPathway';
+import {Composition, registerRoot} from 'remotion';
+import {Film, FILM_FRAMES} from './Film';
 
-registerRoot(() => (
-  <Composition
-    id="DancerPathway"
-    component={DancerPathway}
-    durationInFrames={DANCER_PATHWAY_DURATION}
-    fps={30}
-    width={1080}
-    height={1920}
-  />
-));
+registerRoot(() => <Composition id="DancerPathway" component={Film} durationInFrames={FILM_FRAMES} fps={30} width={1920} height={1080} />);

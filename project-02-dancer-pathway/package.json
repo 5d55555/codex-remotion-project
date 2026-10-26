@@ -2,18 +2,25 @@
   "name": "project-02-dancer-pathway",
   "private": true,
   "scripts": {
-    "dev": "remotion studio src/index.tsx",
-    "build": "remotion render src/index.tsx DancerPathway out/dancer-pathway.mp4",
-    "typecheck": "tsc --noEmit"
+    "glyphs": "node scripts/glyphs.mjs",
+    "score": "python3 scripts/make_score.py",
+    "dev": "node scripts/glyphs.mjs && remotion studio src/index.tsx",
+    "qa": "node scripts/glyphs.mjs && node scripts/qa.mjs",
+    "build": "node scripts/glyphs.mjs && remotion render src/index.tsx DancerPathway out/dancer-pathway.mp4 --browser-executable=/opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell",
+    "typecheck": "node scripts/glyphs.mjs && tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/noto-sans-sc": "^5.3.1",
+    "@fontsource/noto-serif-sc": "^5.3.1",
+    "@fontsource/zcool-qingke-huangyou": "^5.3.0",
     "@remotion/cli": "^4.0.0",
     "@remotion/media-utils": "^4.0.0",
-    "remotion": "^4.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.0",
     "typescript": "^5.5.4"
   }
 }
