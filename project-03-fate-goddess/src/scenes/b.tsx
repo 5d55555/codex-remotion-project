@@ -5,7 +5,7 @@ import {SeqFigure, Thread, TOTAL} from '../parts';
 
 const WIKI = {kind: '整理' as const, src: '诡秘之主 Wiki「命运女神途径」'};
 
-const Ch2: React.FC = () => <ChapterCard glyphs="孙子" no="第二章" name="孙子辈" line1="序列9 → 序列3" foot="没有数值，没有拳头" />;
+const Ch2: React.FC = () => <ChapterCard glyphs="孙子" no="第二章" name="孙子辈" line1="序列9 → 序列3" foot="不见数值，不见拳头" />;
 
 /* 图04 数值面板：战士序列9 vs 命运女神序列9—5 */
 const F04: React.FC = () => {
@@ -21,7 +21,7 @@ const F04: React.FC = () => {
   ];
   const bar = prog(f, 60, 30);
   return (
-    <Figure chrome={{section: '孙子', value: '9—5 · 数值', node: 4, prev: 7, fig: 4, total: TOTAL}} tag={['孙子辈', '数值', '序列9—5']} title="数值：零" sub="序列9到5，一点没加">
+    <Figure chrome={{section: '孙子', value: '9—5 · 数值', node: 4, prev: 7, fig: 4, total: TOTAL}} tag={['孙子辈', '数值', '序列9—5']} title="数值：一项没写" sub="序列9到5，不见任何加成">
       <Svg>
         <P d="M1000 312 L1840 312" at={10} dur={20} w={2} />
         <P d="M1000 392 L1840 392" at={50} dur={20} w={1.2} op={0.5} />
@@ -47,7 +47,7 @@ const F04: React.FC = () => {
           ))}
         </React.Fragment>
       ))}
-      <Txt x={1000} y={760} text="资料没写，不等于绝对没有；但序列9—5的条目里，一项身体加成都没有列。" at={170} size={19} color={C.soft} stagger={0.5} />
+      <Txt x={1000} y={760} text="资料没写，不等于绝对没有；但本片引用的 Wiki 条目里，序列9—5 一项身体加成都没有列。" at={170} size={19} color={C.soft} stagger={0.5} />
       <Badge x={1000} y={812} at={200} kind="整理" src="诡秘之主 Wiki「命运女神途径」「战士途径」" />
     </Figure>
   );
@@ -89,7 +89,7 @@ const F06: React.FC = () => {
       fig={6}
       abilities={['倾听命运的声音', '大量准备，长时间演奏', '复述命运之声，影响目标命运', '有人刺瞎双眼，专心倾听']}
       source={WIKI}
-      note={{text: '贴吧评价：准备时间长，不便实战，缺乏体质加强', kind: '整理', src: '百度贴吧讨论（读者观点）'}}
+      note={{text: '贴吧读者评价（概述）：准备太长，不便使用，缺乏体质加强', kind: '整理', src: '百度贴吧《如何评价命运三途径，但是主角途径》'}}
     >
       <Svg>
         <P d="M1062 640 C1020 520 1040 380 1080 300" at={10} dur={20} w={3.5} />
@@ -109,7 +109,7 @@ const F07: React.FC = () => {
   const f = useCurrentFrame();
   const ix = 1130 + Math.sin(f * 0.05) * 18;
   return (
-    <SeqFigure seq={7} name="窥命师" sub="看得见，打不着" rank="孙子" power={1} fig={7} abilities={['不借助任何媒介', '直接看见命运启示', '直接听见命运启示']} source={WIKI}>
+    <SeqFigure seq={7} name="窥命师" sub="看得见，打不着" rank="孙子" power={1} fig={7} abilities={['不借助任何媒介', '直接看到或听到命运启示']} source={WIKI}>
       <Svg>
         <Thread x1={990} x2={1290} y={330} amp={8} at={60} />
         <Thread x1={990} x2={1290} y={610} amp={8} phase={2} at={66} />
@@ -127,7 +127,7 @@ const F08: React.FC = () => (
   <SeqFigure
     seq={6}
     name="哑巴"
-    sub="说一句，闭嘴好几天"
+    sub="说一句，闭嘴很久"
     rank="孙子"
     power={1}
     fig={8}
@@ -160,7 +160,7 @@ const F09: React.FC = () => {
       fig={9}
       abilities={['以假死脱离原本的命运', '摆脱此前的限制', '较正常地窥视、影响命运', '假死瞒过占卜与预言']}
       source={WIKI}
-      note={{text: '正文：卢米安回忆“正义”女士说过，“逝者”能利用死亡脱离原本的命运', kind: '正文', src: '第二卷第81章《拳套》'}}
+      note={{text: '正文：卢米安回忆“正义”女士说过，“逝者”能利用死亡脱离原本的命运', kind: '正文', src: '第三卷第81章《拳套》'}}
     >
       <Svg>
         <P d="M990 660 L1290 660" at={8} dur={20} w={2} />
@@ -181,7 +181,7 @@ const F10: React.FC = () => {
   const fall = prog(f, 190, 18);
   const sneak = prog(f, 240, 60);
   const L = ['超越常人的力量', '超越常人的敏捷', '精通武器与格斗'];
-  const R = ['无身体加成记载', '无直接攻击手段', '会假死'];
+  const R = ['未见身体加成记载', '未列直接攻击技能', '会假死'];
   return (
     <Figure theme="navy" rays={{cx: 1290, cy: 470}} chrome={{section: '孙子', value: '5 vs 战士9', node: 4, prev: 4, fig: 10, total: TOTAL}} tag={['逝者', 'vs', '战士途径序列9']} title="高四级，打不过" sub="逝者（序列5）vs 战士（序列9）">
       <Svg>

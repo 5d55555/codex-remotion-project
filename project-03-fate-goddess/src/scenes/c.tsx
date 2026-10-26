@@ -24,7 +24,7 @@ const F13: React.FC = () => {
       fig={13}
       abilities={['“无眼者”', '初步接触纺织命运的权柄', '编织大量目标，交汇成网', '织网时不再遭到反噬']}
       source={WIKI}
-      note={{text: '神话形态为三身，另两身尚未完全成形', ...WIKI}}
+      note={{text: '神话形态三身并立，无臂与无头之躯尚未完全成形', ...WIKI}}
     >
       <Svg>
         {outer.map(([x, y], i) => {
@@ -85,7 +85,7 @@ const F15: React.FC = () => {
       rank="爷爷"
       power={5}
       fig={15}
-      abilities={['编织、汇聚、裁决命运', '万物命运仍交织成河，就能回归', '要杀祂：毁灭所有生物，搅乱长河']}
+      abilities={['编织、汇聚、裁决命运', '万物命运仍交织成河，就能回归']}
       source={WIKI}
     >
       <Svg>
@@ -136,6 +136,7 @@ const F16: React.FC = () => {
       <Txt x={1580} y={300} text="所有事物命运的纺织者" at={120} size={24} font={F.serif} w={900} />
       <Txt x={1580} y={340} text="最终裁决的象征" at={128} size={20} color="#d2c9b4" />
       <Txt x={1580} y={374} text="Wiki：安排命运的能力强于上帝" at={136} size={18} color="#968f7c" />
+      <Txt x={1580} y={408} text="长河短暂完全混乱，才可能杀死祂" at={144} size={18} color="#968f7c" />
       <Badge x={1000} y={860} at={150} kind="观点" src="" />
       <Txt x={1090} y={860} text={`辈分：列祖列宗    战力  ${stars(5)}+`} at={154} size={26} font={F.serif} w={900} color={C.gold} stagger={1} />
       <Badge x={1000} y={910} at={170} kind="整理" src="诡秘之主 Wiki「命运女神途径」" />
@@ -185,7 +186,7 @@ const Outro: React.FC = () => (
     question="先当孙子，再当祖宗。"
     under={
       <>
-        <Txt x={960} y={900} a="c" width={1500} fade at={110} size={16} color={C.soft} lh={1.6} text="资料：诡秘之主 Wiki「命运女神途径」「战士途径」（转录作者公众号设定）；《宿命之环》第二卷第81章《拳套》；百度贴吧讨论。" />
+        <Txt x={960} y={900} a="c" width={1500} fade at={110} size={16} color={C.soft} lh={1.6} text="资料：诡秘之主 Wiki「命运女神途径」「战士途径」（转录作者公众号设定）；《宿命之环》第三卷第81章《拳套》；百度贴吧讨论。" />
         <Txt x={960} y={948} a="c" width={1500} fade at={120} size={16} color={C.soft} lh={1.6} text="辈分、星级与战力曲线为个人锐评，不是官方设定；“二手整理”来自 Wiki 与论坛。本片为同人科普作品。" />
       </>
     }

@@ -53,7 +53,7 @@ const F01: React.FC = () => {
 const F02: React.FC = () => {
   const f = useCurrentFrame();
   const names = ['失梦人', '乐师', '窥命师', '哑巴', '逝者', '改命人', '命运侍者', '织网人', '命运之刃', '永生律'];
-  const losses = ['失去梦', '有人刺瞎双眼', '', '长时间禁言', '假死', '', '反噬致残', '无眼者', '神话形态无头', '永生'];
+  const losses = ['失去做梦能力', '部分自刺双眼', '', '施术后禁言', '假死', '', '可能反噬致残', '无眼者', '神话形态无头', '永生'];
   const y = (i: number) => 820 - i * 64;
   const climb = prog(f, 150, 90);
   const cy = y(0) - (y(0) - y(9)) * climb;
