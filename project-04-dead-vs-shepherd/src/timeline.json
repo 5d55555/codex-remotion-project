@@ -23,6 +23,11 @@
    "frames": 390
   },
   {
+   "id": "flock",
+   "kind": "figure",
+   "frames": 600
+  },
+  {
    "id": "record",
    "kind": "figure",
    "frames": 450
@@ -35,7 +40,7 @@
   {
    "id": "ko",
    "kind": "figure",
-   "frames": 360
+   "frames": 540
   },
   {
    "id": "sim",

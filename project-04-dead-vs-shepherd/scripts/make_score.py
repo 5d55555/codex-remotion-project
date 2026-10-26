@@ -143,19 +143,35 @@ for s in segments:
         if name != 'record':
             for j,f in enumerate((40,58,76,94)):
                 tone(event(f), [76,79,83,88][j], .095, .24, pan=.2)
+    elif name == 'flock':
+        bed(a, dur, 'warm')
+        for j in range(7):
+            f0 = 24+j*66
+            # Each soul card lands on its own step of the scale; three small blips follow its three abilities.
+            tone(event(f0), [72,74,76,79,81,83,86][j], .16, .22, pan=(j-3)*.2)
+            for k in range(3):
+                tone(event(f0+12+k*6), [79,83,88][k], .06, .09, 'triangle', (j-3)*.2)
     elif name == 'round1':
         drone(a, 26/30, .10)
         chord(event(4), [40,52,59,64], .35, .20)
         chord(event(26), [52,59,64,76], .40, .24)
         bed(event(26), (205-26)/30)
-        drone(event(205), (388-205)/30, .18, True)
-        for t in np.arange(205/30,388/30,.2):
+        drone(event(205), (330-205)/30, .18, True)
+        for t in np.arange(205/30,330/30,.2):
             tone(a+t, 76 if int(t*5)%2 else 77, .075, .055, 'triangle', .5)
-        for f in (300,330):
+        for f in (256,278):
             tone(event(f), 43, .14, .20, 'triangle', slide=-14)
             noise(event(f), .06, .06)
-        hit(event(388), .8)
-        bed(event(388), dur-388/30)
+        # Soul swaps: a quick two-note pickup.
+        for f in (60,112,290,436,458):
+            tone(event(f), 84, .05, .12, pan=.4)
+            tone(event(f)+.05, 91, .07, .12, pan=.4)
+        chord(event(292), [83,88,91], .9, .07, 'bell')
+        noise(event(128), .2, .12, pan=-.3)
+        noise(event(396), 24/30, .16, rising=True)
+        tone(event(458), 91, 12/30, .08, 'sine', slide=-20)
+        hit(event(330), .8)
+        bed(event(330), dur-330/30)
         for f in (95,135,420,445,470):
             hit(event(f), .48)
         tone(event(170), 71, .65, .20, 'square', slide=24)
@@ -175,10 +191,27 @@ for s in segments:
         env = np.sin(np.pi*t/(40/30))**.7
         put(event(120), y*env*(.5+.5*np.sin(2*np.pi*(8*t+17*t*t))), .28)
         drone(event(160), dur-160/30, .09)
-        for j,t in enumerate(np.arange(222/30,290/30,.22)):
-            tone(a+t, [64,67,71,67][j%4], .075, .12, pan=(-1)**j*.3)
+        for j in range(6):
+            tone(event(162)+j*.07, 83+j*2, .17, .065, 'bell', (-1)**j*.5)
+        # Three branches: run, get caught (A: blink, B: door), or get away (C).
+        for f0,f1 in ((212,262),(322,372),(425,495)):
+            for j,t in enumerate(np.arange(f0/30,f1/30,.22)):
+                tone(a+t, [64,67,71,67][j%4], .075, .12, pan=(-1)**j*.3)
+        for f in (240,338):
+            chord(event(f), [83,88,91], .5, .06, 'bell')
+        tone(event(256), 76, .2, .12, 'sine', slide=24)
+        noise(event(256), .12, .14, pan=-.4)
+        hit(event(262), .6)
+        tone(event(350), 28, 1.3, .16, 'sine', vibrato=.4)
+        noise(event(350), 1.2, .10, rising=True)
+        tone(event(372), 64, .6, .14, 'triangle', slide=-24)
+        for f in (272,390):
+            hit(event(f), .5)
+            tone(event(f), 47, .4, .12, 'square', slide=-5)
+        for f in (305,407):
+            noise(event(f), 12/30, .12)
         for j,n in enumerate([76,79,83,88]):
-            tone(event(290)+j*.13, n, .23, .18)
+            tone(event(495)+j*.13, n, .23, .18)
     elif name == 'sim':
         drone(a, 40/30, .055)
         scale = [64,67,69,71,74,76,79,81,83]

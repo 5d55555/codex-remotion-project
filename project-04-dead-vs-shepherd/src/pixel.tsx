@@ -143,21 +143,56 @@ export const PixelChar: React.FC<{
   );
 };
 
-/* 灵魂羊：被放牧的灵，带琥珀色光晕。 */
+/* 灵魂羊：被放牧的灵，带光晕；七个具名灵魂各有一件配饰。羊头朝左。 */
 const SHEEP = ['..wwwww..', '.wwwwwww.', 'kkwwwwwww', 'kkwwwwwww', '.wwwwwww.', '..k...k..'];
 
-export const PixelSheep: React.FC<{x: number; y: number; at: number; cell?: number; glow?: string; dim?: boolean}> = ({x, y, at, cell = 10, glow = '#ffb340', dim = false}) => {
+// 配饰用 c 代表灵魂色，其余字母是固定色。
+const ACC: Record<string, Layer> = {
+  light: {col: 2, row: -4, pal: {}, rows: ['.ccc.', 'c...c', '.ccc.']},
+  sea: {col: 7, row: -5, pal: {}, rows: ['.cc', '.c.', '.c.', 'cc.', 'cc.']},
+  puppet: {col: 1, row: -5, pal: {}, rows: ['ccccccc', '.c...c.', '.c...c.', '.c...c.', '.c...c.']},
+  travel: {col: 10, row: -2, pal: {x: '#0a1a10', g: '#f4f1ea'}, rows: ['cccc', 'cxxc', 'cxxc', 'cxxc', 'cxgc', 'cxxc', 'cxxc', 'cxxc']},
+  gate: {col: 1, row: -4, pal: {}, rows: ['cc.....', 'c.ccccc', 'cc..c.c']},
+  luck: {col: 3, row: -5, pal: {p: '#1a1a1a'}, rows: ['cccc', 'cpcc', 'ccpc', 'cccc']},
+  guard: {col: -3, row: 1, pal: {w: '#f4f1ea'}, rows: ['ccc', 'cwc', 'ccc', '.c.']},
+};
+
+export const PixelSheep: React.FC<{x: number; y: number; at: number; cell?: number; glow?: string; dim?: boolean; acc?: string; scale?: number}> = ({
+  x,
+  y,
+  at,
+  cell = 10,
+  glow = '#ffb340',
+  dim = false,
+  acc,
+  scale = 1,
+}) => {
   const f = useCurrentFrame();
   const p = prog(f, at, 10);
   if (p <= 0) return null;
   const bob = (Math.floor((f + x) / 9) % 2) * Math.round(cell * 0.5);
+  const layer = acc ? ACC[acc] : undefined;
   return (
     <svg width={1920} height={1080} style={{position: 'absolute', inset: 0, overflow: 'visible'}} shapeRendering="crispEdges">
-      <g transform={`translate(${x} ${y - bob}) scale(${Math.round(p * 4) / 4}) translate(${-4.5 * cell} ${-6 * cell})`} opacity={dim ? 0.35 : 0.95} style={{filter: dim ? undefined : `drop-shadow(0 0 8px ${glow})`}}>
+      <g transform={`translate(${x} ${y - bob}) scale(${(Math.round(p * 4) / 4) * scale}) translate(${-4.5 * cell} ${-6 * cell})`} opacity={dim ? 0.35 : 0.95} style={{filter: dim ? undefined : `drop-shadow(0 0 8px ${glow})`}}>
         {SHEEP.flatMap((r, ri) =>
           [...r].map((ch, ci) => (ch === '.' ? null : <rect key={`${ri}-${ci}`} x={ci * cell} y={ri * cell} width={cell + 0.5} height={cell + 0.5} fill={ch === 'w' ? '#f4f1ea' : '#1a1a1a'} />)),
         )}
+        {layer && rects({...layer, pal: {c: glow, ...layer.pal}}, cell, false)}
       </g>
     </svg>
   );
 };
+
+/* 花盆：赢家“引来灾祸”的像素示意。 */
+const POT = ['.gg.g', 'gggg.', 'rrrrr', '.rrr.', '.rrr.'];
+
+export const PixelPot: React.FC<{x: number; y: number; cell?: number; rot?: number}> = ({x, y, cell = 10, rot = 0}) => (
+  <svg width={1920} height={1080} style={{position: 'absolute', inset: 0, overflow: 'visible'}} shapeRendering="crispEdges">
+    <g transform={`translate(${x} ${y}) rotate(${rot}) translate(${-2.5 * cell} ${-2.5 * cell})`}>
+      {POT.flatMap((r, ri) =>
+        [...r].map((ch, ci) => (ch === '.' ? null : <rect key={`${ri}-${ci}`} x={ci * cell} y={ri * cell} width={cell + 0.5} height={cell + 0.5} fill={ch === 'g' ? '#4caf50' : '#c0603a'} />)),
+      )}
+    </g>
+  </svg>
+);

@@ -3,6 +3,7 @@ import {AbsoluteFill, interpolate, useCurrentFrame} from 'remotion';
 import {Arena, Caption, Flash, H, HF, Label, Radar, Shake, Skill, Slam, Typer} from '../hud';
 import {prog} from '../kit';
 import {PixelChar, PixelSheep} from '../pixel';
+import {SOULS} from '../souls';
 
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
 const AXES = ['伤害', '控制', '防御', '机动', '续航', '情报'];
@@ -70,12 +71,12 @@ const P2: React.FC = () => (
   <AbsoluteFill>
     <Arena left={0.12} right={1} />
     <PixelChar kind="shep" x={1520} y={860} cell={26} flip at={4} />
-    <PixelSheep x={1240} y={900} at={110} cell={11} />
-    <PixelSheep x={1780} y={910} at={118} cell={11} />
-    <Label x={1830} y={786} a="r" text="× 7" at={126} size={34} color={H.shep} font={HF.mono} />
+    {SOULS.map((s, i) => (
+      <PixelSheep key={s.id} x={1215 + i * 98} y={i % 2 ? 470 : 430} at={110 + i * 5} cell={6} glow={s.color} acc={s.id} />
+    ))}
     <Slam x={1810} y={170} a="r" text="牧羊人" at={6} size={110} color={H.shep} />
     <Label x={1800} y={262} a="r" text="秘祈人途径 · 序列5 · 魔药打满" at={16} size={24} color={H.dim} />
-    <Radar cx={300} cy={540} r={150} axes={AXES} values={[5, 4, 5, 4, 6, 3]} color={H.shep} at={120} />
+    <Radar cx={300} cy={540} r={150} axes={AXES} values={[5, 5, 5, 5, 6, 4]} color={H.shep} at={120} />
     <Label x={300} y={780} a="c" text="雷达：我的判断，不是原作数值" at={140} size={18} color={H.dim} />
     <Skill x={560} y={240} at={40} glyph="牧" name="放牧" desc="最多七个灵魂，一次驱使一个，瞬间切换" color={H.shep} />
     <Skill x={560} y={380} at={58} glyph="三" name="每魂三技" desc="初次放牧时选定三种能力，之后不能改" color={H.shep} />
