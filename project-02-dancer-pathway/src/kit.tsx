@@ -259,14 +259,14 @@ export const RingIcon: React.FC<{cx: number; cy: number; r: number; at: number; 
   );
 };
 
-export const Badge: React.FC<{x: number; y: number; at: number; kind: '原文' | '摘要' | '未找到'; src: string; a?: Anchor}> = ({x, y, at, kind, src, a = 'l'}) => {
+export const Badge: React.FC<{x: number; y: number; at: number; kind: '正文' | '整理' | '待核'; src: string; a?: Anchor}> = ({x, y, at, kind, src, a = 'l'}) => {
   const f = useCurrentFrame();
   const t = tc(useTheme());
-  const col = kind === '原文' ? t.accent : t.mute;
+  const col = kind === '正文' ? t.accent : t.mute;
   const tx = a === 'c' ? '-50%' : a === 'r' ? '-100%' : '0';
   return (
     <div style={{position: 'absolute', left: x, top: y, transform: `translate(${tx}, -50%)`, display: 'flex', alignItems: 'center', gap: 12, opacity: prog(f, at, 14), whiteSpace: 'nowrap'}}>
-      <span style={{border: `2px ${kind === '原文' ? 'solid' : 'dashed'} ${col}`, color: col, fontFamily: F.serif, fontWeight: 900, fontSize: 17, padding: '1px 10px', letterSpacing: '0.1em'}}>{kind}</span>
+      <span style={{border: `2px ${kind === '正文' ? 'solid' : 'dashed'} ${col}`, color: col, fontFamily: F.serif, fontWeight: 900, fontSize: 17, padding: '1px 10px', letterSpacing: '0.1em'}}>{{正文: '正文核对', 整理: '二手整理', 待核: '待核实'}[kind]}</span>
       <span style={{fontFamily: F.sans, fontWeight: 500, fontSize: 17, color: t.soft}}>{src}</span>
     </div>
   );
@@ -276,8 +276,7 @@ export const Badge: React.FC<{x: number; y: number; at: number; kind: '原文' |
 
 export const PaperBG: React.FC = () => (
   <AbsoluteFill style={{backgroundColor: '#e2dbc7'}}>
-    <Img src={staticFile('tex/paper.png')} style={{width: '100%', height: '100%', objectFit: 'cover', filter: 'saturate(0.5) brightness(1.04) contrast(0.92)'}} />
-    <AbsoluteFill style={{background: 'radial-gradient(ellipse at 52% 48%, rgba(250,246,233,0.42) 0%, rgba(250,246,233,0) 55%, rgba(110,98,76,0.20) 100%)'}} />
+    <Img src={staticFile('tex/paper.png')} style={{width: '100%', height: '100%'}} />
   </AbsoluteFill>
 );
 
@@ -285,7 +284,7 @@ export const NavyBG: React.FC<{rays?: {cx: number; cy: number}}> = ({rays}) => {
   const f = useCurrentFrame();
   return (
     <AbsoluteFill style={{backgroundColor: C.navy}}>
-      <Img src={staticFile('tex/navy.png')} style={{width: '100%', height: '100%', objectFit: 'cover', opacity: 0.75}} />
+      <Img src={staticFile('tex/navy.png')} style={{width: '100%', height: '100%'}} />
       {rays && (
         <>
           <AbsoluteFill
@@ -306,8 +305,7 @@ export const NavyBG: React.FC<{rays?: {cx: number; cy: number}}> = ({rays}) => {
 
 export const RedBG: React.FC = () => (
   <AbsoluteFill style={{backgroundColor: '#c0261d'}}>
-    <Img src={staticFile('tex/red.png')} style={{width: '100%', height: '100%', objectFit: 'cover', filter: 'hue-rotate(-5deg) saturate(0.88) brightness(0.9)'}} />
-    <AbsoluteFill style={{background: 'radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 45%, rgba(60,0,0,0.25) 100%)'}} />
+    <Img src={staticFile('tex/red.png')} style={{width: '100%', height: '100%'}} />
   </AbsoluteFill>
 );
 

@@ -75,7 +75,7 @@ export const F01: React.FC = () => {
       <Txt x={1650} y={752} text="尊名意象" at={160} size={18} color="#968f7c" />
       <Txt x={1650} y={788} text="永恒轮回 · 注定命运" at={166} size={26} font={F.serif} w={900} />
       {vt('轮回与宿命', 1800, 120)}
-      <Badge x={1290} y={880} a="c" at={180} kind="原文" src="第62章 · 正文称其为“旧日支配者”" />
+      <Badge x={1290} y={880} a="c" at={180} kind="正文" src="第二卷第41章《声音》 · 称其为旧日支配者" />
     </Figure>
   );
 };
@@ -85,7 +85,7 @@ export const F02: React.FC = () => {
   const f = useCurrentFrame();
   const squares = Array.from({length: 22}, (_, i) => ({x: 1010 + (i % 11) * 52, y: 262 + Math.floor(i / 11) * 52}));
   return (
-    <Figure chrome={{section: '恩赐', value: '恩赐途径', node: 10, prev: 10, fig: 2, total: TOTAL}} tag={['恩赐', '外神', '第62章']} title="恩赐途径" sub="不是喝下魔药，是被赐予">
+    <Figure chrome={{section: '恩赐', value: '恩赐途径', node: 10, prev: 10, fig: 2, total: TOTAL}} tag={['恩赐', '外神', '第一卷第60章']} title="恩赐途径" sub="不是喝下魔药，是被赐予">
       <Svg>
         {squares.map((s, i) => (
           <P key={i} d={`M${s.x} ${s.y} h38 v38 h-38 Z`} at={14 + i * 1.5} dur={12} w={2} />
@@ -104,8 +104,8 @@ export const F02: React.FC = () => {
       <Txt x={1300} y={712} a="c" text="赐予力量" at={152} size={24} font={F.serif} w={900} color={C.red} />
       <Txt x={1010} y={772} text="同样按序列9—0划分，方便对应与参考" at={176} size={20} color="#4b453b" />
       <div style={{position: 'absolute', left: 1006, top: 812, width: 6, height: 70, background: C.red, opacity: prog(f, 196, 12)}} />
-      <Txt x={1030} y={830} text="“恩赐，是受控制的、可以回收的污染。”" at={200} size={28} font={F.serif} w={900} stagger={1.2} />
-      <Txt x={1030} y={868} text="第1040章《诱惑之泉》 · 原文" at={236} size={17} color="#7b7366" fade />
+      <Txt x={1030} y={830} text="恩赐的本质，更接近受控制的、可以回收的污染" at={200} size={28} font={F.serif} w={900} stagger={1.2} />
+      <Txt x={1030} y={868} text="第1040章《诱惑之泉》 · 正文概括" at={236} size={17} color="#7b7366" fade />
     </Figure>
   );
 };
@@ -123,7 +123,7 @@ export const F03: React.FC = () => {
     {y: 360, n: '7', name: '受契之人'},
   ];
   return (
-    <Figure chrome={{section: '恩赐', value: '卢米安 · 双线', node: 2, prev: 10, fig: 3, total: TOTAL}} tag={['宿命之环', '主角', '卢米安·李']} title="卢米安·李" sub="猎人之外，还有一支舞">
+    <Figure chrome={{section: '恩赐', value: '卢米安 · 第三卷时', node: 2, prev: 10, fig: 3, total: TOTAL}} tag={['宿命之环', '主角', '卢米安·李']} title="卢米安·李" sub="猎人之外，还有一支舞">
       <Svg>
         <P d="M1100 700 L1100 330" at={14} dur={30} w={3} />
         <P d="M1480 700 L1480 330" at={20} dur={30} w={3} c={C.red} />
@@ -148,7 +148,7 @@ export const F03: React.FC = () => {
       ))}
       <Txt x={1290} y={280} a="c" text="双序列7" at={166} size={26} font={F.serif} w={900} color={C.red} />
       <Txt x={1290} y={880} a="c" text="他向愚者先生与体内污染祈求，而不是直接向宿命之环" at={190} size={21} color="#4b453b" stagger={1} />
-      <Badge x={1290} y={924} a="c" at={220} kind="原文" src="第73章" />
+      <Badge x={1290} y={924} a="c" at={220} kind="正文" src="第三卷第73章 · 此阶段为双序列7" />
     </Figure>
   );
 };
@@ -159,9 +159,9 @@ export const F04: React.FC = () => {
   const names = ['舞蹈家', '托钵僧侣', '受契之人', '苦修士', '猎命师', '环中人', '受难者', '罪人', '救赎天使', '永劫者'];
   const y = (i: number) => 820 - i * 64;
   const tiers = [
-    {from: 0, to: 2, name: '低序列'},
-    {from: 3, to: 4, name: '中序列'},
-    {from: 5, to: 6, name: '半神'},
+    {from: 0, to: 1, name: '低序列'},
+    {from: 2, to: 4, name: '中序列'},
+    {from: 5, to: 6, name: '圣者'},
     {from: 7, to: 8, name: '天使'},
     {from: 9, to: 9, name: '真神'},
   ];

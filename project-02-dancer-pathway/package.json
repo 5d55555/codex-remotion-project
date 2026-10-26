@@ -7,7 +7,8 @@
     "dev": "node scripts/glyphs.mjs && remotion studio src/index.tsx",
     "qa": "node scripts/glyphs.mjs && node scripts/qa.mjs",
     "build": "node scripts/glyphs.mjs && remotion render src/index.tsx DancerPathway out/dancer-pathway.mp4 --browser-executable=/opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell",
-    "typecheck": "node scripts/glyphs.mjs && tsc --noEmit"
+    "typecheck": "node scripts/glyphs.mjs && tsc --noEmit",
+    "textures": "python3 scripts/make_textures.py"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

@@ -33,7 +33,7 @@ const F05: React.FC = () => (
     <Note x={1530} y={272} at={100} title="神秘舞蹈" desc="更容易掌握" />
     <Note x={1550} y={462} at={114} title="灵性" desc="随晋升提升" />
     <Note x={1050} y={704} a="r" at={128} title="柔韧性" desc="大幅提升" red />
-    <Badge x={1300} y={900} a="c" at={160} kind="摘要" src="第62章《舞蹈家》" />
+    <Badge x={1300} y={900} a="c" at={160} kind="正文" src="第一卷第60章《舞蹈家》" />
   </Figure>
 );
 
@@ -68,14 +68,15 @@ const F06: React.FC = () => {
       <Txt x={1660} y={292} text="不特定的存在" at={150} size={22} font={F.serif} w={900} />
       <Txt x={1580} y={630} a="c" text="调动自然力量" at={180} size={25} font={F.serif} w={900} />
       <Txt x={1580} y={664} a="c" text="产生不同效果" at={186} size={18} color={C.soft} />
-      <Badge x={1300} y={880} a="c" at={200} kind="摘要" src="诡秘之主 Wiki「宿命之环途径」" />
+      <Txt x={1300} y={836} a="c" text="祈祷的对象不限于宿命之环，也可以设计新的祭舞" at={196} size={19} color={C.soft} stagger={0.8} />
+      <Badge x={1300} y={880} a="c" at={210} kind="整理" src="诡秘之主 Wiki · 百度百科" />
     </Figure>
   );
 };
 
 /* 图07 两支舞：祭舞 / 招摄之舞 */
 const F07: React.FC = () => (
-  <Figure chrome={ch(7, '舞蹈家')} tag={['序列9', '舞蹈', '两种']} title="两支舞" sub="一支求力量，一支招灵体">
+  <Figure chrome={ch(7, '舞蹈家')} tag={['序列9', '舞蹈', '两种']} title="两支舞" sub="本片介绍的两种舞">
     <Svg>
       <P d="M1290 230 L1290 810" at={8} dash="4 10" w={1.5} />
       <RingIcon cx={1120} cy={286} r={58} at={20} />
@@ -87,17 +88,17 @@ const F07: React.FC = () => (
     </Svg>
     <Txt x={1196} y={286} text="宿命" at={60} size={22} font={F.serif} w={900} />
     <Txt x={1120} y={748} a="c" text="祭舞" at={84} size={40} font={F.serif} w={900} />
-    <Txt x={1120} y={796} a="c" text="向宿命祈求力量" at={92} size={20} color={C.soft} />
+    <Txt x={1120} y={796} a="c" text="以仪式舞蹈祈祷，产生相应效果" at={92} size={20} color={C.soft} />
     <Txt x={1460} y={748} a="c" text="招摄之舞" at={120} size={40} font={F.serif} w={900} color={C.red} />
     <Txt x={1460} y={796} a="c" text="召来灵体，可使其附身" at={128} size={20} color={C.soft} />
-    <Badge x={1290} y={880} a="c" at={150} kind="摘要" src="第62章 · 诡秘之主 Wiki" />
+    <Badge x={1290} y={880} a="c" at={150} kind="整理" src="第一卷第60章 · 百度百科" />
   </Figure>
 );
 
-export const Ch3: React.FC = () => <ChapterCard glyphs="案例" no="第三章" name="案例" line1="卢米安的四个片段" foot="第52 · 72 · 80 · 83章" />;
+export const Ch3: React.FC = () => <ChapterCard glyphs="案例" no="第三章" name="案例" line1="卢米安的四个片段" foot="第一卷 72 · 83 章  ｜  第二卷 52 · 80 章" />;
 
-/* 图08 第80章《配合》：梦境废墟 */
-const F08: React.FC = () => {
+/* 案例四 第二卷第80章《配合》：异常镜中空间 */
+const Cooperation: React.FC = () => {
   const f = useCurrentFrame();
   const m = prog(f, 130, 80);
   const mx = 1350 + (1168 - 1350) * m;
@@ -108,7 +109,7 @@ const F08: React.FC = () => {
   const ripple = (k: number) => ((f - 60 + k * 30) % 90) / 90;
   const spikes = Array.from({length: 16}, (_, i) => pol(0, 0, i % 2 ? 11 : 20, i * 22.5).join(',')).join(' ');
   return (
-    <Figure chrome={ch(8, '案例')} tag={['案例一', '卢米安', '第80章']} title="招摄之舞" sub="把怪物，引向自己">
+    <Figure chrome={ch(11, '案例')} tag={['案例四', '卢米安', '第二卷第80章']} title="招摄之舞" sub="把怪物，引向自己">
       <Svg>
         {['M1000 240 L1260 240', 'M1320 240 L1580 240', 'M1580 240 L1580 520', 'M1580 580 L1580 800', 'M1580 800 L1150 800', 'M1080 800 L1000 800', 'M1000 800 L1000 240'].map((d, i) => (
           <P key={i} d={d} at={8 + i * 4} dur={20} w={4.5} />
@@ -142,18 +143,18 @@ const F08: React.FC = () => {
       <Note x={1030} y={524} at={170} step="第三步" title="拖住怪物" />
       <Note x={1500} y={748} a="r" at={200} step="第四步" title="芙兰卡下水找镜子" />
       <Txt x={1448} y={636} text="镜子" at={74} size={18} color={C.soft} />
-      <Txt x={1290} y={846} a="c" text="梦境废墟" at={20} size={19} color={C.soft} fade />
-      <Badge x={1290} y={892} a="c" at={240} kind="摘要" src="第80章《配合》" />
+      <Txt x={1290} y={846} a="c" text="特里尔地下 · 异常镜中空间" at={20} size={19} color={C.soft} fade />
+      <Badge x={1290} y={892} a="c" at={240} kind="正文" src="第二卷第80章《配合》" />
     </Figure>
   );
 };
 
-/* 图09 第52章：灵附身 */
-const F09: React.FC = () => {
+/* 案例三 第二卷第52章《特质》：灵附身 */
+const Possession: React.FC = () => {
   const f = useCurrentFrame();
   const merge = prog(f, 150, 30);
   return (
-    <Figure chrome={ch(9, '案例')} tag={['案例二', '卢米安', '第52章']} title="灵附身" sub="借一个灵，读它的记忆">
+    <Figure chrome={ch(10, '案例')} tag={['案例三', '卢米安', '第二卷第52章']} title="灵附身" sub="借一个灵，读它的记忆">
       <Svg>
         <P d="M990 800 L1050 640 C1070 540 1110 420 1190 340 C1260 270 1350 262 1420 300 C1500 345 1540 430 1560 520 L1590 800" at={8} dur={40} w={4.5} />
         <P d="M970 800 L1610 800" at={20} dur={24} w={1.5} />
@@ -174,47 +175,49 @@ const F09: React.FC = () => {
           </g>
         ))}
       </Svg>
-      <Note x={1590} y={420} at={64} title="灵体" desc="被招摄之舞召来" />
-      <Txt x={1240} y={420} a="c" text="剧场女演员的记忆" at={220} size={24} font={F.serif} w={900} color={C.red} />
+      <Note x={1590} y={420} at={64} title="死者的灵" desc="被招摄之舞召来" />
+      <Txt x={1262} y={418} a="c" text="死者记忆里的剧场女演员" at={220} size={22} font={F.serif} w={900} color={C.red} />
       <Txt x={1290} y={850} a="c" text="当时尚未晋升受契之人，还不能签订长期借用能力的契约" at={244} size={20} color={C.soft} stagger={0.9} />
-      <Badge x={1290} y={896} a="c" at={266} kind="摘要" src="第52章" />
+      <Badge x={1290} y={896} a="c" at={266} kind="正文" src="第二卷第52章《特质》" />
     </Figure>
   );
 };
 
-/* 图10 第72章《祭舞》：祈求被封印挡住 */
-const F10: React.FC = () => {
+/* 案例一 第一卷第72章《祭舞》：担心封印挡住祈求，仪式最终成功 */
+const Ritual: React.FC = () => {
   const f = useCurrentFrame();
-  const blocked = prog(f, 150, 20);
+  const pass = prog(f, 170, 20);
+  const beam = prog(f, 196, 30);
   return (
-    <Figure theme="navy" rays={{cx: 1290, cy: 270}} chrome={ch(10, '案例')} tag={['案例三', '第72章', '祭舞']} title="祭舞" sub="向宿命祈求，被封印挡住">
+    <Figure theme="navy" rays={{cx: 1290, cy: 270}} chrome={ch(8, '案例')} tag={['案例一', '第一卷第72章', '祭舞']} title="祭舞" sub="封印之下，祈求仍然成功">
       <Svg>
         <RingIcon cx={1290} cy={270} r={70} at={10} c={C.gold} />
         <P d="M1060 770 A230 56 0 1 1 1520 770 A230 56 0 1 1 1060 770" at={20} dur={36} c={C.gold} w={2} />
         <Steps cx={1290} cy={770} r={56} rx={230} n={12} at={50} every={4} c={C.cream} />
         <Person x={1290} y={760} at={30} pose="up" s={1.2} c={C.cream} />
         <P d="M1290 560 L1290 500" at={96} dash="5 8" c={C.gold} w={2.5} />
-        <g opacity={1 - 0.7 * blocked}>
-          <P d="M1290 410 L1290 350" at={110} dash="5 8" c={C.gold} w={2.5} />
-        </g>
         <g transform="rotate(45 1290 455)">
-          <P d="M1255 420 L1325 420 L1325 490 L1255 490 Z" at={130} dur={18} c={C.red} w={3.5} />
+          <P d="M1255 420 L1325 420 L1325 490 L1255 490 Z" at={120} dur={18} c={pass > 0.5 ? C.gold : C.red} w={3.5} />
         </g>
-        <P d="M1270 435 L1310 475 M1310 435 L1270 475" at={150} dur={12} c={C.red} w={3.5} />
+        <P d="M1290 410 L1290 350" at={170} dash="5 8" c={C.gold} w={2.5} />
+        {beam > 0 && <line x1={1290} y1={340} x2={1290} y2={340 + 300 * beam} stroke={C.gold} strokeWidth={6} opacity={0.85} strokeLinecap="round" />}
+        {beam > 0 && <circle cx={1290} cy={640} r={70 * beam} fill={C.gold} opacity={0.2 * beam} />}
       </Svg>
-      <Txt x={1360} y={440} text="封印" at={140} size={28} font={F.serif} w={900} color={C.red} />
-      <Txt x={1360} y={476} text="体内的污染被封住" at={148} size={18} color="#d2c9b4" />
       <Txt x={1376} y={270} text="宿命" at={30} size={24} font={F.serif} w={900} color={C.gold} />
-      {[...'力量调不动'].map((c2, i) => (
-        <Txt key={i} x={1800} y={200 + i * 46} a="c" text={c2} at={170 + i * 5} size={32} font={F.serif} w={900} />
+      <Txt x={1360} y={440} text="封印" at={130} size={28} font={F.serif} w={900} color={pass > 0.5 ? C.gold : C.red} />
+      <Txt x={1360} y={476} text="担心它会挡住祈求" at={138} size={18} color="#d2c9b4" />
+      <Txt x={1460} y={600} text="获准汲取恩赐" at={210} size={30} font={F.serif} w={900} color={C.gold} />
+      <Txt x={1460} y={640} text="成为舞蹈家" at={218} size={20} color="#d2c9b4" />
+      {[...'仪式成功'].map((c2, i) => (
+        <Txt key={i} x={1800} y={200 + i * 46} a="c" text={c2} at={226 + i * 5} size={32} font={F.serif} w={900} />
       ))}
-      <Badge x={1290} y={890} a="c" at={190} kind="摘要" src="第72章《祭舞》" />
+      <Badge x={1290} y={890} a="c" at={240} kind="正文" src="第一卷第72章《祭舞》" />
     </Figure>
   );
 };
 
-/* 图11 第83章《突遇》：黑色荆棘符号，半激发 */
-const F11: React.FC = () => {
+/* 案例二 第一卷第83章《突遇》：黑色荆棘符号，半激发 */
+const Thorn: React.FC = () => {
   const f = useCurrentFrame();
   const half = prog(f, 120, 40);
   const cx = 1290;
@@ -227,7 +230,7 @@ const F11: React.FC = () => {
   });
   const zig = Array.from({length: 25}, (_, i) => pol(cx, cy, i % 2 ? 40 : 50, i * 15).join(' ')).join(' L');
   return (
-    <Figure chrome={ch(11, '案例')} tag={['案例四', '第83章', '原文']} title="黑色荆棘" sub="一支祭舞，点亮一半">
+    <Figure chrome={ch(9, '案例')} tag={['案例二', '第一卷第83章', '成为舞蹈家后']} title="黑色荆棘" sub="借祭舞，半激发符号">
       <Svg>
         <defs>
           <clipPath id="thorn-half">
@@ -256,7 +259,7 @@ const F11: React.FC = () => {
       <Note x={1490} y={552} at={154} title="黑色荆棘符号" desc="与宿命之环相连" />
       <Note x={1036} y={752} a="r" at={172} title="半激发" desc="借神秘祭舞" red />
       <Txt x={1290} y={866} a="c" text="他仍认为高位格怪物危险，不贸然拿它试验" at={200} size={20} color={C.soft} stagger={1} />
-      <Badge x={1290} y={910} a="c" at={220} kind="原文" src="第83章《突遇》" />
+      <Badge x={1290} y={910} a="c" at={220} kind="正文" src="第一卷第83章《突遇》" />
     </Figure>
   );
 };
@@ -266,10 +269,10 @@ const F12: React.FC = () => {
   const cols = [
     {x: 1080, t: '精神疲惫', d: '仪式后身体酸痛'},
     {x: 1290, t: '附身风险', d: '招来的怪物可能附身'},
-    {x: 1500, t: '污染受封印', d: '力量不能自由调动'},
+    {x: 1500, t: '封印限制', d: '卢米安体内污染被封印'},
   ];
   return (
-    <Figure chrome={ch(12, '代价')} tag={['代价', '风险', '污染']} title="代价" sub="每一支舞，都要付账">
+    <Figure chrome={ch(12, '代价')} tag={['代价', '风险', '限制']} title="代价" sub="消耗、风险与个人限制">
       <Svg>
         <Person x={1080} y={560} at={12} pose="slump" s={1.1} />
         {[0, 1, 2].map((i) => (
@@ -282,7 +285,7 @@ const F12: React.FC = () => {
         </g>
         <P d={circ(1500, 470, 22)} at={60} dur={14} w={2.5} />
         <P d="M1474 444 L1526 496" at={74} dur={8} c={C.red} w={3} />
-        <P d="M1060 740 L1520 740" at={110} dash="4 8" w={1.5} />
+        <P d="M1060 760 L1520 760" at={110} dash="4 8" w={1.5} />
       </Svg>
       {cols.map((c, i) => (
         <React.Fragment key={c.t}>
@@ -290,11 +293,12 @@ const F12: React.FC = () => {
           <Txt x={c.x} y={690} a="c" text={c.d} at={78 + i * 10} size={18} color={C.soft} />
         </React.Fragment>
       ))}
-      <Txt x={1290} y={796} a="c" text="恩赐，本就是受控制的、可以回收的污染" at={130} size={30} font={F.serif} w={900} color={C.red} stagger={1.4} />
-      <Badge x={1290} y={850} a="c" at={170} kind="原文" src="第1040章（污染）" />
-      <Badge x={1290} y={892} a="c" at={180} kind="摘要" src="疲惫、附身、封印：第72、80章" />
+      <Txt x={1290} y={796} a="c" text="恩赐的本质，更接近受控制、可回收的污染" at={130} size={30} font={F.serif} w={900} color={C.red} stagger={1.4} />
+      <Txt x={1290} y={730} a="c" text="封印是卢米安的特殊处境，不是所有舞蹈家的共同代价" at={110} size={18} color={C.soft} stagger={0.8} />
+      <Badge x={1290} y={850} a="c" at={170} kind="正文" src="第1040章《诱惑之泉》（概括）" />
+      <Badge x={1290} y={892} a="c" at={180} kind="正文" src="疲惫：第一卷第72章 · 附身：第二卷第80章" />
     </Figure>
   );
 };
 
-export const SCENES: Record<string, React.FC> = {ch2: Ch2, f05: F05, f06: F06, f07: F07, ch3: Ch3, f08: F08, f09: F09, f10: F10, f11: F11, f12: F12};
+export const SCENES: Record<string, React.FC> = {ch2: Ch2, f05: F05, f06: F06, f07: F07, ch3: Ch3, f08: Ritual, f09: Thorn, f10: Possession, f11: Cooperation, f12: F12};
