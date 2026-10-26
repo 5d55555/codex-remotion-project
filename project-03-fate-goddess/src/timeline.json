@@ -1,0 +1,7 @@
+{
+ "fps": 30,
+ "overlap": 15,
+ "segments": [
+  {"id": "logo", "kind": "logo", "frames": 210}
+ ]
+}
