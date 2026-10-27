@@ -208,12 +208,12 @@ const ZHENG = [
   'M14 30 L 14 52',
   'M6 52 L 54 52',
 ];
-export const Tally: React.FC<{count: number; x?: number; y?: number; label?: string; bumpAt?: number}> = ({count, x = 1560, y = 40, label = '受苦计数', bumpAt = -99}) => {
+export const Tally: React.FC<{count: number; x?: number; y?: number; right?: number; label?: string; bumpAt?: number}> = ({count, x = 1560, y = 40, right, label = '受苦计数', bumpAt = -99}) => {
   const f = useCurrentFrame();
   const bump = f - bumpAt >= 0 && f - bumpAt < 12 ? 1 + 0.25 * (1 - (f - bumpAt) / 12) : 1;
   const groups = Math.ceil(count / 5);
   return (
-    <div style={{position: 'absolute', left: x, top: y, background: '#fff', border: `5px solid ${C.ink}`, padding: '8px 14px', transform: `scale(${bump})`, transformOrigin: 'right top', boxShadow: '5px 6px 0 rgba(0,0,0,0.2)'}}>
+    <div style={{position: 'absolute', left: right === undefined ? x : undefined, right, top: y, background: '#fff', border: `5px solid ${C.ink}`, padding: '8px 14px', transform: `scale(${bump})`, transformOrigin: 'right top', boxShadow: '5px 6px 0 rgba(0,0,0,0.2)'}}>
       <div style={{fontFamily: F.sans, fontWeight: 900, fontSize: 18, color: C.ink, letterSpacing: '0.2em'}}>{label}</div>
       <div style={{display: 'flex', gap: 6, alignItems: 'center', marginTop: 4}}>
         <svg width={Math.max(60, groups * 62)} height={60}>
