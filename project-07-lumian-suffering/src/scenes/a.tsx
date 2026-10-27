@@ -14,7 +14,7 @@ const Cover: React.FC = () => {
     <Paper>
       <SpeedLines n={120} inner={0.3} seed={3} />
       <AbsoluteBox>
-        <Lumian x={960} y={560} s={1.5} face="smirk" />
+        <Lumian x={960} y={620} s={1.35} face="smirk" />
       </AbsoluteBox>
       <div style={{position: 'absolute', left: 0, right: 0, top: 70, textAlign: 'center', opacity: prog(f, 4, 10)}}>
         <span style={{fontFamily: F.pop, fontSize: 150, color: C.ink, WebkitTextStroke: `12px ${C.paper}`, paintOrder: 'stroke fill', letterSpacing: '0.06em'}}>卤面受苦实录</span>
