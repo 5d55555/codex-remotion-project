@@ -1,0 +1,61 @@
+{
+ "fps": 30,
+ "overlap": 0,
+ "segments": [
+  {
+   "id": "leader",
+   "kind": "figure",
+   "frames": 150
+  },
+  {
+   "id": "open",
+   "kind": "figure",
+   "frames": 240
+  },
+  {
+   "id": "steam",
+   "kind": "figure",
+   "frames": 360
+  },
+  {
+   "id": "smog",
+   "kind": "figure",
+   "frames": 390
+  },
+  {
+   "id": "quill",
+   "kind": "figure",
+   "frames": 330
+  },
+  {
+   "id": "war",
+   "kind": "figure",
+   "frames": 480
+  },
+  {
+   "id": "godwar",
+   "kind": "figure",
+   "frames": 300
+  },
+  {
+   "id": "creed",
+   "kind": "figure",
+   "frames": 450
+  },
+  {
+   "id": "chapel",
+   "kind": "figure",
+   "frames": 450
+  },
+  {
+   "id": "slogan",
+   "kind": "figure",
+   "frames": 240
+  },
+  {
+   "id": "credits",
+   "kind": "figure",
+   "frames": 330
+  }
+ ]
+}
