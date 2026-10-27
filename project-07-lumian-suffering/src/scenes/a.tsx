@@ -14,7 +14,7 @@ const Cover: React.FC = () => {
     <Paper>
       <SpeedLines n={120} inner={0.3} seed={3} />
       <AbsoluteBox>
-        <Lumian x={960} y={620} s={1.35} face="smirk" />
+        <Lumian x={960} y={712} s={1.2} face="smirk" />
       </AbsoluteBox>
       <div style={{position: 'absolute', left: 0, right: 0, top: 70, textAlign: 'center', opacity: prog(f, 4, 10)}}>
         <span style={{fontFamily: F.pop, fontSize: 150, color: C.ink, WebkitTextStroke: `12px ${C.paper}`, paintOrder: 'stroke fill', letterSpacing: '0.06em'}}>卤面受苦实录</span>
@@ -37,7 +37,7 @@ const P1: React.FC = () => (
   <Page vol="第一卷" name="梦魇" base={0} events={[262, 472]}>
     <Panel x={40} y={150} w={1840} h={430} at={10} from="t">
       <Caption x={50} y={60} w={900} at={20} text="奥萝尔讲起一个人：他走了“刺客”途径，喝下序列7“女巫”魔药——身体变成了女性。" size={32} />
-      <Lumian x={1400} y={210} s={0.78} face={useFaceAt([[0, 'shock'], [110, 'relief']])} sweat />
+      <Lumian x={1400} y={210} s={0.78} {...useFaceAt([[0, 'shock'], [110, 'relief']])} sweat />
       <Sfx x={1130} y={120} text="嘶……" at={110} size={96} rot={-10} />
       <Caption x={50} y={250} w={1000} at={130} text="“……分外庆幸自己获得的第一份材料是‘猎人’非凡特性。”" size={32} dark={false} />
       <Stamp x={1700} y={330} text="立 flag" at={200} size={60} />
@@ -57,7 +57,7 @@ const P1: React.FC = () => (
         <ellipse cx={244} cy={140} rx={14} ry={10} fill="none" stroke="#fff" strokeWidth={3} />
       </svg>
       <Bolt x1={640} y1={-20} x2={620} y2={140} at={470} />
-      <Lumian x={630} y={220} s={0.6} face={useFaceAt([[0, 'shock'], [472, 'dead']])} />
+      <Lumian x={630} y={220} s={0.6} {...useFaceAt([[0, 'shock'], [472, 'dead']])} />
       <Sfx x={760} y={70} text="轰" at={470} size={110} color="#fff" stroke={C.ink} rot={8} />
       <Caption x={20} y={20} w={560} at={400} text="“奥萝尔浅蓝色的眼眸不知什么时候也变得异常空洞”" size={24} dark={false} />
       <Caption x={300} y={330} w={580} at={500} text="“刚才那个不是奥萝尔，是被怪物控制的她！”" size={24} dark={false} />
@@ -66,10 +66,10 @@ const P1: React.FC = () => (
   </Page>
 );
 
-// 按时间切换表情：[[帧, 表情], ...]
-function useFaceAt(list: [number, Face][]): Face {
+// 按时间切换表情：[[帧, 表情], ...]；since 是这次换表情的帧号（呆毛会弹一下）
+function useFaceAt(list: [number, Face][]): {face: Face; since: number} {
   const f = useCurrentFrame();
-  return list.reduce((v, [t, x]) => (f >= t ? x : v), list[0][1]);
+  return list.reduce((v, [t, x]) => (f >= t ? {face: x, since: t} : v), {face: list[0][1], since: list[0][0]});
 }
 
 /* 第二页：破碎；报告；封印与六点重置 */
@@ -90,7 +90,7 @@ const P2: React.FC = () => (
     </Panel>
     <Panel x={980} y={480} w={900} h={560} at={300} from="b">
       <Tone opacity={0.18} />
-      <Lumian x={300} y={240} s={0.66} face={useFaceAt([[0, 'calm'], [430, 'dead']])} gloom={false} />
+      <Lumian x={300} y={240} s={0.66} {...useFaceAt([[0, 'calm'], [430, 'dead']])} gloom={false} />
       <SealMark x={260} y={355} at={330} r={30} />
       <Clock x={740} y={150} at={420} r={64} />
       <Caption x={30} y={20} w={560} at={330} text="佛尔思：“这些灵魂残片和带着强烈污染性的力量都被我主封印在了你的左胸。”" size={22} />
@@ -111,7 +111,7 @@ const P3: React.FC = () => (
         <circle cx={650} cy={140} r={10} fill={C.ink} />
         <circle cx={700} cy={140} r={10} fill={C.ink} />
       </svg>
-      <Lumian x={300} y={200} s={0.62} face={useFaceAt([[0, 'pain'], [200, 'calm']])} bandage />
+      <Lumian x={300} y={200} s={0.62} {...useFaceAt([[0, 'pain'], [200, 'calm']])} bandage />
       <Splat x={360} y={300} at={60} r={50} seed={4} />
       <Caption x={20} y={330} w={840} at={60} text="“对正常人来说，这是连抢救都没有必要，可以等死的伤势。”" size={24} dark={false} />
       <Src x={20} y={20} at={70} ev="正文" text="第二卷第16章《挣扎》（蒙苏里鬼魂）" />

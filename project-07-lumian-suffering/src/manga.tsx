@@ -41,6 +41,9 @@ export const SpeedLines: React.FC<{cx?: number; cy?: number; w?: number; h?: num
   );
 };
 
+/* 分格出场的帧号，传给格子里的角色（卢米安的呆毛在出场时弹一下）。 */
+export const PanelClock = React.createContext(-999);
+
 /* 分格：粗黑框，从一侧滑入。内容在框里被裁切。 */
 export const Panel: React.FC<{x: number; y: number; w: number; h: number; at: number; from?: 'l' | 'r' | 't' | 'b' | 'z'; children?: React.ReactNode; bg?: string; tilt?: number; border?: number}> = ({
   x,
@@ -77,7 +80,9 @@ export const Panel: React.FC<{x: number; y: number; w: number; h: number; at: nu
         boxShadow: '6px 8px 0 rgba(0,0,0,0.18)',
       }}
     >
-      <div style={{position: 'absolute', left: -border, top: -border, width: w, height: h}}>{children}</div>
+      <div style={{position: 'absolute', left: -border, top: -border, width: w, height: h}}>
+        <PanelClock.Provider value={at}>{children}</PanelClock.Provider>
+      </div>
     </div>
   );
 };

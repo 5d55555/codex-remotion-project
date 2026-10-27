@@ -7,9 +7,10 @@ import {AmonSilhouette, ExtraHead, Flashback, Report, Storm, Thought} from '../p
 import {C, F} from '../theme';
 import {Page} from './page';
 
-function useFaceAt(list: [number, Face][]): Face {
+// 按时间切换表情；since 是这次换表情的帧号（呆毛会弹一下）
+function useFaceAt(list: [number, Face][]): {face: Face; since: number} {
   const f = useCurrentFrame();
-  return list.reduce((v, [t, x]) => (f >= t ? x : v), list[0][1]);
+  return list.reduce((v, [t, x]) => (f >= t ? {face: x, since: t} : v), {face: list[0][1], since: list[0][0]});
 }
 
 // 第一卷那一格的缩小回放：松了口气的卢米安。
@@ -32,7 +33,7 @@ const P5: React.FC = () => (
     </Panel>
     <Panel x={40} y={440} w={900} h={600} at={110} from="l">
       <Report x={30} y={30} w={520} h={250} at={120} title="心理治疗报告" lines={['“有强烈的自毁倾向，', '失去了回应他人情感的能力。”']} size={26} />
-      <Lumian x={700} y={190} s={0.5} face={useFaceAt([[0, 'dead'], [270, 'shock']])} gloom />
+      <Lumian x={700} y={190} s={0.5} {...useFaceAt([[0, 'dead'], [270, 'shock']])} gloom />
       <AmonSilhouette x={150} y={430} s={0.5} at={240} />
       <Bubble x={300} y={330} w={580} h={160} at={260} text="你第一次知道这个名字的时候，忒尔弥波洛斯就已经等于我。" size={24} tail={{x: 230, y: 420}} />
       <Src x={30} y={540} at={160} ev="正文" text="第五卷第141章《病人》（阿蒙念报告）、第142章" />
