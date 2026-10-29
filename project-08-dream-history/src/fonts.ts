@@ -1,0 +1,31 @@
+import {useEffect, useState} from 'react';
+import {continueRender, delayRender} from 'remotion';
+import '@fontsource/noto-sans-sc/500.css';
+import '@fontsource/noto-sans-sc/700.css';
+import '@fontsource/noto-serif-sc/700.css';
+import '@fontsource/noto-serif-sc/900.css';
+import '@fontsource/zcool-xiaowei/400.css';
+import '@fontsource/zhi-mang-xing/400.css';
+import '@fontsource/ma-shan-zheng/400.css';
+import {GLYPHS} from './glyphs';
+
+const FACES = [
+  '500 20px "Noto Sans SC"',
+  '700 20px "Noto Sans SC"',
+  '700 20px "Noto Serif SC"',
+  '900 20px "Noto Serif SC"',
+  '400 20px "ZCOOL XiaoWei"',
+  '400 20px "Zhi Mang Xing"',
+  '400 20px "Ma Shan Zheng"',
+];
+
+let loading: Promise<unknown> | null = null;
+
+// 中文字体按 unicode-range 分片加载；渲染前一次性加载片中用到的全部字形，避免个别帧回退字体。
+export const useFonts = () => {
+  const [handle] = useState(() => delayRender('fonts', {timeoutInMilliseconds: 120000}));
+  useEffect(() => {
+    loading ??= Promise.all(FACES.map((face) => document.fonts.load(face, GLYPHS))).then(() => document.fonts.ready);
+    loading.then(() => continueRender(handle), () => continueRender(handle));
+  }, [handle]);
+};

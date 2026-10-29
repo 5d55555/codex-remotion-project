@@ -1,0 +1,15 @@
+{
+  "fps": 30,
+  "overlap": 0,
+  "note": "段落边界对齐《青衣》DJ版：34s 鼓点进入，65s 骤停一拍，120–127.5s 低谷，158.5s 短暂凹陷，215.5–222s 安静段；动画在 222s 结束，音乐在此剪断。",
+  "segments": [
+    {"id": "open", "frames": 1020},
+    {"id": "narc", "frames": 1080},
+    {"id": "gift", "frames": 750},
+    {"id": "green", "frames": 750},
+    {"id": "play", "frames": 1155},
+    {"id": "grief", "frames": 975},
+    {"id": "graft", "frames": 660},
+    {"id": "wake", "frames": 270}
+  ]
+}
