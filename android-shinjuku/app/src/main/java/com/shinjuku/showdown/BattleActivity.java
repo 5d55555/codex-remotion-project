@@ -81,8 +81,10 @@ public class BattleActivity extends Activity implements Controls.Actions, Battle
 
     @Override
     public void cutsceneDone(int castId) {
-        view.setInputBlocked(false);
-        view.endCutscene(castId);
+        if (isDestroyed()) return;
+        view.endCutscene(castId, () -> {
+            if (!isDestroyed()) view.setInputBlocked(false); // 战斗线程已经丢掉旧按键、接着打了
+        });
     }
 
     /* ---------------- 顶部按钮（主线程） ---------------- */

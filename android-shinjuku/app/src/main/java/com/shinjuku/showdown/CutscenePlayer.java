@@ -51,6 +51,7 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
 
     // 主线程
     private int showing = -1; // 正在放的 castId，-1 没在放
+    private boolean released;
     private float videoAspect = 16f / 9f;
 
     // cutscene 线程
@@ -83,6 +84,7 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
 
     /** 开始放（主线程）。 */
     void play(int castId) {
+        if (released) return;
         showing = castId;
         curtain.open = false;
         curtain.setVisibility(View.VISIBLE);
@@ -138,9 +140,17 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
         });
     }
 
+    /**
+     * 退出（主线程）：之后不再回调 Host。cutscene 线程上只撤掉超时，不清空整个队列——
+     * surfaceDestroyed 投递的“摘下 Surface”还在排队的话必须执行，主线程在等它。
+     */
     void release() {
+        released = true;
+        showing = -1;
+        main.removeCallbacksAndMessages(null);
         media.post(() -> {
-            media.removeCallbacksAndMessages(null);
+            media.removeCallbacks(mFirstFrameTimeout);
+            media.removeCallbacks(mTotalTimeout);
             mSession = -1;
             if (mPlayer != null) {
                 try {
@@ -260,6 +270,7 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
         if (w > 0 && h > 0) {
             float aspect = w / (float) h;
             main.post(() -> {
+                if (released) return;
                 videoAspect = aspect;
                 fit();
             });
@@ -299,6 +310,7 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
             mRendering = true;
             media.removeCallbacks(mFirstFrameTimeout);
             main.post(() -> {
+                if (released) return;
                 curtain.open = true; // 第一帧出来了：幕布只挡黑边
                 curtain.invalidate();
             });
@@ -338,7 +350,7 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
         }
         mStarted = false;
         main.post(() -> {
-            if (showing != id) return;
+            if (released || showing != id) return;
             hide();
             host.cutsceneDone(id);
         });

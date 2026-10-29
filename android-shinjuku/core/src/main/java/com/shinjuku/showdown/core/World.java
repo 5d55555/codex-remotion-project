@@ -434,9 +434,9 @@ public final class World {
         events.emit(Events.PURPLE_FIRE, hx, g.y + 56, g.facing, is200 ? 1 : 0, tick);
     }
 
-    /** 念咒被打断（松手、被攻击）：什么都不放，短时间内不能再按。 */
+    /** 念咒被打断（松手、被攻击；按住茈还没开始念的起手也算）：什么都不放，短时间内不能再按。 */
     private void breakChant() {
-        if (gojo.state != Fighter.PURPLE_CHANT) return;
+        if (gojo.state != Fighter.PURPLE_CHANT && !(gojo.state == Fighter.PURPLE_WINDUP && !purpleReleased)) return;
         enter(gojo, Fighter.FREE);
         chantPhase = -1;
         purpleFailLock = Tuning.CHANT_BROKEN_LOCK;
@@ -942,7 +942,7 @@ public final class World {
         for (int i = 0; i < 2; i++) {
             Fighter f = fighter(i);
             if (f.state != Fighter.KO && f.hpMilli == 0) {
-                if (f == gojo && f.state == Fighter.PURPLE_CHANT) breakChant();
+                if (f == gojo) breakChant(); // 念咒（或按住茈的起手）中倒下：打断
                 f.state = Fighter.KO;
                 f.stateTick = 0;
                 f.captured = false;

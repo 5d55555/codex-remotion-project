@@ -446,6 +446,34 @@ public class CombatTest {
         assertFalse(w.purple.active);
     }
 
+    /** 按住茈、还没开始念（起手）时挨打也算打断；点按的普通茈不受影响。 */
+    @Test
+    public void attackDuringHeldPurpleWindupBreaksIt() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 600;
+        w.sukuna.x = 900;
+        in.purple = in.purpleHeld = true;
+        run(w, in, 4);
+        assertEquals(Fighter.PURPLE_WINDUP, w.gojo.state);
+        w.sukunaIntent.dismantle = true;
+        run(w, in, Tuning.DISMANTLE_WINDUP + 2);
+        assertEquals(Fighter.FREE, w.gojo.state);
+        run(w, in, Tuning.PURPLE_HOLD + Tuning.CHANT_PHRASES * Tuning.CHANT_PHRASE + 40);
+        assertFalse("被打断了：不会接着念、也不会放", w.purple.active);
+        assertEquals(w.sukuna.maxHpMilli, w.sukuna.hpMilli);
+
+        World v = world();
+        TickInput tap = new TickInput();
+        v.gojo.x = 600;
+        v.sukuna.x = 900;
+        tap.purple = true;
+        run(v, tap, 4);
+        v.sukunaIntent.dismantle = true;
+        run(v, tap, Tuning.PURPLE_WINDUP + 4);
+        assertTrue("点按的普通茈照常放出", v.purple.active || v.sukuna.hpMilli < v.sukuna.maxHpMilli);
+    }
+
     /** 点一下茈还是普通茈。 */
     @Test
     public void tappedPurpleIsNormal() {

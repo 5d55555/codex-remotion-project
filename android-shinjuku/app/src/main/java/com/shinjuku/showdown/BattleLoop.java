@@ -138,14 +138,20 @@ final class BattleLoop implements Choreographer.FrameCallback {
         });
     }
 
-    /** 过场放完（或放不了）：回到战斗线程展开领域，接着打。castId 不对的（旧的）忽略。 */
-    void endCutscene(int castId) {
+    /**
+     * 过场放完（或放不了）：回到战斗线程展开领域，丢掉积压的按键，接着打；之后才在主线程调 resumed
+     * （解除触摸屏蔽要在丢按键之后，不然刚按下的键也会被丢掉）。castId 不对的（旧的）忽略。
+     */
+    void endCutscene(int castId, Runnable resumed) {
         handler.post(() -> {
             world.endCutscene(castId);
-            if (world.cutscene || !cutscenePaused) return;
-            cutscenePaused = false;
-            controls.discardPending();
-            update();
+            if (world.cutscene) return;
+            if (cutscenePaused) {
+                cutscenePaused = false;
+                controls.discardPending();
+                update();
+            }
+            mainHandler.post(resumed);
         });
     }
 
