@@ -1,19 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
+<!-- 根用 merge：直接挂到 Activity 自带的内容 FrameLayout 上，少一层 -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- 背景：新宿夜景，代码绘制 -->
     <com.shinjuku.showdown.ShinjukuView
         android:id="@+id/scene"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no" />
 
     <LinearLayout
         android:id="@+id/content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:fitsSystemWindows="true"
         android:gravity="center_horizontal"
         android:orientation="vertical">
 
@@ -31,7 +30,7 @@
             android:shadowRadius="28"
             android:text="@string/title"
             android:textColor="@color/text"
-            android:textSize="62sp"
+            android:textSize="@dimen/title_size"
             android:textStyle="bold" />
 
         <View
@@ -48,32 +47,34 @@
             android:letterSpacing="0.45"
             android:text="@string/subtitle"
             android:textColor="@color/text_dim"
-            android:textSize="13sp" />
+            android:textSize="@dimen/subtitle_size" />
 
         <Space
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="0.9" />
 
-        <TextView
+        <Button
             android:id="@+id/btn_start"
             style="@style/MenuButton"
             android:background="@drawable/btn_primary"
             android:text="@string/start_game"
             android:textStyle="bold" />
 
-        <TextView
+        <Button
             android:id="@+id/btn_vacant_1"
             style="@style/MenuButton"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="@dimen/menu_gap"
             android:background="@drawable/btn_secondary"
+            android:contentDescription="@string/vacant_1_desc"
             android:text="@string/vacant" />
 
-        <TextView
+        <Button
             android:id="@+id/btn_vacant_2"
             style="@style/MenuButton"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="@dimen/menu_gap"
             android:background="@drawable/btn_secondary"
+            android:contentDescription="@string/vacant_2_desc"
             android:text="@string/vacant" />
 
         <Space
@@ -82,11 +83,22 @@
             android:layout_weight="1.4" />
 
         <TextView
+            android:id="@+id/version"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
+            android:padding="6dp"
             android:text="@string/version"
             android:textColor="#669AA3C7"
             android:textSize="11sp" />
     </LinearLayout>
-</FrameLayout>
+
+    <!-- 帧率监视：长按版本号打开 -->
+    <com.shinjuku.showdown.FrameStatsView
+        android:id="@+id/frame_stats"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="44dp" />
+</merge>

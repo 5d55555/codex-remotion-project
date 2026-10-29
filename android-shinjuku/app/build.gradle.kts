@@ -17,9 +17,26 @@ android {
         versionName = "0.1"
     }
 
+    // 测试签名：放在仓库里，保证每次构建的签名一致，新包能直接覆盖安装旧包。只用于测试，不用于上架。
+    signingConfigs {
+        create("test") {
+            storeFile = rootProject.file("signing/test.jks")
+            storePassword = "shinjuku-test"
+            keyAlias = "test"
+            keyPassword = "shinjuku-test"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("test")
+        }
+        // 发布版：R8 精简 + 资源压缩，不带 debuggable，测性能请装这个
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.getByName("test")
         }
     }
 

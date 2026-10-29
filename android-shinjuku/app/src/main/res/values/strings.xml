@@ -6,5 +6,7 @@
     <string name="start_game">开始游戏</string>
     <string name="vacant">空置</string>
     <string name="not_open">未开放</string>
+    <string name="vacant_1_desc">空置一，未开放</string>
+    <string name="vacant_2_desc">空置二，未开放</string>
     <string name="version">v0.1</string>
 </resources>

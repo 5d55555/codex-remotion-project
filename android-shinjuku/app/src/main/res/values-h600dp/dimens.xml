@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 普通手机竖屏（可用高度 600dp 以上） -->
+<resources>
+    <dimen name="title_size">62sp</dimen>
+    <dimen name="subtitle_size">13sp</dimen>
+    <dimen name="menu_width">260dp</dimen>
+    <dimen name="menu_height">58dp</dimen>
+    <dimen name="menu_gap">18dp</dimen>
+    <dimen name="menu_text">20sp</dimen>
+</resources>

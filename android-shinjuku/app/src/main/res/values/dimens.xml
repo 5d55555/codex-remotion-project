@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 紧凑尺寸：矮窗口（分屏、横屏小窗）也放得下标题和三个选项 -->
+<resources>
+    <dimen name="title_size">46sp</dimen>
+    <dimen name="subtitle_size">12sp</dimen>
+    <dimen name="menu_width">240dp</dimen>
+    <dimen name="menu_height">50dp</dimen>
+    <dimen name="menu_gap">12dp</dimen>
+    <dimen name="menu_text">18sp</dimen>
+</resources>
