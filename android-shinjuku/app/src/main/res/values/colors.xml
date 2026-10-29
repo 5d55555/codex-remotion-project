@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="night">#05060F</color>
+    <color name="red">#E0283C</color>
+    <color name="red_dark">#9E1426</color>
+    <color name="blue">#4C7DFF</color>
+    <color name="text">#F4F1EA</color>
+    <color name="text_dim">#9AA3C7</color>
+    <color name="ic_launcher_background">#07081A</color>
+</resources>
