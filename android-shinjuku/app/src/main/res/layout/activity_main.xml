@@ -9,10 +9,18 @@
         android:layout_height="match_parent"
         android:importantForAccessibility="no" />
 
+    <!-- 正常高度时内容居中铺满；窗口太矮（分屏、超大字体）时可以滚动，不会被裁掉 -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
     <LinearLayout
         android:id="@+id/content"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:orientation="vertical">
 
@@ -92,6 +100,7 @@
             android:textColor="#669AA3C7"
             android:textSize="11sp" />
     </LinearLayout>
+    </ScrollView>
 
     <!-- 帧率监视：长按版本号打开 -->
     <com.shinjuku.showdown.FrameStatsView
@@ -100,5 +109,5 @@
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
         android:layout_marginStart="12dp"
-        android:layout_marginTop="44dp" />
+        android:layout_marginTop="12dp" />
 </merge>

@@ -8,11 +8,14 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RadialGradient;
 import android.graphics.RecordingCanvas;
+import android.graphics.Rect;
 import android.graphics.RenderNode;
 import android.graphics.Shader;
 import android.os.Build;
 import android.os.SystemClock;
 import android.util.AttributeSet;
+import android.view.Choreographer;
+import android.view.Display;
 import android.view.View;
 
 import java.util.Random;
@@ -23,23 +26,29 @@ import java.util.Random;
  * 正中是都厅双塔的剪影；地面有一层红雾，火星慢慢往上飘。全部用代码画，不用图片。
  *
  * 性能：
- * - 不会动的部分（夜空、远近楼群、灯窗、双塔）在尺寸确定时只画一次：
- *   Android 10+ 录成 RenderNode（显示列表，GPU 直接重放），更早的版本缓存成一张位图。
- * - 会动的部分每帧零分配：着色器、路径、点数组都预先建好；星星、灭掉的窗、火星各用一次 drawPoints 批量画。
- * - 窗口不可见时停掉动画循环。
+ * - 不会动的部分（夜空、远近楼群、灯窗、双塔）只录一次：Android 10+ 录成 RenderNode，
+ *   每帧检查显示列表是否还在，被系统丢掉就重录；Android 8–9 缓存成一张有像素预算的位图。
+ * - 会动的部分每帧零分配：着色器、路径、点数组都预先建好；星星、灭掉的窗、火星各用一次 drawPoints。
+ * - 自己用 Choreographer 调度：按显示刷新率整数分频，最多约 60–90 帧/秒（120Hz 屏隔一帧画一次）。
+ * - 只有“前台 + 可见 + 系统允许动画”时才动；停下时动画时间冻结，恢复后接着播。
  */
-public class ShinjukuView extends View {
+public class ShinjukuView extends View implements Choreographer.FrameCallback {
 
     private static final int TOWER = 0xFF1B2050; // 都厅双塔，比远处的楼亮一档
     private static final int NEAR = 0xFF07081A;
     private static final int FAR = 0xFF0E1130;
     private static final int STAR_GROUPS = 3;
     private static final int EMBER_BINS = 4;
+    private static final long BITMAP_PIXEL_BUDGET = 2_000_000L; // 旧系统位图缓存的像素上限（约 8MB）
+    private static final float[] BEAM_WIDTHS = {44, 26, 14, 6};
+    private static final int[] BEAM_ALPHAS = {0x22, 0x40, 0x80, 0xE0};
 
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint dots = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint flarePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint hazePaint = new Paint();
+    private final Paint bitmapPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
+    private final Rect bitmapDst = new Rect();
     private final float dp;
 
     // 静态层
@@ -47,20 +56,22 @@ public class ShinjukuView extends View {
     private Bitmap staticBitmap;
 
     // 动态部分预先算好的数据
-    private float[][] starPts = new float[STAR_GROUPS * 2][];
+    private final float[][] starPts = new float[STAR_GROUPS * 2][];
     private final float[] starPhase = new float[STAR_GROUPS];
     private float[] windows = new float[0]; // 每扇窗 3 个数：中心 x、中心 y、种子
     private float[] offPts = new float[0];
-    private float[][] embers = new float[0][]; // x、起始进度、大小、速度、相位
+    private float[][] embers = new float[0][]; // x、起始进度、（空）、速度、相位
     private final float[][] emberPts = new float[EMBER_BINS][];
     private final int[] emberCount = new int[EMBER_BINS];
     private final Path[] beamPaths = new Path[8];
     private final Paint[] beamPaints = new Paint[8];
     private float flareX, flareY, flareR, towerLightY, towerLightL, towerLightR;
 
-    private boolean visible, animating = true;
-    // 动画时钟：从视图创建时起算，用 double，避免开机多日后 float 精度不够、动画一跳一跳
-    private final long startMs = SystemClock.uptimeMillis();
+    // 调度与动画时钟
+    private boolean resumed, visible, allowed = true, scheduled;
+    private int vsyncDivisor = 1, vsyncCount;
+    private long activeMs;      // 已经播放过的动画时长（停下时不累计）
+    private long runStartMs = -1; // 本段开始播放的时刻；-1 表示停着
 
     public ShinjukuView(Context context) {
         this(context, null);
@@ -73,6 +84,10 @@ public class ShinjukuView extends View {
         for (int i = 0; i < beamPaths.length; i++) {
             beamPaths[i] = new Path();
             beamPaints[i] = new Paint(Paint.ANTI_ALIAS_FLAG);
+        }
+        if (Build.VERSION.SDK_INT >= 35) {
+            // 慢节奏的背景动画，不需要让屏幕一直跑高刷（只是偏好，不是限速；限速见 doFrame）
+            setRequestedFrameRate(REQUESTED_FRAME_RATE_CATEGORY_NORMAL);
         }
     }
 
@@ -87,7 +102,7 @@ public class ShinjukuView extends View {
         buildClash(w, h);
         hazePaint.setShader(new LinearGradient(0, h * 0.72f, 0, h,
                 new int[]{0x00E0283C, 0x55E0283C, 0x99300810}, new float[]{0f, 0.6f, 1f}, Shader.TileMode.CLAMP));
-        recordStatic(w, h);
+        buildStatic(w, h);
     }
 
     private void buildStars(int w, int h, Random r) {
@@ -135,10 +150,8 @@ public class ShinjukuView extends View {
         float len = (float) Math.hypot(dx, dy);
         float nx = -dy / len, ny = dx / len;
         int rgb = color & 0x00FFFFFF;
-        float[] widths = {44, 26, 14, 6};
-        int[] alphas = {0x22, 0x40, 0x80, 0xE0};
         for (int i = 0; i < 4; i++) {
-            float hw = widths[i] * dp / 2;
+            float hw = BEAM_WIDTHS[i] * dp / 2;
             Path p = beamPaths[at + i];
             p.reset();
             p.moveTo(x0 + nx * hw * 0.3f, y0 + ny * hw * 0.3f);
@@ -146,66 +159,79 @@ public class ShinjukuView extends View {
             p.lineTo(x1 - nx * hw, y1 - ny * hw);
             p.lineTo(x0 - nx * hw * 0.3f, y0 - ny * hw * 0.3f);
             p.close();
-            beamPaints[at + i].setShader(new LinearGradient(x0, y0, x1, y1, rgb, (alphas[i] << 24) | rgb, Shader.TileMode.CLAMP));
+            beamPaints[at + i].setShader(new LinearGradient(x0, y0, x1, y1, rgb, (BEAM_ALPHAS[i] << 24) | rgb, Shader.TileMode.CLAMP));
         }
     }
 
-    /** 不会动的部分画进静态层。 */
-    private void recordStatic(int w, int h) {
+    /** 建静态层：Android 10+ 用 RenderNode（第一次绘制时录制），更早的系统用有像素预算的位图。 */
+    private void buildStatic(int w, int h) {
         releaseStatic();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             staticNode = new RenderNode("shinjuku-static");
             staticNode.setPosition(0, 0, w, h);
-            RecordingCanvas rc = staticNode.beginRecording(w, h);
-            drawStatic(rc, w, h);
-            staticNode.endRecording();
+            drawStatic(null, w, h); // 先算出窗户位置；真正录制推迟到第一次硬件绘制
         } else {
-            staticBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-            drawStatic(new Canvas(staticBitmap), w, h);
+            double scale = Math.min(1.0, Math.sqrt((double) BITMAP_PIXEL_BUDGET / ((long) w * h)));
+            int bw = Math.max(1, (int) Math.ceil(w * scale));
+            int bh = Math.max(1, (int) Math.ceil(h * scale));
+            staticBitmap = Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888);
+            Canvas bc = new Canvas(staticBitmap);
+            bc.scale((float) scale, (float) scale);
+            drawStatic(bc, w, h);
+            bitmapDst.set(0, 0, w, h);
         }
     }
 
-    /** 楼群用自己的固定种子：不管画几次（显示列表或位图），楼和窗的位置都一样。 */
+    /**
+     * 画不会动的部分。楼群用自己的固定种子：不管画几次（重录、软件画布），楼和窗的位置都一样。
+     * c 为 null 时只计算窗户位置，不画。这是尺寸变化或重录时才走的慢路径，允许分配。
+     */
     private void drawStatic(Canvas c, int w, int h) {
         Random r = new Random(2024);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setShader(new LinearGradient(0, 0, 0, h,
-                new int[]{0xFF04050D, 0xFF0B0E2C, 0xFF1C0B26, 0xFF2E0A16},
-                new float[]{0f, 0.45f, 0.75f, 1f}, Shader.TileMode.CLAMP));
-        c.drawRect(0, 0, w, h, p);
-        p.setShader(null);
+        if (c != null) {
+            p.setShader(new LinearGradient(0, 0, 0, h,
+                    new int[]{0xFF04050D, 0xFF0B0E2C, 0xFF1C0B26, 0xFF2E0A16},
+                    new float[]{0f, 0.45f, 0.75f, 1f}, Shader.TileMode.CLAMP));
+            c.drawRect(0, 0, w, h, p);
+            p.setShader(null);
+        }
 
         // 远处一层楼：高低错落，只有轮廓
         p.setColor(FAR);
         for (float x = -10 * dp; x < w; ) {
             float bw = (18 + r.nextFloat() * 34) * dp;
             float bh = h * (0.12f + r.nextFloat() * 0.16f);
-            c.drawRect(x, h - bh, x + bw, h, p);
+            if (c != null) c.drawRect(x, h - bh, x + bw, h, p);
             x += bw + r.nextFloat() * 4 * dp;
         }
 
         // 都厅双塔：正中最高，顶上两座塔楼，塔身几列竖着的灯带
         float cx = w * 0.5f, bw = Math.min(w * 0.30f, 150 * dp);
         float body = h * 0.30f, tower = h * 0.38f, tw = bw * 0.36f;
-        p.setColor(TOWER);
-        c.drawRect(cx - bw / 2, h - body, cx + bw / 2, h, p);
         Path path = new Path();
+        if (c != null) {
+            p.setColor(TOWER);
+            c.drawRect(cx - bw / 2, h - body, cx + bw / 2, h, p);
+        }
         for (int s = -1; s <= 1; s += 2) {
             float tx = cx + s * (bw / 2 - tw / 2);
-            path.reset();
-            path.moveTo(tx - tw / 2, h - body);
-            path.lineTo(tx - tw / 2, h - tower + tw * 0.25f);
-            path.lineTo(tx - tw * 0.32f, h - tower);
-            path.lineTo(tx + tw * 0.32f, h - tower);
-            path.lineTo(tx + tw / 2, h - tower + tw * 0.25f);
-            path.lineTo(tx + tw / 2, h - body);
-            path.close();
-            p.setColor(TOWER);
-            c.drawPath(path, p);
-            p.setColor(0x55FFCF7A);
-            for (int k = -1; k <= 1; k++) {
-                float lx = tx + k * tw * 0.26f;
-                c.drawRect(lx - 0.8f * dp, h - tower + tw * 0.5f, lx + 0.8f * dp, h - body * 0.55f, p);
+            if (c != null) {
+                path.reset();
+                path.moveTo(tx - tw / 2, h - body);
+                path.lineTo(tx - tw / 2, h - tower + tw * 0.25f);
+                path.lineTo(tx - tw * 0.32f, h - tower);
+                path.lineTo(tx + tw * 0.32f, h - tower);
+                path.lineTo(tx + tw / 2, h - tower + tw * 0.25f);
+                path.lineTo(tx + tw / 2, h - body);
+                path.close();
+                p.setColor(TOWER);
+                c.drawPath(path, p);
+                p.setColor(0x55FFCF7A);
+                for (int k = -1; k <= 1; k++) {
+                    float lx = tx + k * tw * 0.26f;
+                    c.drawRect(lx - 0.8f * dp, h - tower + tw * 0.5f, lx + 0.8f * dp, h - body * 0.55f, p);
+                }
             }
             if (s < 0) towerLightL = tx;
             else towerLightR = tx;
@@ -221,24 +247,29 @@ public class ShinjukuView extends View {
         for (float x = -6 * dp; x < w; ) {
             float bwn = (26 + r.nextFloat() * 40) * dp;
             float bh = h * (0.06f + r.nextFloat() * 0.11f);
-            p.setColor(NEAR);
-            c.drawRect(x, h - bh, x + bwn, h, p);
+            if (c != null) {
+                p.setColor(NEAR);
+                c.drawRect(x, h - bh, x + bwn, h, p);
+            }
             for (float wy = h - bh + 8 * dp; wy < h - 10 * dp; wy += win + gap) {
                 for (float wx = x + 5 * dp; wx < x + bwn - 6 * dp; wx += win + gap) {
                     if (r.nextFloat() >= 0.42f) continue;
-                    c.drawRect(wx, wy, wx + win, wy + win, lit);
+                    if (c != null) c.drawRect(wx, wy, wx + win, wy + win, lit);
+                    float seed = r.nextFloat() * 1000;
                     if (n + 3 <= buf.length) {
                         buf[n++] = wx + win / 2;
                         buf[n++] = wy + win / 2;
-                        buf[n++] = r.nextFloat() * 1000;
+                        buf[n++] = seed;
                     }
                 }
             }
             x += bwn + r.nextFloat() * 3 * dp;
         }
-        windows = new float[n];
+        if (windows.length != n) {
+            windows = new float[n];
+            offPts = new float[n / 3 * 2];
+        }
         System.arraycopy(buf, 0, windows, 0, n);
-        offPts = new float[n / 3 * 2];
     }
 
     private void releaseStatic() {
@@ -246,10 +277,8 @@ public class ShinjukuView extends View {
             staticNode.discardDisplayList();
         }
         staticNode = null;
-        if (staticBitmap != null) {
-            staticBitmap.recycle();
-            staticBitmap = null;
-        }
+        // 不主动 recycle：位图可能还被 View 的显示列表引用，交给 GC
+        staticBitmap = null;
     }
 
     /* ---------------- 每帧：只画会动的部分，零分配 ---------------- */
@@ -258,19 +287,23 @@ public class ShinjukuView extends View {
     protected void onDraw(Canvas c) {
         int w = getWidth(), h = getHeight();
         if (w <= 0 || h <= 0) return;
-        double t = (SystemClock.uptimeMillis() - startMs) / 1000.0;
+        double t = animSeconds();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && staticNode != null && c.isHardwareAccelerated()) {
-            c.drawRenderNode(staticNode);
-        } else if (staticNode != null) {
-            // 软件画布（比如截图测试）不能重放 RenderNode：临时画一张位图
-            if (staticBitmap == null) {
-                staticBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-                drawStatic(new Canvas(staticBitmap), w, h);
+            if (!staticNode.hasDisplayList()) {
+                // 第一次绘制，或系统丢掉了显示列表：重录（慢路径）
+                RecordingCanvas rc = staticNode.beginRecording(w, h);
+                try {
+                    drawStatic(rc, w, h);
+                } finally {
+                    staticNode.endRecording();
+                }
             }
-            c.drawBitmap(staticBitmap, 0, 0, null);
+            c.drawRenderNode(staticNode);
         } else if (staticBitmap != null) {
-            c.drawBitmap(staticBitmap, 0, 0, null);
+            c.drawBitmap(staticBitmap, null, bitmapDst, bitmapPaint);
+        } else {
+            drawStatic(c, w, h); // 软件画布（截图等）：直接画，不另外缓存
         }
 
         // 星星：三组，各自明暗；大小两档
@@ -339,38 +372,88 @@ public class ShinjukuView extends View {
             dots.setColor((a << 24) | 0xFF7A3C);
             c.drawPoints(emberPts[b], 0, emberCount[b], dots);
         }
-
-        // 下一帧：postInvalidateOnAnimation 在同一帧内会合并，不会出现两条调度链
-        if (visible && animating) postInvalidateOnAnimation();
     }
 
-    /* ---------------- 生命周期：看不见、进后台、系统关了动画，都停 ---------------- */
+    /* ---------------- 调度：前台 + 可见 + 允许动画才动 ---------------- */
 
-    /** Activity 在 onResume/onPause 调用。关掉时画面停在当前这一帧。 */
-    public void setAnimating(boolean on) {
-        if (animating == on) return;
-        animating = on;
-        if (on && visible) postInvalidateOnAnimation();
+    /** 动画时钟：只累计真正在播放的时间。long 相减后再转 double，长时间运行也不丢精度。 */
+    private double animSeconds() {
+        long ms = activeMs + (runStartMs >= 0 ? SystemClock.uptimeMillis() - runStartMs : 0L);
+        return ms / 1000.0;
+    }
+
+    @Override
+    public void doFrame(long frameTimeNanos) {
+        scheduled = false;
+        if (!shouldRun()) return;
+        // 按刷新率整数分频：60Hz 每帧画，90Hz 每帧画，120/144Hz 隔一帧画
+        if (++vsyncCount >= vsyncDivisor) {
+            vsyncCount = 0;
+            invalidate();
+        }
+        schedule();
+    }
+
+    private boolean shouldRun() {
+        return resumed && visible && allowed && isAttachedToWindow();
+    }
+
+    private void schedule() {
+        if (!scheduled) {
+            scheduled = true;
+            Choreographer.getInstance().postFrameCallback(this);
+        }
+    }
+
+    /** 所有状态变化都走这里：决定开始还是停下，并保证只有一条回调链。 */
+    private void sync() {
+        boolean run = shouldRun();
+        if (run && runStartMs < 0) {
+            runStartMs = SystemClock.uptimeMillis();
+            Display d = getDisplay();
+            float hz = d != null ? d.getRefreshRate() : 60f;
+            vsyncDivisor = Math.max(1, (int) (hz / 60f + 0.25f));
+            vsyncCount = 0;
+            invalidate();
+            schedule();
+        } else if (!run && runStartMs >= 0) {
+            activeMs += SystemClock.uptimeMillis() - runStartMs;
+            runStartMs = -1;
+            Choreographer.getInstance().removeFrameCallback(this);
+            scheduled = false;
+        }
+    }
+
+    /** Activity 在 onResume/onPause 调用。 */
+    public void setResumed(boolean on) {
+        resumed = on;
+        sync();
+    }
+
+    /** 系统动画开关（无障碍“移除动画”、动画缩放为 0、省电模式）。关掉时画面停在当前一帧。 */
+    public void setAnimationsAllowed(boolean on) {
+        allowed = on;
+        sync();
     }
 
     @Override
     public void onVisibilityAggregated(boolean isVisible) {
         super.onVisibilityAggregated(isVisible);
-        boolean was = visible;
         visible = isVisible;
-        if (visible && !was && animating) postInvalidateOnAnimation();
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        visible = false;
-        releaseStatic();
-        super.onDetachedFromWindow();
+        sync();
     }
 
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        if (staticNode == null && staticBitmap == null && getWidth() > 0) onSizeChanged(getWidth(), getHeight(), 0, 0);
+        if (staticNode == null && staticBitmap == null && getWidth() > 0) buildStatic(getWidth(), getHeight());
+        sync();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        sync(); // 此时已不再 attached，会停下并移除回调
+        releaseStatic();
     }
 }

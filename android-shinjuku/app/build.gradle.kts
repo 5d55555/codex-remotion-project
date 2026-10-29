@@ -40,6 +40,11 @@ android {
         }
     }
 
+    // 背景音乐用 openRawResourceFd 直接从 APK 里读，必须不压缩
+    androidResources {
+        noCompress += "mp3"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
