@@ -6,7 +6,8 @@ package com.shinjuku.showdown.core;
  */
 public final class Events {
     public static final int HIT = 1, BLACK_FLASH = 2, RED_BURST = 3, BLUE_SPAWN = 4, BLUE_LAND = 5, BLUE_END = 6,
-            INFINITY_BLOCK = 7, DAMAGE = 8, KO = 9, REVIVE = 10, CAST = 11;
+            INFINITY_BLOCK = 7, DAMAGE = 8, KO = 9, REVIVE = 10, CAST = 11, RED_FIRE = 12, PURPLE_FIRE = 13,
+            HOLLOW_FORM = 14, HOLLOW_END = 15, LAND = 16;
 
     public static final int CAP = 128, MASK = CAP - 1;
     public final int[] type = new int[CAP];

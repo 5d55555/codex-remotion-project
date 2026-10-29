@@ -2,8 +2,8 @@ package com.shinjuku.showdown.core;
 
 /**
  * 战斗世界：每秒 120 tick 固定步长推进。完全确定：同一个配置 + 同一串输入 = 同一个结果。
- * 一个 tick 的顺序：五条悟的操作与动作状态机 → 攻击命中裁决（赫先于苍的吸力）→ 苍的吸力与持续伤害
- * → 积分（重力、外力、阻尼）→ 地面与墙 → 计时器。
+ * 一个 tick 的顺序：五条悟的操作与动作状态机 → 体术命中 → 赫（飞行；遇到苍变无指向茈；命中）→ 茈 → 无指向茈的扩张
+ * → 苍的吸力与持续伤害 → 积分（重力、外力）→ 地面与墙 → 计时器、倒地与复活。
  * 热路径不分配对象。
  */
 public final class World {
@@ -11,6 +11,9 @@ public final class World {
     public final Fighter gojo = new Fighter(Fighter.GOJO);
     public final Fighter sukuna = new Fighter(Fighter.SUKUNA);
     public final BlueOrb blue = new BlueOrb();
+    public final Shot red = new Shot();
+    public final Shot purple = new Shot();
+    public final Hollow hollow = new Hollow();
     public final Events events = new Events();
     public final Domains domains = new Domains();
     public final CombatRng rng;
@@ -18,14 +21,13 @@ public final class World {
 
     public int tick;
     public int hitstop;               // >0 时整个世界停住（黑闪的命中停顿）
-    public int meleeCd, blueCd, redCd, blueFailLock;
+    public int meleeCd, blueCd, redCd, purpleCd, blueFailLock;
     public int blueCdMax = Tuning.BLUE_COOLDOWN;
     private boolean pendingCharged;
     private float aimX = 1, aimY;     // 苍的瞄准方向（单位向量）
     private int attackSeq;            // 每次出招一个编号，同一招对同一目标只命中一次
-    private int meleeHitId = -1, redHitId = -1;
-    private int koTimer;
-    private int bufMelee, bufRed, bufJump;
+    private int meleeHitId = -1;
+    private int bufMelee, bufRed, bufJump, bufPurple;
     // 苍的按下/松开按发生顺序排队（停顿期间按的也留着）；只有用得上的状态才取，过一会儿没用上就作废
     private static final int BQ = 8;
     private final boolean[] bqDown = new boolean[BQ];
@@ -57,13 +59,21 @@ public final class World {
         sukuna.py = sukuna.y;
         blue.px = blue.x;
         blue.py = blue.y;
+        red.px = red.x;
+        red.py = red.y;
+        purple.px = purple.x;
+        purple.py = purple.y;
         latch(in);
         if (hitstop > 0) {
             hitstop--;
             return;
         }
         controlGojo(in);
-        resolveAttacks();
+        resolveMelee();
+        advanceBlue();
+        updateRed();
+        updatePurple();
+        updateHollow();
         applyBlue();
         integrate(gojo);
         integrate(sukuna);
@@ -77,6 +87,7 @@ public final class World {
         if (in.melee) bufMelee = Tuning.INPUT_BUFFER;
         if (in.red) bufRed = Tuning.INPUT_BUFFER;
         if (in.jump) bufJump = Tuning.INPUT_BUFFER;
+        if (in.purple) bufPurple = Tuning.INPUT_BUFFER;
         if (in.blueDown) bluePush(true);
         if (in.blueUp) bluePush(false);
     }
@@ -105,6 +116,10 @@ public final class World {
     private void controlGojo(TickInput in) {
         Fighter g = gojo;
         g.moveInput = in.moveX;
+        if (g.state == Fighter.KO) {
+            move(g, 0, 0);
+            return;
+        }
         if (g.hitstun > 0) return;
         g.stateTick++;
         switch (g.state) {
@@ -126,12 +141,15 @@ public final class World {
                 } else if (bufRed > 0 && redCd == 0) {
                     bufRed = 0;
                     enter(g, Fighter.RED_WINDUP);
-                    attackSeq++;
                     events.emit(Events.CAST, g.x, g.centerY(), 0, Attack.RED, tick);
+                } else if (bufPurple > 0 && purpleCd == 0) {
+                    bufPurple = 0;
+                    enter(g, Fighter.PURPLE_WINDUP);
+                    events.emit(Events.CAST, g.x, g.centerY(), 0, Attack.PURPLE, tick);
                 } else if (blueNextIsDown() && blueCd == 0 && blueFailLock == 0 && !blue.active()) {
                     bluePop();
                     enter(g, Fighter.BLUE_HOLD);
-                    bufMelee = bufRed = bufJump = 0; // 更早按的那些被这次苍取代，不会马上把蓄力取消掉
+                    bufMelee = bufRed = bufJump = bufPurple = 0; // 更早按的那些被这次苍取代，不会马上把蓄力取消掉
                     updateAim(in);
                     if (blueNextIsUp()) { // 同一 tick 里按下又松开：普通苍
                         bluePop();
@@ -146,7 +164,7 @@ public final class World {
             case Fighter.BLUE_HOLD:
                 move(g, in.moveX, 1f);
                 updateAim(in);
-                if (bufJump > 0 || bufMelee > 0 || bufRed > 0) {
+                if (bufJump > 0 || bufMelee > 0 || bufRed > 0 || bufPurple > 0) {
                     enter(g, Fighter.FREE); // 长按确认前可以取消，不进冷却；缓冲着的那个动作下一 tick 就出
                 } else if (blueNextIsUp()) {
                     bluePop();
@@ -176,7 +194,9 @@ public final class World {
                 if (g.stateTick >= Tuning.RED_WINDUP) {
                     enter(g, Fighter.RED_ACTIVE);
                     redCd = Tuning.RED_COOLDOWN;
-                    events.emit(Events.RED_BURST, g.x + g.facing * 30, g.y + 52, g.facing, tick);
+                    float hx = clamp(g.x + g.facing * 24, 0, Tuning.WIDTH);
+                    red.start(++attackSeq, hx, g.y + 56, g.facing);
+                    events.emit(Events.RED_FIRE, hx, g.y + 56, g.facing, Attack.RED, tick);
                 }
                 break;
             case Fighter.RED_ACTIVE:
@@ -186,6 +206,20 @@ public final class World {
             case Fighter.RED_RECOVER:
                 move(g, 0, 0);
                 if (g.stateTick >= Tuning.RED_RECOVERY) enter(g, Fighter.FREE);
+                break;
+            case Fighter.PURPLE_WINDUP:
+                move(g, 0, 0);
+                if (g.stateTick >= Tuning.PURPLE_WINDUP) {
+                    enter(g, Fighter.PURPLE_RECOVER);
+                    purpleCd = Tuning.PURPLE_COOLDOWN;
+                    float hx = clamp(g.x + g.facing * 30, 0, Tuning.WIDTH);
+                    purple.start(++attackSeq, hx, g.y + 56, g.facing);
+                    events.emit(Events.PURPLE_FIRE, hx, g.y + 56, g.facing, Attack.PURPLE, tick);
+                }
+                break;
+            case Fighter.PURPLE_RECOVER:
+                move(g, 0, 0);
+                if (g.stateTick >= Tuning.PURPLE_RECOVER) enter(g, Fighter.FREE);
                 break;
             default:
                 break;
@@ -271,7 +305,7 @@ public final class World {
 
     /* ---------------- 命中裁决 ---------------- */
 
-    private void resolveAttacks() {
+    private void resolveMelee() {
         Fighter g = gojo, s = sukuna;
         if (s.state == Fighter.KO) return;
         // 体术：有效帧内碰到就算一次（同一招只算一次）
@@ -295,19 +329,135 @@ public final class World {
                 }
             }
         }
-        // 赫：有效帧内前方一段距离内就击飞（同一招只算一次）；先于苍的吸力结算
-        if (g.state == Fighter.RED_ACTIVE && redHitId != attackSeq) {
-            float dx = (s.x - g.x) * g.facing, dy = Math.abs(s.centerY() - g.centerY());
-            if (dx >= -10 && dx <= Tuning.RED_REACH + 2 * Tuning.BODY_HALF_W && dy <= 120) {
-                redHitId = attackSeq;
-                attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.RED, attackSeq, Tuning.RED_DAMAGE_MILLI,
-                        g.facing * Tuning.RED_IMPULSE_X, Tuning.RED_IMPULSE_Y, Tuning.RED_HITSTUN, 0);
-                if ((apply(attack) & Defense.ALLOW_IMPULSE) != 0) {
-                    s.captured = false;            // 赫解除苍的捕获
-                    s.pullResist = Tuning.RED_PULL_RESIST; // 免得刚击飞又被吸回去
-                }
+    }
+
+    /* ---------------- 赫：飞行、遇到苍变成无指向茈、命中 ---------------- */
+
+    private void updateRed() {
+        Shot r = red;
+        if (!r.active) return;
+        r.tick++;
+        r.x += r.dir * Tuning.RED_SPEED * Tuning.DT;
+        // 赫与苍重叠，或互相在对方的作用范围内（距离不超过两者作用范围中较小的那个）：直接变成无指向茈。
+        // 按这一 tick 两者的相对运动线段求交（擦边飞过也算），在第一次进入范围的位置合成
+        if (blue.active()) {
+            float range = Math.min(Tuning.RED_RANGE, blue.radius);
+            float x0 = r.px - blue.px, y0 = r.py - blue.py;
+            float dx = (r.x - blue.x) - x0, dy = (r.y - blue.y) - y0;
+            float t = firstContact(x0, y0, dx, dy, range);
+            if (t >= 0) {
+                float rx = r.px + (r.x - r.px) * t, ry = r.py + (r.y - r.py) * t;
+                float bx = blue.px + (blue.x - blue.px) * t, by = blue.py + (blue.y - blue.py) * t;
+                formHollow((rx + bx) * 0.5f, (ry + by) * 0.5f);
+                return;
             }
         }
+        Fighter s = sukuna;
+        if (!r.hit && s.state != Fighter.KO && touches(r.x, r.y, Tuning.RED_ORB_R, s)) {
+            r.hit = true;
+            attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.RED, r.instanceId, Tuning.RED_DAMAGE_MILLI,
+                    r.dir * Tuning.RED_IMPULSE_X, Tuning.RED_IMPULSE_Y, Tuning.RED_HITSTUN, 0);
+            if ((apply(attack) & Defense.ALLOW_IMPULSE) != 0) {
+                s.captured = false;                    // 赫解除苍的捕获
+                s.pullResist = Tuning.RED_PULL_RESIST; // 免得刚击飞又被吸回去
+            }
+            burstRed();
+            return;
+        }
+        if (r.tick >= Tuning.RED_TRAVEL || r.x < 0 || r.x > Tuning.WIDTH) burstRed();
+    }
+
+    private void burstRed() {
+        red.active = false;
+        events.emit(Events.RED_BURST, red.x, red.y, red.dir, Attack.RED, tick);
+    }
+
+    /* ---------------- 茈：一直飞到战场外，打中一次 850 ---------------- */
+
+    private void updatePurple() {
+        Shot p = purple;
+        if (!p.active) return;
+        p.tick++;
+        p.x += p.dir * Tuning.PURPLE_SPEED * Tuning.DT;
+        Fighter s = sukuna;
+        if (!p.hit && s.state != Fighter.KO && touches(p.x, p.y, Tuning.PURPLE_R, s)) {
+            p.hit = true;
+            attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.PURPLE, p.instanceId, Tuning.PURPLE_DAMAGE_MILLI,
+                    p.dir * Tuning.PURPLE_IMPULSE_X, Tuning.PURPLE_IMPULSE_Y, Tuning.PURPLE_HITSTUN, 0);
+            if ((apply(attack) & Defense.ALLOW_IMPULSE) != 0) {
+                s.captured = false;
+                s.pullResist = Tuning.RED_PULL_RESIST;
+            }
+        }
+        if (p.x < -Tuning.PURPLE_R * 2 || p.x > Tuning.WIDTH + Tuning.PURPLE_R * 2) p.active = false;
+    }
+
+    /* ---------------- 无指向茈：向四周扩张，扩到谁就打谁（五条悟一半） ---------------- */
+
+    private void formHollow(float x, float y) {
+        Hollow h = hollow;
+        h.active = true;
+        h.tick = 0;
+        h.instanceId = ++attackSeq;
+        h.x = x;
+        h.y = y;
+        h.radius = 0;
+        h.hitSukuna = h.hitGojo = false;
+        red.active = false;
+        blue.phase = BlueOrb.OFF;      // 苍和赫都被吃掉了
+        sukuna.captured = false;
+        events.emit(Events.HOLLOW_FORM, x, y, Tuning.HOLLOW_RADIUS, Attack.HOLLOW, tick);
+    }
+
+    private void updateHollow() {
+        Hollow h = hollow;
+        if (!h.active) return;
+        h.tick++;
+        float k = Math.min(1f, h.tick / (float) Tuning.HOLLOW_GROW);
+        h.radius = Tuning.HOLLOW_RADIUS * (1 - (1 - k) * (1 - k)); // 先快后慢
+        Fighter s = sukuna, g = gojo;
+        if (!h.hitSukuna && s.state != Fighter.KO && touches(h.x, h.y, h.radius, s)) {
+            h.hitSukuna = true;
+            float dir = s.x >= h.x ? 1 : -1;
+            attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.HOLLOW, h.instanceId, Tuning.HOLLOW_DAMAGE_MILLI,
+                    dir * Tuning.HOLLOW_IMPULSE_X, Tuning.HOLLOW_IMPULSE_Y, Tuning.HOLLOW_HITSTUN, 0);
+            if ((apply(attack) & Defense.ALLOW_IMPULSE) != 0) s.pullResist = Tuning.RED_PULL_RESIST;
+        }
+        if (!h.hitGojo && g.state != Fighter.KO && touches(h.x, h.y, h.radius, g)) {
+            h.hitGojo = true;
+            float dir = g.x >= h.x ? 1 : -1;
+            attack.set(Fighter.GOJO, Fighter.GOJO, Attack.HOLLOW, h.instanceId, Tuning.HOLLOW_SELF_DAMAGE_MILLI,
+                    dir * Tuning.HOLLOW_SELF_IMPULSE_X, Tuning.HOLLOW_SELF_IMPULSE_Y, Tuning.HOLLOW_SELF_HITSTUN, 0);
+            apply(attack);
+        }
+        if (h.tick >= Tuning.HOLLOW_LIFE) {
+            h.active = false;
+            events.emit(Events.HOLLOW_END, h.x, h.y, 0, Attack.HOLLOW, tick);
+        }
+    }
+
+    /** 从 (x0, y0) 沿 (dx, dy) 走一段（t 从 0 到 1），第一次进入以原点为圆心、半径 r 的圆时的 t；进不去返回 -1。 */
+    static float firstContact(float x0, float y0, float dx, float dy, float r) {
+        // double 算，判别式和 [0,1] 边界都留一点和数值大小相称的余量：正好相切、正好在这一 tick 末尾碰到也算
+        double c = (double) x0 * x0 + (double) y0 * y0 - (double) r * r;
+        if (c <= 0) return 0;
+        double a = (double) dx * dx + (double) dy * dy;
+        if (a < 1e-12) return -1;
+        double b = 2 * ((double) x0 * dx + (double) y0 * dy);
+        double disc = b * b - 4 * a * c;
+        double eps = 1e-6 * (b * b + Math.abs(4 * a * c));
+        if (disc < -eps) return -1;
+        double t = (-b - Math.sqrt(Math.max(0, disc))) / (2 * a);
+        if (t < -1e-6 || t > 1 + 1e-6) return -1;
+        return (float) Math.max(0, Math.min(1, t));
+    }
+
+    /** 圆（cx, cy, r）是否碰到人的身体（一个竖着的矩形）。 */
+    private static boolean touches(float cx, float cy, float r, Fighter f) {
+        float nx = clamp(cx, f.x - Tuning.BODY_HALF_W, f.x + Tuning.BODY_HALF_W);
+        float ny = clamp(cy, f.y, f.y + Tuning.BODY_H);
+        float dx = cx - nx, dy = cy - ny;
+        return dx * dx + dy * dy <= r * r;
     }
 
     /** 一次攻击接触：交给防御裁决，再按允许的部分生效。返回裁决位掩码。 */
@@ -338,7 +488,8 @@ public final class World {
 
     /* ---------------- 苍：飞行、吸引、持续伤害 ---------------- */
 
-    private void applyBlue() {
+    /** 苍这一 tick 的位置先推进（飞行中往落点走），赫的相遇判定要用到。 */
+    private void advanceBlue() {
         BlueOrb b = blue;
         if (!b.active()) return;
         b.tick++;
@@ -352,9 +503,13 @@ public final class World {
                 b.tick = 0;
                 events.emit(Events.BLUE_LAND, b.cx, b.cy, b.charged ? 1 : 0, tick);
             }
-            return;
         }
-        if (b.tick > Tuning.BLUE_LIFE) {
+    }
+
+    private void applyBlue() {
+        BlueOrb b = blue;
+        if (b.phase != BlueOrb.PULL || b.tick == 0) return; // 刚落地这一 tick 先不吸
+        if (b.tick > Tuning.BLUE_LIFE) { // 到期放在赫的判定之后：到期那一 tick 赫还能和它合成
             endBlue();
             return;
         }
@@ -429,14 +584,16 @@ public final class World {
                 f.vx = f.vy = 0;
             }
             if (f.y <= 0) {
+                if (!f.onGround && f.vy < -400) events.emit(Events.LAND, f.x, 0, -f.vy, tick); // 重重落地：扬尘
                 f.y = 0;
                 if (f.vy < 0) f.vy = 0;
                 f.onGround = true;
             } else {
                 f.onGround = false;
             }
-            // 地上滑行减速（被击飞落地后）；五条悟自己控制速度，被苍吸着时也不减
-            if (f.onGround && f.id == Fighter.SUKUNA && !f.pulled) {
+            // 地上滑行减速（被击飞落地后）；五条悟平时自己控制速度，只有被打飞（硬直、倒地）时才滑；被苍吸着时也不减
+            boolean sliding = f.id == Fighter.SUKUNA || f.hitstun > 0 || f.state == Fighter.KO;
+            if (f.onGround && sliding && !f.pulled) {
                 float dec = Tuning.GROUND_FRICTION * dt;
                 f.vx = Math.abs(f.vx) <= dec ? 0 : f.vx - Math.signum(f.vx) * dec;
             }
@@ -474,10 +631,12 @@ public final class World {
         if (meleeCd > 0) meleeCd--;
         if (blueCd > 0) blueCd--;
         if (redCd > 0) redCd--;
+        if (purpleCd > 0) purpleCd--;
         if (blueFailLock > 0) blueFailLock--;
         if (bufMelee > 0) bufMelee--;
         if (bufRed > 0) bufRed--;
         if (bufJump > 0) bufJump--;
+        if (bufPurple > 0) bufPurple--;
         for (int i = 0; i < bqSize; i++) bqTtl[(bqHead + i) % BQ]--;
         while (bqSize > 0 && bqTtl[bqHead] <= 0) bluePop(); // 越早的越先到期，到期的总在队头
         for (int i = 0; i < 2; i++) {
@@ -485,18 +644,24 @@ public final class World {
             if (f.hitstun > 0) f.hitstun--;
             if (f.pullResist > 0) f.pullResist--;
         }
-        Fighter s = sukuna;
-        if (s.state != Fighter.KO && s.hpMilli == 0) {
-            s.state = Fighter.KO;
-            s.captured = false;
-            koTimer = Tuning.KO_TICKS;
-            events.emit(Events.KO, s.x, s.centerY(), 0, tick);
-        } else if (s.state == Fighter.KO && --koTimer <= 0) {
-            s.state = Fighter.FREE;
-            s.hpMilli = s.maxHpMilli;
-            events.emit(Events.REVIVE, s.x, s.centerY(), 0, tick);
+        // 打空血量就倒地，过一会儿满血站起来（现在是训练：宿傩是活靶子；五条悟被自己的无指向茈打空也一样）
+        for (int i = 0; i < 2; i++) {
+            Fighter f = fighter(i);
+            if (f.state != Fighter.KO && f.hpMilli == 0) {
+                f.state = Fighter.KO;
+                f.stateTick = 0;
+                f.captured = false;
+                f.koTimer = Tuning.KO_TICKS;
+                events.emit(Events.KO, f.x, f.centerY(), 0, f.id, tick);
+            } else if (f.state == Fighter.KO && --f.koTimer <= 0) {
+                f.state = Fighter.FREE;
+                f.stateTick = 0;
+                f.hpMilli = f.maxHpMilli;
+                events.emit(Events.REVIVE, f.x, f.centerY(), 0, f.id, tick);
+            }
         }
         // 宿傩没有 AI：只是面向五条悟
+        Fighter s = sukuna;
         if (s.state != Fighter.KO && s.hitstun == 0) s.facing = gojo.x >= s.x ? 1 : -1;
     }
 

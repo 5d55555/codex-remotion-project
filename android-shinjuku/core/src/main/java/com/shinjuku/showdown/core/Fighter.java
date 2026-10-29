@@ -6,7 +6,7 @@ public final class Fighter {
 
     // 动作状态
     public static final int FREE = 0, MELEE = 1, BLUE_HOLD = 2, BLUE_WINDUP = 3, RED_WINDUP = 4, RED_ACTIVE = 5,
-            RED_RECOVER = 6, BLUE_RECOVER = 7, KO = 8;
+            RED_RECOVER = 6, BLUE_RECOVER = 7, KO = 8, PURPLE_WINDUP = 9, PURPLE_RECOVER = 10;
 
     public final int id;
     public float x, y, vx, vy;   // y 是离地高度
@@ -28,6 +28,7 @@ public final class Fighter {
     // 给画面用
     public float moveInput;      // 本 tick 的移动输入（跑步动画）
     public int lastHitTick = -9999, lastHitKind;
+    int koTimer;
 
     Fighter(int id) {
         this.id = id;

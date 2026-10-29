@@ -59,15 +59,39 @@ public final class Tuning {
     public static final int BLUE_COOLDOWN_CHARGED = 1080; // 占位：9 秒
     public static final int BLUE_FAIL_LOCK = 60;   // 被打断后 0.5 秒内不能再按
 
-    // 赫：斥力击飞，直接 150 伤害（定）
+    // 赫：斥力击飞，直接 150 伤害（定）。从手里飞出一颗红色球，RED_TRAVEL tick 内飞完射程，碰到人就爆
     public static final long RED_DAMAGE_MILLI = 150_000;
     public static final int RED_WINDUP = 14, RED_ACTIVE = 4, RED_RECOVERY = 24; // 占位
-    public static final float RED_REACH = 0.16f * WIDTH; // 占位
+    public static final float RED_REACH = 0.16f * WIDTH; // 占位：射程
+    public static final int RED_TRAVEL = 10;             // 占位：飞完射程用的 tick
+    public static final float RED_SPEED = RED_REACH * HZ / RED_TRAVEL;
+    public static final float RED_ORB_R = 30f;           // 占位：命中半径
+    public static final float RED_RANGE = 0.08f * WIDTH; // 占位：赫的作用范围（和苍的作用范围“互相在内”就变成无指向茈）
     public static final float RED_IMPULSE_X = 650f, RED_IMPULSE_Y = 420f;
     public static final float MAX_VX = 800f, MAX_VY = 600f;
     public static final int RED_HITSTUN = 42;
     public static final int RED_PULL_RESIST = 24; // 被赫打中后这段时间不会被苍吸回去
     public static final int RED_COOLDOWN = 480;   // 占位：4 秒
+
+    // 茈：向朝向发射，850 伤害（定）
+    public static final long PURPLE_DAMAGE_MILLI = 850_000;
+    public static final int PURPLE_WINDUP = 40, PURPLE_RECOVER = 30; // 占位
+    public static final float PURPLE_SPEED = 1500f;      // 占位
+    public static final float PURPLE_R = 44f;            // 占位：命中半径
+    public static final int PURPLE_COOLDOWN = 1800;      // 占位：15 秒
+    public static final float PURPLE_IMPULSE_X = 800f, PURPLE_IMPULSE_Y = 360f;
+    public static final int PURPLE_HITSTUN = 60;
+
+    // 无指向茈：赫与苍重叠或互相在作用范围内时生成；伤害和茈一样 850（定），范围内的五条悟也挨，只有一半（定）
+    public static final long HOLLOW_DAMAGE_MILLI = PURPLE_DAMAGE_MILLI;
+    public static final long HOLLOW_SELF_DAMAGE_MILLI = HOLLOW_DAMAGE_MILLI / 2;
+    // 占位：覆盖范围半径（和苍一样大）。苍放得近，五条悟自己会被卷进去；苍放远、让赫飞到射程末端再相遇，就能躲开
+    public static final float HOLLOW_RADIUS = 0.18f * WIDTH;
+    public static final int HOLLOW_GROW = 16, HOLLOW_LIFE = 54; // 占位：扩张用时、总时长
+    public static final float HOLLOW_IMPULSE_X = 800f, HOLLOW_IMPULSE_Y = 420f;
+    public static final int HOLLOW_HITSTUN = 60;
+    public static final float HOLLOW_SELF_IMPULSE_X = 380f, HOLLOW_SELF_IMPULSE_Y = 260f;
+    public static final int HOLLOW_SELF_HITSTUN = 24;
 
     // 活靶子：被打倒后过一会儿满血站起来
     public static final int KO_TICKS = 360;       // 占位：3 秒

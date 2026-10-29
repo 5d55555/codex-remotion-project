@@ -26,8 +26,8 @@ public class SelectActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        SystemUi.immersive(this);
         setContentView(R.layout.activity_select);
+        SystemUi.immersive(this);
         SystemUi.applySafeInsets(findViewById(R.id.select_content), null);
         findViewById(R.id.back).setOnClickListener(v -> finish());
 

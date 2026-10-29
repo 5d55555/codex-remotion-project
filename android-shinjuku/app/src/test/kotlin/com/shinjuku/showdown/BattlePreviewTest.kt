@@ -1,6 +1,7 @@
 package com.shinjuku.showdown
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.view.View
 import app.cash.paparazzi.DeviceConfig
@@ -15,14 +16,15 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * 战斗画面截图：用真正的 World 和真正的 BattleRenderer（同一份绘制代码），按脚本输入打出几个场景。
- * 每推进一段就让渲染器读一次事件，模拟中间那些帧，最后画一帧截图。
+ * 战斗画面截图：真正的 World + 真正的 PixelScene（和游戏里 GL 画的是同一份场景代码，这里走 Canvas 后端），
+ * 按脚本输入打出几个场景。每推进 1/60 秒让场景读一次事件、更新一次粒子，模拟中间那些帧，最后画一帧截图。
  */
 class BattlePreviewTest {
     @get:Rule
     val paparazzi = Paparazzi(
         deviceConfig = DeviceConfig.PIXEL_5.copy(screenWidth = 2340, screenHeight = 1080, orientation = ScreenOrientation.LANDSCAPE, density = Density.XXHIGH),
         theme = "Theme.Shinjuku",
+        useDeviceResolution = true, // 不缩小：像素画要按原始分辨率看
     )
 
     private val noActions: Controls.Actions = object : Controls.Actions {
@@ -34,26 +36,45 @@ class BattlePreviewTest {
     internal inner class Scene(ctx: Context, d: Difficulty, script: Scene.() -> Unit) : View(ctx) {
         val world = World(BattleConfig().also { d.configure(it) })
         internal val controls = Controls(noActions)
-        internal val renderer = BattleRenderer(ctx.resources, d, controls, null, false)
+        private val atlas = Atlas()
+        private val bg = BitmapFactory.decodeResource(ctx.resources, R.drawable.bg_battle_px, BitmapFactory.Options().apply { inScaled = false })
+        internal val scene = PixelScene(atlas, bg.width, bg.height, bg.getPixel(0, 0), d, controls, null)
+        private val target = CanvasTarget(atlas.bitmap, bg)
+        private val scratch = Canvas(android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888))
         val input = TickInput()
         private val dm = ctx.resources.displayMetrics
         private var setup = script
+        private var w = 0
+        private var h = 0
 
         fun steps(n: Int) {
             repeat(n) {
                 world.step(input)
                 input.clearEdges()
-                if (world.tick % 2 == 0) renderer.consume(world, world.tick / 120f)
+                if (world.tick % 2 == 0) frame(scratch) // 模拟游戏里的一帧（读事件、跑粒子），画到一张不要的小图上
             }
         }
 
+        private fun frame(c: Canvas) {
+            target.setDestination(c)
+            scene.draw(target, world, 0f, world.tick / 120f, w, h)
+        }
+
         override fun onDraw(c: Canvas) {
+            w = width
+            h = height
             controls.layout = Controls.Layout(width.toFloat(), height.toFloat(), dm.density, 0f, 0f, 0f, 0f)
-            renderer.draw(c, world, 0f, 0f, width, height) // 初始化布局
+            scene.layout(w, h)
+            target.setHud(scene.hudText().bitmap)
             setup(this)
             setup = {}
-            renderer.draw(c, world, 0f, world.tick / 120f, width, height)
+            frame(c)
         }
+    }
+
+    @Test
+    fun idle() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) { steps(40) })
     }
 
     @Test
@@ -85,10 +106,50 @@ class BattlePreviewTest {
     fun red() {
         paparazzi.snapshot(Scene(paparazzi.context, Difficulty.URAUME) {
             world.gojo.x = 420f
-            world.sukuna.x = 560f
+            world.sukuna.x = 600f
             steps(10)
             input.red = true
-            steps(14 + 9)
+            steps(14 + 5)
+        })
+    }
+
+    @Test
+    fun purple() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.YOROZU) {
+            world.gojo.x = 260f
+            world.sukuna.x = 900f
+            steps(10)
+            input.purple = true
+            steps(40 + 14)
+        })
+    }
+
+    @Test
+    fun purpleWindup() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.YOROZU) {
+            world.gojo.x = 400f
+            world.sukuna.x = 800f
+            steps(10)
+            input.purple = true
+            steps(32)
+        })
+    }
+
+    @Test
+    fun hollowPurple() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.STRONGEST) {
+            world.gojo.x = 300f
+            world.sukuna.x = 500f
+            steps(10)
+            input.blueDown = true; input.blueHeld = true; input.blueUp = true
+            input.blueHeld = false
+            steps(12 + 18 + 50)
+            input.red = true
+            var formed = false
+            for (i in 0 until 40) {
+                steps(1)
+                if (world.hollow.active && !formed) { formed = true; steps(9); break }
+            }
         })
     }
 
@@ -97,7 +158,6 @@ class BattlePreviewTest {
         paparazzi.snapshot(Scene(paparazzi.context, Difficulty.YOROZU) {
             world.gojo.x = 560f
             world.sukuna.x = 620f
-            // 一直打到出黑闪为止，然后停在命中后几帧
             var seen = world.events.written
             var flashed = false
             for (round in 0 until 64) {

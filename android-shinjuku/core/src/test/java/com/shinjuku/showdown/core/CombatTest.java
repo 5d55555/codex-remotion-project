@@ -287,7 +287,7 @@ public class CombatTest {
         w.gojo.x = 400;
         w.sukuna.x = 520;
         in.red = true;
-        run(w, in, Tuning.RED_WINDUP + 2);
+        run(w, in, Tuning.RED_WINDUP + Tuning.RED_TRAVEL + 2);
         assertEquals(w.sukuna.maxHpMilli - Tuning.RED_DAMAGE_MILLI, w.sukuna.hpMilli);
         assertFalse(w.sukuna.captured);
         assertTrue(w.sukuna.vx > 300);
@@ -296,9 +296,9 @@ public class CombatTest {
         assertEquals("同一招只命中一次", w.sukuna.maxHpMilli - Tuning.RED_DAMAGE_MILLI, w.sukuna.hpMilli);
     }
 
-    /** 赫打中被苍抓住的宿傩：解除捕获，短时间内不会被吸回去。 */
+    /** 苍把宿傩抓在近处，再放赫：赫与苍相遇，直接变成无指向茈。宿傩 850；五条悟在范围内，挨一半 425（无限挡不住自己的茈）。 */
     @Test
-    public void redReleasesBlueCapture() {
+    public void redMeetingBlueBecomesHollowPurple() {
         World w = world();
         TickInput in = new TickInput();
         w.gojo.x = 300;
@@ -307,19 +307,148 @@ public class CombatTest {
         run(w, in, Tuning.BLUE_WINDUP + Tuning.BLUE_FLY + 60);
         in.blueHeld = false;
         assertTrue("被苍抓住", w.sukuna.captured);
+        long sBefore = w.sukuna.hpMilli, gBefore = w.gojo.hpMilli;
         in.red = true;
-        long before = 0;
-        for (int i = 0; i < Tuning.RED_WINDUP + 4 && w.sukuna.lastHitKind != Attack.RED; i++) {
-            before = w.sukuna.hpMilli;
+        for (int i = 0; i < Tuning.RED_WINDUP + Tuning.RED_TRAVEL + 2 && !w.hollow.active; i++) {
             w.step(in);
             in.clearEdges();
         }
-        assertEquals(Attack.RED, w.sukuna.lastHitKind);
-        long dealt = before - w.sukuna.hpMilli;
-        assertTrue("赫 150 + 这一 tick 苍的持续伤害：" + dealt, dealt >= Tuning.RED_DAMAGE_MILLI && dealt < Tuning.RED_DAMAGE_MILLI + 1000);
+        assertTrue("变成了无指向茈", w.hollow.active);
+        assertFalse(w.blue.active());
+        assertFalse(w.red.active);
         assertFalse(w.sukuna.captured);
-        assertTrue(w.sukuna.pullResist > 0);
-        assertTrue(w.sukuna.vx > 300);
+        run(w, in, Tuning.HOLLOW_GROW + 2);
+        long dealt = sBefore - w.sukuna.hpMilli; // 850，加上赫前摇那 0.12 秒里苍的持续伤害（核心每秒 100）
+        assertTrue("宿傩挨了 850：" + dealt, dealt >= Tuning.HOLLOW_DAMAGE_MILLI && dealt <= Tuning.HOLLOW_DAMAGE_MILLI + 20_000);
+        assertEquals("五条悟挨了一半", Tuning.HOLLOW_SELF_DAMAGE_MILLI, gBefore - w.gojo.hpMilli);
+        assertEquals(425_000, Tuning.HOLLOW_SELF_DAMAGE_MILLI);
+        run(w, in, Tuning.HOLLOW_LIFE);
+        assertFalse(w.hollow.active);
+        assertEquals("每人只挨一次", Tuning.HOLLOW_SELF_DAMAGE_MILLI, gBefore - w.gojo.hpMilli);
+    }
+
+    /** 苍放得远、赫飞到射程末端才相遇：无指向茈照样打宿傩，但扩不到五条悟身上。 */
+    @Test
+    public void hollowFarFromGojoSparesHim() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 300;
+        w.sukuna.x = 620;
+        in.blueDown = in.blueHeld = in.blueUp = true;
+        run(w, in, Tuning.BLUE_WINDUP + Tuning.BLUE_FLY + 90);
+        in.blueHeld = false;
+        assertTrue(w.sukuna.captured);
+        long sBefore = w.sukuna.hpMilli;
+        in.red = true;
+        run(w, in, Tuning.RED_WINDUP + Tuning.RED_TRAVEL + Tuning.HOLLOW_LIFE + 4);
+        assertTrue("宿傩挨了无指向茈", sBefore - w.sukuna.hpMilli >= Tuning.HOLLOW_DAMAGE_MILLI);
+        assertEquals("五条悟不在范围内，没受伤", w.gojo.maxHpMilli, w.gojo.hpMilli);
+    }
+
+    /** 赫擦着苍的作用范围边缘飞过（这一 tick 两头都在范围外，中间进了范围）：也要变成无指向茈。 */
+    @Test
+    public void grazingRedStillMeetsBlue() {
+        World w = world();
+        float range = Math.min(Tuning.RED_RANGE, Tuning.BLUE_RADIUS);
+        BlueOrb b = w.blue;
+        b.phase = BlueOrb.PULL;
+        b.tick = 10;
+        b.radius = Tuning.BLUE_RADIUS;
+        b.cx = b.x = b.px = 640;
+        b.cy = b.y = b.py = 200;
+        float step = Tuning.RED_SPEED * Tuning.DT;
+        w.red.start(99, 640 - step * 0.5f, 200 + range - 0.1f, 1); // 这一 tick 从中线左边飞到右边
+        float end = (float) Math.hypot(step * 0.5f, range - 0.1f);
+        assertTrue("两头都在范围外", end > range);
+        w.step(new TickInput());
+        assertTrue(w.hollow.active);
+        assertEquals("在刚进入范围的地方合成（离最近点不远）", 640, w.hollow.x, 5f);
+    }
+
+    /** 线段求交的边界：正好相切、正好在末尾碰到都算；碰不到的不算。 */
+    @Test
+    public void firstContactEdges() {
+        assertTrue("正好相切", World.firstContact(-10f, 102.4f, 20.48f, 0f, 102.4f) >= 0);
+        assertEquals("末尾刚碰到", 1f, World.firstContact(-112.4f, 0f, 10f, 0f, 102.4f), 1e-4f);
+        assertEquals("一开始就在里面", 0f, World.firstContact(5f, 5f, 1f, 0f, 102.4f), 0f);
+        assertEquals("擦不到", -1f, World.firstContact(-10f, 103f, 20f, 0f, 102.4f), 0f);
+        assertEquals("背着走", -1f, World.firstContact(-110f, 0f, -10f, 0f, 102.4f), 0f);
+    }
+
+    /** 苍和赫离得远（不在作用范围内）：各打各的，不会变成茈。 */
+    @Test
+    public void farRedAndBlueStaySeparate() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 200;
+        w.sukuna.x = 1200;
+        in.moveX = 1; // 苍朝右丢到最远
+        in.blueDown = in.blueHeld = in.blueUp = true;
+        run(w, in, Tuning.BLUE_WINDUP + 2);
+        in.moveX = 0;
+        in.blueHeld = false;
+        run(w, in, Tuning.BLUE_FLY + 4);
+        in.red = true;
+        run(w, in, Tuning.RED_WINDUP + Tuning.RED_TRAVEL + 4);
+        assertFalse(w.hollow.active);
+        assertTrue(w.blue.active());
+    }
+
+    /** 茈：向朝向发射，打中 850，一直飞出战场。 */
+    @Test
+    public void purpleFiresForwardForEightFifty() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 300;
+        w.sukuna.x = 800;
+        in.purple = true;
+        run(w, in, Tuning.PURPLE_WINDUP + 2);
+        assertTrue(w.purple.active);
+        assertEquals(1, w.purple.dir, 0);
+        assertTrue(w.purpleCd > 0);
+        run(w, in, 60);
+        assertEquals(w.sukuna.maxHpMilli - Tuning.PURPLE_DAMAGE_MILLI, w.sukuna.hpMilli);
+        run(w, in, 60);
+        assertFalse("飞出战场了", w.purple.active);
+        assertEquals("同一发只打一次", w.sukuna.maxHpMilli - Tuning.PURPLE_DAMAGE_MILLI, w.sukuna.hpMilli);
+        assertEquals("茈不伤五条悟", w.gojo.maxHpMilli, w.gojo.hpMilli);
+    }
+
+    /** 茈朝人物当前的朝向发射：背对宿傩就打不到他。 */
+    @Test
+    public void purpleFollowsFacing() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 600;
+        w.sukuna.x = 900;
+        in.moveX = -1; // 推着摇杆朝左（不推的时候会自动面向宿傩）
+        in.purple = true;
+        w.step(in);
+        in.clearEdges();
+        in.moveX = 0;
+        run(w, in, Tuning.PURPLE_WINDUP + 2);
+        assertEquals(-1, w.purple.dir, 0);
+        run(w, in, 120);
+        assertEquals(w.sukuna.maxHpMilli, w.sukuna.hpMilli);
+    }
+
+    /** 五条悟被自己的无指向茈打空血量：倒地，过一会儿满血站起来（训练模式）。 */
+    @Test
+    public void gojoKnockedOutBySelfHollowRevives() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 300;
+        w.sukuna.x = 500;
+        w.gojo.hpMilli = 100_000;
+        in.blueDown = in.blueHeld = in.blueUp = true;
+        run(w, in, Tuning.BLUE_WINDUP + Tuning.BLUE_FLY + 60);
+        in.blueHeld = false;
+        in.red = true;
+        run(w, in, Tuning.RED_WINDUP + Tuning.RED_TRAVEL + Tuning.HOLLOW_GROW + 4);
+        assertEquals(Fighter.KO, w.gojo.state);
+        run(w, in, Tuning.KO_TICKS + 2);
+        assertEquals(Fighter.FREE, w.gojo.state);
+        assertEquals(w.gojo.maxHpMilli, w.gojo.hpMilli);
     }
 
     /** 苍贴墙投出也不超过 30%，苍消失后不会残留捕获。 */
@@ -411,6 +540,7 @@ public class CombatTest {
             in.jump = r.nextUnitDouble() < 0.02;
             in.melee = r.nextUnitDouble() < 0.05;
             in.red = r.nextUnitDouble() < 0.01;
+            in.purple = r.nextUnitDouble() < 0.003;
             boolean held = in.blueHeld;
             in.blueHeld = r.nextUnitDouble() < (held ? 0.98 : 0.01);
             in.blueDown = in.blueHeld && !held;
@@ -426,6 +556,7 @@ public class CombatTest {
         assertEquals(a.sukuna.hpMilli, b.sukuna.hpMilli);
         assertEquals(a.sukuna.x, b.sukuna.x, 0);
         assertEquals(a.rng.state(), b.rng.state());
-        assertEquals(a.gojo.maxHpMilli, a.gojo.hpMilli); // 宿傩没有攻击，五条悟始终满血
+        assertEquals(a.gojo.hpMilli, b.gojo.hpMilli);
+        assertTrue(a.gojo.hpMilli >= 0 && a.sukuna.hpMilli >= 0);
     }
 }

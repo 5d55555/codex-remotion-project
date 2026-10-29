@@ -25,12 +25,16 @@ final class SystemUi {
         }
     }
 
-    /** 横屏游戏界面：隐藏状态栏和导航栏，从边缘滑动可临时呼出。 */
+    /**
+     * 横屏游戏界面：隐藏状态栏和导航栏，从边缘滑动可临时呼出。在 setContentView 之后调用。
+     * 注意：Window.getInsetsController() 在 DecorView 建好之前会空指针（Android 11+，v0.3 点开始游戏就闪退的原因），
+     * 所以这里从 getDecorView() 取：它会先把 DecorView 建好，没挂到窗口上时返回一个先记下操作、挂上后再执行的控制器。
+     */
     @SuppressWarnings("deprecation")
     static void immersive(Activity a) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             a.getWindow().setDecorFitsSystemWindows(false);
-            WindowInsetsController c = a.getWindow().getInsetsController();
+            WindowInsetsController c = a.getWindow().getDecorView().getWindowInsetsController();
             if (c != null) {
                 c.hide(WindowInsets.Type.systemBars());
                 c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);

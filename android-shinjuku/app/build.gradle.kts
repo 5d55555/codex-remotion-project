@@ -13,8 +13,8 @@ android {
         applicationId = "com.shinjuku.showdown"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3"
+        versionCode = 4
+        versionName = "0.4"
     }
 
     // 测试签名：放在仓库里，保证每次构建的签名一致，新包能直接覆盖安装旧包。只用于测试，不用于上架。
@@ -63,5 +63,17 @@ kotlin {
 dependencies {
     implementation(project(":core"))
     testImplementation("junit:junit:4.13.2")
+    // GL 画面的对照测试：用 LWJGL + 系统的 Mesa 软件 GLES（libEGL / libGLESv2）在 JVM 上跑真正的 GlTarget
+    testImplementation("org.lwjgl:lwjgl:3.3.6")
+    testImplementation("org.lwjgl:lwjgl-egl:3.3.6")
+    testImplementation("org.lwjgl:lwjgl-opengles:3.3.6")
+    testRuntimeOnly("org.lwjgl:lwjgl:3.3.6:natives-linux")
+    testRuntimeOnly("org.lwjgl:lwjgl-opengles:3.3.6:natives-linux")
     testImplementation("org.jetbrains.kotlin:kotlin-stdlib:2.3.0")
+}
+
+// GL 对照测试用 Mesa 的软件实现，不需要显示器
+tasks.withType<Test>().configureEach {
+    environment("EGL_PLATFORM", "surfaceless")
+    environment("LIBGL_ALWAYS_SOFTWARE", "1")
 }

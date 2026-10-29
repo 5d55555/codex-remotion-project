@@ -2,6 +2,8 @@ package com.shinjuku.showdown;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Insets;
 import android.graphics.PixelFormat;
 import android.os.Build;
@@ -17,23 +19,25 @@ import com.shinjuku.showdown.core.World;
 
 /**
  * 战斗画面的 SurfaceView：自己一块不透明的缓冲区，由战斗线程直接用 GPU 画，不经过界面的绘制流程。
- * 分辨率特别高的屏幕上把缓冲区缩到约 260 万像素以内，由硬件合成器放大，省填充率。
+ * 缓冲区保持屏幕原生尺寸（像素风的放大由 GL 用最近邻做；交给合成器缩放可能会变糊）。
  * 触摸在主线程交给 Controls。
  */
 @SuppressLint("ViewConstructor")
 final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
-    private static final float PIXEL_BUDGET = 2400f * 1080f;
-
     private final Controls controls;
-    private final BattleRenderer renderer;
+    private final PixelScene scene;
     private final BattleLoop loop;
     private float safeL, safeT, safeR, safeB;
 
     BattleView(Context context, World world, Difficulty difficulty, Controls.Actions actions, Bgm bgm) {
         super(context);
         controls = new Controls(actions);
-        renderer = new BattleRenderer(getResources(), difficulty, controls, bgm, true);
-        loop = new BattleLoop(world, controls, renderer);
+        Atlas atlas = new Atlas();
+        BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inScaled = false; // 像素背景必须 1:1
+        Bitmap bg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_battle_px, o);
+        scene = new PixelScene(atlas, bg.getWidth(), bg.getHeight(), bg.getPixel(0, 0), difficulty, controls, bgm);
+        loop = new BattleLoop(world, controls, scene, new GlTarget(new AndroidGl(), atlas.bitmap, bg), new CanvasTarget(atlas.bitmap, bg));
         getHolder().setFormat(PixelFormat.OPAQUE);
         getHolder().addCallback(this);
         setFocusable(true);
@@ -45,7 +49,7 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
     }
 
     void toggleStats() {
-        renderer.statsOn = !renderer.statsOn;
+        scene.statsOn = !scene.statsOn;
     }
 
     void release() {
@@ -79,13 +83,6 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         relayout(w, h);
-        float px = (float) w * h;
-        if (px > PIXEL_BUDGET) {
-            float s = (float) Math.sqrt(PIXEL_BUDGET / px);
-            getHolder().setFixedSize(Math.round(w * s), Math.round(h * s));
-        } else {
-            getHolder().setSizeFromLayout();
-        }
     }
 
     private void relayout(int w, int h) {

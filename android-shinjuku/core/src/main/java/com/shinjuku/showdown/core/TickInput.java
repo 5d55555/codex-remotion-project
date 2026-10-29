@@ -6,11 +6,11 @@ package com.shinjuku.showdown.core;
  */
 public final class TickInput {
     public float moveX, moveY;     // -1..1，y 向上
-    public boolean jump, melee, red;
+    public boolean jump, melee, red, purple;
     public boolean blueDown, blueUp, blueHeld;
 
     public void clearEdges() {
-        jump = melee = red = blueDown = blueUp = false;
+        jump = melee = red = purple = blueDown = blueUp = false;
     }
 
     public void clearAll() {

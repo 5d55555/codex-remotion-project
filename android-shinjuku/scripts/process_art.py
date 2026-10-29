@@ -11,14 +11,42 @@ os.makedirs(OUT, exist_ok=True)
 
 JOBS = {
     # 文件名: (最大边长, 是否保留透明)
-    'bg_battle.png': (1920, False),
     'bg_select.png': (1920, False),
-    'icon_music.png': (192, True),
     'emblem_miwa.png': (360, True),
     'emblem_uraume.png': (360, True),
     'emblem_yorozu.png': (360, True),
     'emblem_strongest.png': (360, True),
 }
+
+def pixel_background():
+    """像素战斗背景：Luna 的“像素风”原图像素并不对齐网格，这里按面积缩到 266 高（每个像素块就是游戏里的一个虚拟像素），
+    量化到 64 色、不抖动，边缘锐利；上面再补 80 行分档的天空，给比较高的屏幕用。存成无损 PNG。"""
+    src = os.path.join(ART, 'bg_battle_px.png')
+    if not os.path.exists(src):
+        print('缺少', src)
+        return
+    im = Image.open(src).convert('RGB')
+    H, SKY = 266, 80
+    W = round(im.width * H / im.height)
+    small = im.resize((W, H), Image.BOX)
+    q = small.quantize(colors=64, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert('RGB')
+    top = [q.getpixel((x, 0)) for x in range(0, W, 7)]
+    avg = tuple(sum(c[i] for c in top) // len(top) for i in range(3))
+    deep = (max(0, avg[0] - 34), max(0, avg[1] - 30), min(255, avg[2] - 6))
+    out = Image.new('RGB', (W, H + SKY), avg)
+    bands = 5
+    for b in range(bands):
+        k = b / (bands - 1)
+        c = tuple(round(deep[i] + (avg[i] - deep[i]) * k) for i in range(3))
+        y0, y1 = round(SKY * b / bands), round(SKY * (b + 1) / bands)
+        out.paste(c, (0, y0, W, y1))
+    out.paste(q, (0, SKY))
+    dst = os.path.join(OUT, 'bg_battle_px.png')
+    out.save(dst, optimize=True)
+    print(f'{dst}  {out.width}x{out.height}  {os.path.getsize(dst) // 1024} KB')
+
+
+pixel_background()
 
 for name, (edge, alpha) in JOBS.items():
     src = os.path.join(ART, name)

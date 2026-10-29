@@ -17,7 +17,6 @@ public class BattleActivity extends Activity implements Controls.Actions {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        SystemUi.immersive(this);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         Difficulty d = parse(getIntent().getStringExtra(EXTRA_DIFFICULTY));
         BattleConfig config = new BattleConfig();
@@ -26,6 +25,7 @@ public class BattleActivity extends Activity implements Controls.Actions {
         bgm = Bgm.get(this);
         view = new BattleView(this, new World(config), d, this, bgm);
         setContentView(view);
+        SystemUi.immersive(this);
     }
 
     private static Difficulty parse(String name) {
