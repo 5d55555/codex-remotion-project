@@ -2,13 +2,11 @@ package com.shinjuku.showdown;
 
 import android.animation.ValueAnimator;
 import android.app.Activity;
-import android.graphics.Insets;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.view.DisplayCutout;
 import android.view.View;
-import android.view.WindowInsets;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.Toast;
 
@@ -28,18 +26,22 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        drawBehindSystemBars();
+        SystemUi.drawBehindSystemBars(this);
         setContentView(R.layout.activity_main);
         scene = findViewById(R.id.scene);
         stats = findViewById(R.id.frame_stats);
-        applySafeInsets(findViewById(R.id.menu_scroll), stats); // 安全区给滚动容器：滚动时内容也不会钻到状态栏下面
+        SystemUi.applySafeInsets(findViewById(R.id.menu_scroll), stats); // 安全区给滚动容器：滚动时内容也不会钻到状态栏下面
 
-        // 背景音乐：现在就开始准备（在它自己的线程上），点开始游戏时就能立刻从头播
+        // 背景音乐：现在就开始准备（在它自己的线程上），点开始游戏时就能立刻从头播；
+        // 前后台暂停/继续由 App 统一管（在界面之间跳转时音乐不断）
         bgm = Bgm.get(this);
         bgm.prepare();
 
-        // 开始游戏：游戏本体还没做；先把背景音乐从头放起来（循环）
-        findViewById(R.id.btn_start).setOnClickListener(v -> bgm.playFromStart());
+        // 开始游戏：背景音乐从头放起来（循环），进入难度选择
+        findViewById(R.id.btn_start).setOnClickListener(v -> {
+            bgm.playFromStart();
+            startActivity(new Intent(this, SelectActivity.class));
+        });
 
         // 空置：弹出“未开放”。2.5 秒内的重复点击直接忽略；要弹新的先撤掉旧的。
         View.OnClickListener notOpen = v -> {
@@ -68,7 +70,6 @@ public class MainActivity extends Activity {
         scene.setAnimationsAllowed(ValueAnimator.areAnimatorsEnabled());
         scene.setResumed(true);
         stats.setResumed(true);
-        bgm.setHostPaused(false);
         // 前台期间系统动画设置变了（关掉动画、进省电模式），背景跟着停/走
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (scaleListener == null) scaleListener = scale -> scene.setAnimationsAllowed(ValueAnimator.areAnimatorsEnabled());
@@ -83,7 +84,6 @@ public class MainActivity extends Activity {
         }
         scene.setResumed(false);
         stats.setResumed(false);
-        bgm.setHostPaused(true);
         if (toast != null) {
             toast.cancel();
             toast = null;
@@ -96,55 +96,6 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         if (isFinishing()) bgm.release();
         super.onDestroy();
-    }
-
-    /** 夜景背景铺满整屏，连状态栏和导航栏后面也画上。 */
-    @SuppressWarnings("deprecation")
-    private void drawBehindSystemBars() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            getWindow().setDecorFitsSystemWindows(false);
-        } else {
-            getWindow().getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-        }
-    }
-
-    /** 内容层避开状态栏、导航栏和刘海；背景不避让，照样铺满。帧率面板跟着顶部安全区下移。 */
-    @SuppressWarnings("deprecation")
-    private static void applySafeInsets(View content, View overlay) {
-        final int l = content.getPaddingLeft(), t = content.getPaddingTop();
-        final int r = content.getPaddingRight(), b = content.getPaddingBottom();
-        content.setOnApplyWindowInsetsListener((v, insets) -> {
-            int sl, st, sr, sb;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                Insets s = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-                sl = s.left;
-                st = s.top;
-                sr = s.right;
-                sb = s.bottom;
-            } else {
-                sl = insets.getSystemWindowInsetLeft();
-                st = insets.getSystemWindowInsetTop();
-                sr = insets.getSystemWindowInsetRight();
-                sb = insets.getSystemWindowInsetBottom();
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    DisplayCutout cut = insets.getDisplayCutout();
-                    if (cut != null) {
-                        sl = Math.max(sl, cut.getSafeInsetLeft());
-                        st = Math.max(st, cut.getSafeInsetTop());
-                        sr = Math.max(sr, cut.getSafeInsetRight());
-                        sb = Math.max(sb, cut.getSafeInsetBottom());
-                    }
-                }
-            }
-            v.setPadding(l + sl, t + st, r + sr, b + sb);
-            overlay.setTranslationX(sl);
-            overlay.setTranslationY(st);
-            return insets;
-        });
-        content.requestApplyInsets();
     }
 
     /** 进场：标题先浮现，三个选项依次升上来；全部到位约 0.75 秒。 */

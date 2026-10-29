@@ -2,6 +2,7 @@ package com.shinjuku.showdown;
 
 import android.animation.ValueAnimator;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -31,7 +32,7 @@ public class SelectActivity extends Activity {
         findViewById(R.id.back).setOnClickListener(v -> finish());
 
         row = findViewById(R.id.cards);
-        for (Difficulty d : Difficulty.values()) row.addView(card(d));
+        for (Difficulty d : Difficulty.values()) row.addView(card(this, d, v -> onDifficultyChosen(d)));
         if (savedInstanceState == null && ValueAnimator.areAnimatorsEnabled()) playEntrance();
     }
 
@@ -42,11 +43,12 @@ public class SelectActivity extends Activity {
         startActivity(i);
     }
 
-    private View card(Difficulty d) {
-        float dp = getResources().getDisplayMetrics().density;
+    /** 一张难度卡（截图测试也用它）。 */
+    static View card(Context ctx, Difficulty d, View.OnClickListener onClick) {
+        float dp = ctx.getResources().getDisplayMetrics().density;
         boolean nightmare = d == Difficulty.STRONGEST;
 
-        LinearLayout card = new LinearLayout(this);
+        LinearLayout card = new LinearLayout(ctx);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_HORIZONTAL);
         card.setPadding((int) (10 * dp), (int) (14 * dp), (int) (10 * dp), (int) (14 * dp));
@@ -62,23 +64,26 @@ public class SelectActivity extends Activity {
         card.setClickable(true);
         card.setFocusable(true);
         card.setContentDescription(d.title + "，" + d.tier + "，" + d.subtitle);
-        card.setOnClickListener(v -> onDifficultyChosen(d));
+        card.setOnClickListener(onClick);
 
-        ImageView emblem = new ImageView(this);
+        ImageView emblem = new ImageView(ctx);
         emblem.setImageResource(d.emblem);
         emblem.setScaleType(ImageView.ScaleType.FIT_CENTER);
         emblem.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         card.addView(emblem, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        TextView title = text(d.title, nightmare ? 30 : 32, Color.WHITE, true);
-        title.setShadowLayer(14 * dp, 0, 0, d.accent);
+        TextView title = text(ctx, d.title, nightmare ? 30 : 32, Color.WHITE, true);
+        title.setShadowLayer(8 * dp, 0, 0, d.accent);
+        int glow = (int) (10 * dp); // 给光晕留地方，不然会被 TextView 自己的边界裁成方块
+        title.setPadding(glow, glow / 2, glow, glow / 2);
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        tl.topMargin = (int) (6 * dp);
+        tl.topMargin = (int) (1 * dp);
+        tl.bottomMargin = -glow / 2;
         card.addView(title, tl);
 
-        card.addView(text(d.subtitle, 13, 0xCCDDE2F5, false));
+        card.addView(text(ctx, d.subtitle, 13, 0xCCDDE2F5, false));
 
-        TextView tier = text(d.tier, 13, nightmare ? 0xFFFFE6A8 : Color.WHITE, true);
+        TextView tier = text(ctx, d.tier, 13, nightmare ? 0xFFFFE6A8 : Color.WHITE, true);
         GradientDrawable pill = new GradientDrawable();
         pill.setCornerRadius(99 * dp);
         pill.setColor(nightmare ? 0xFF8E0F1C : (d.accent & 0x00FFFFFF) | 0x66000000);
@@ -96,8 +101,8 @@ public class SelectActivity extends Activity {
         return card;
     }
 
-    private TextView text(String s, int sp, int color, boolean bold) {
-        TextView t = new TextView(this);
+    private static TextView text(Context ctx, String s, int sp, int color, boolean bold) {
+        TextView t = new TextView(ctx);
         t.setText(s);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         t.setTextColor(color);

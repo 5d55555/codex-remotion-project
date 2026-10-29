@@ -9,7 +9,8 @@
     <string name="vacant_1_desc">空置一，未开放</string>
     <string name="vacant_2_desc">空置二，未开放</string>
     <string name="back">返回</string>
+    <string name="arrow_back" translatable="false">←</string>
     <string name="select_title">选择难度</string>
     <string name="select_sub">新宿决战 · 宿傩</string>
-    <string name="version">v0.2</string>
+    <string name="version">v0.3</string>
 </resources>

@@ -13,8 +13,8 @@ android {
         applicationId = "com.shinjuku.showdown"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
     }
 
     // 测试签名：放在仓库里，保证每次构建的签名一致，新包能直接覆盖安装旧包。只用于测试，不用于上架。
@@ -45,6 +45,11 @@ android {
         noCompress += "mp3"
     }
 
+    // Kotlin 只用在截图测试里；它的插件生成的元数据文件不需要进 APK
+    packaging {
+        resources.excludes += "kotlin-tooling-metadata.json"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
@@ -56,6 +61,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":core"))
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlin:kotlin-stdlib:2.3.0")
 }

@@ -36,7 +36,7 @@
                 android:background="@drawable/btn_round"
                 android:contentDescription="@string/back"
                 android:gravity="center"
-                android:text="←"
+                android:text="@string/arrow_back"
                 android:textColor="@color/text"
                 android:textSize="22sp" />
 

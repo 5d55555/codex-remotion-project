@@ -24,7 +24,8 @@ public class App extends Application {
 
             @Override
             public void onActivityStopped(Activity a) {
-                if (--started == 0) Bgm.get(App.this).setHostPaused(true);
+                // 转屏等配置变化时界面会马上重建，不算退到后台
+                if (--started == 0 && !a.isChangingConfigurations()) Bgm.get(App.this).setHostPaused(true);
             }
 
             @Override public void onActivityCreated(Activity a, Bundle b) { }

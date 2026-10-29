@@ -6,25 +6,10 @@ import android.graphics.Path;
 import android.graphics.RectF;
 
 /**
- * Q 版角色：代码绘制，所有路径在构造时建好，每帧零分配。
- * 坐标以脚底中心为原点、y 向下，身高约 100 个单位（头大身小）；面朝右，face=-1 时水平翻转。
- * 动作由 Pose 的几个角度驱动：身体前倾、头、前后手臂、前后腿、跳跃时的压扁拉伸。
+ * Q 版角色的矢量画法：所有路径在构造时建好，每帧零分配。
+ * 骨骼层级在 Rig；这里只负责把每个部件画出来（也用来烘焙 ChibiSprite 的位图）。
  */
-final class Chibi {
-
-    /** 一帧的姿势。由动画状态机每帧填写，复用同一个对象。 */
-    static final class Pose {
-        float face = 1;          // 1 面朝右，-1 面朝左
-        float lean;              // 身体前倾（度）
-        float head;              // 头的转动（度）
-        float armFront, armBack; // 手臂相对下垂的角度（度，正值往前抬）
-        float legFront, legBack; // 腿相对竖直的角度（度，正值往前迈）
-        float squash = 1;        // 竖向缩放：<1 压扁（落地），>1 拉长（起跳）
-        float bob;               // 上下浮动（单位）
-        float hurt;              // 受击闪白 0..1
-        float glow;              // 手上发光 0..1（施术）
-        int glowColor = 0xFF6FC3FF;
-    }
+final class Chibi extends Rig {
 
     static final int GOJO = 0, SUKUNA = 1;
     private static final float OUTLINE = 1.5f;
@@ -32,7 +17,6 @@ final class Chibi {
     private final int who;
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path hair = new Path(), hairShade = new Path(), torso = new Path(), collar = new Path();
     private final Path arm = new Path(), leg = new Path(), shoe = new Path();
     private final RectF face = new RectF(), eyeL = new RectF(), eyeR = new RectF();
@@ -118,71 +102,55 @@ final class Chibi {
         shoe.addRoundRect(new RectF(-6, 16, 9, 23), 3.5f, 3.5f, Path.Direction.CW);
     }
 
-    /** 画在 (x, y)：脚底中心；scale：每单位多少像素。 */
-    void draw(Canvas c, float x, float y, float scale, Pose p) {
-        c.save();
-        c.translate(x, y - p.bob * scale);
-        c.scale(scale * p.face, scale * p.squash);
+    @Override
+    void part(Canvas c, int part, Pose p) {
         line.setStrokeWidth(OUTLINE);
-
-        // 后腿、后手臂（颜色稍暗）
-        limb(c, leg, -5, -22, p.legBack, cloth, true);
-        shoeAt(c, -5, -22, p.legBack);
-        c.save();
-        c.rotate(p.lean, 0, -22);
-        limb(c, arm, -12, -48, p.armBack, cloth, true);
-
-        // 身体
-        c.save();
-        c.translate(0, -50);
-        fill.setColor(cloth);
-        c.drawPath(torso, fill);
-        c.drawPath(torso, line);
-        fill.setColor(clothHi);
-        c.drawRect(-2, 6, 2, 28, fill); // 衣襟
-        fill.setColor(who == GOJO ? cloth : accent);
-        c.drawPath(collar, fill);
-        c.drawPath(collar, line);
-        c.restore();
-
-        // 头
-        c.save();
-        c.translate(0, -72);
-        c.rotate(p.head);
-        fill.setColor(skin);
-        c.drawOval(face, fill);
-        c.drawOval(face, line);
-        drawEyes(c);
-        fill.setColor(hairColor);
-        c.drawPath(hair, fill);
-        fill.setColor(hairShadeColor);
-        c.drawPath(hairShade, fill);
-        c.drawPath(hair, line);
-        c.restore();
-
-        // 前手臂（施术时手上发光）
-        limb(c, arm, 12, -48, p.armFront, cloth, false);
-        if (p.glow > 0) {
-            c.save();
-            c.rotate(-p.armFront, 12, -48);
-            glowPaint.setColor((((int) (p.glow * 170)) << 24) | (p.glowColor & 0x00FFFFFF));
-            c.drawCircle(12, -28, 7 + 5 * p.glow, glowPaint);
-            glowPaint.setColor((((int) (p.glow * 255)) << 24) | 0xFFFFFF);
-            c.drawCircle(12, -28, 3.5f, glowPaint);
-            c.restore();
+        switch (part) {
+            case LEG_BACK:
+            case LEG_FRONT:
+                fill.setColor(part == LEG_BACK ? darker(cloth) : cloth);
+                c.drawPath(leg, fill);
+                c.drawPath(leg, line);
+                fill.setColor(0xFF07070B);
+                c.drawPath(shoe, fill);
+                break;
+            case ARM_BACK:
+            case ARM_FRONT:
+                fill.setColor(part == ARM_BACK ? darker(cloth) : cloth);
+                c.drawPath(arm, fill);
+                c.drawPath(arm, line);
+                break;
+            case TORSO:
+                fill.setColor(cloth);
+                c.drawPath(torso, fill);
+                c.drawPath(torso, line);
+                fill.setColor(clothHi);
+                c.drawRect(-2, 6, 2, 28, fill); // 衣襟
+                fill.setColor(who == GOJO ? cloth : accent);
+                c.drawPath(collar, fill);
+                c.drawPath(collar, line);
+                break;
+            case HEAD:
+                fill.setColor(skin);
+                c.drawOval(face, fill);
+                c.drawOval(face, line);
+                drawEyes(c);
+                fill.setColor(hairColor);
+                c.drawPath(hair, fill);
+                fill.setColor(hairShadeColor);
+                c.drawPath(hairShade, fill);
+                c.drawPath(hair, line);
+                break;
+            default:
+                break;
         }
-        c.restore();
+    }
 
-        // 前腿
-        limb(c, leg, 5, -22, p.legFront, cloth, false);
-        shoeAt(c, 5, -22, p.legFront);
-
-        // 受击闪白：整个人叠一层白
-        if (p.hurt > 0) {
-            fill.setColor((((int) (p.hurt * 150)) << 24) | 0xFFFFFF);
-            c.drawOval(-26, -110, 26, 2, fill);
-        }
-        c.restore();
+    @Override
+    void hurtOverlay(Canvas c, Pose p) {
+        if (p.hurt <= 0) return;
+        fill.setColor((((int) (p.hurt * 150)) << 24) | 0xFFFFFF);
+        c.drawOval(-26, -110, 26, 2, fill);
     }
 
     private void drawEyes(Canvas c) {
@@ -217,25 +185,6 @@ final class Chibi {
             c.drawLine(-3, 14.5f, 3, 14.5f, line);
         }
         line.setStrokeWidth(OUTLINE);
-    }
-
-    private void limb(Canvas c, Path shape, float jx, float jy, float deg, int color, boolean back) {
-        c.save();
-        c.translate(jx, jy);
-        c.rotate(-deg);
-        fill.setColor(back ? darker(color) : color);
-        c.drawPath(shape, fill);
-        c.drawPath(shape, line);
-        c.restore();
-    }
-
-    private void shoeAt(Canvas c, float jx, float jy, float deg) {
-        c.save();
-        c.translate(jx, jy);
-        c.rotate(-deg);
-        fill.setColor(0xFF07070B);
-        c.drawPath(shoe, fill);
-        c.restore();
     }
 
     private static int darker(int c) {

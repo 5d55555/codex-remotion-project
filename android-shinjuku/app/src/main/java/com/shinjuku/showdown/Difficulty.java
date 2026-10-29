@@ -1,5 +1,7 @@
 package com.shinjuku.showdown;
 
+import com.shinjuku.showdown.core.BattleConfig;
+
 /**
  * 难度。从左到右：三轮（标准）、里梅（困难）、万（疯狂）、史上最强（噩梦）。
  * 每个难度有自己的 configure()，进入战斗前调用；现在宿傩还是活靶子，这里先只放占位，

@@ -43,6 +43,7 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
     private boolean hostPaused;                 // Activity 在后台
     private boolean focusRegistered, focusUsable; // 焦点请求还登记着；现在允许出声
     private int retries;
+    private volatile boolean muted;             // 战斗界面的音乐按钮关掉了（主线程写，bgm 线程读）
 
     static synchronized Bgm get(Context context) {
         if (instance == null) instance = new Bgm(context.getApplicationContext());
@@ -74,6 +75,7 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
 
     /** 从头播放（循环）。还没准备好就记下来，准备好后立刻从头开始。 */
     void playFromStart() {
+        muted = false;
         handler.post(() -> {
             wanted = true;
             restartPending = true;
@@ -92,7 +94,20 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
         });
     }
 
-    /** 应用退出时释放。 */
+    /** 音乐按钮：关掉就暂停（位置保留），再打开接着播。 */
+    void setMuted(boolean m) {
+        muted = m;
+        handler.post(() -> {
+            if (m) pauseNow();
+            else drive();
+        });
+    }
+
+    boolean isMuted() {
+        return muted;
+    }
+
+    /** 主页退出时释放播放器和音频焦点。bgm 线程随进程保留（只有这一个），下次进来直接复用。 */
     void release() {
         handler.post(() -> {
             wanted = false;
@@ -141,7 +156,7 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
      * 要从头就先 seek 到 0，等 onSeekComplete 再开始，seek 没完成之前不会开播。
      */
     private void drive() {
-        if (player == null || !prepared || !wanted || hostPaused || seeking) return;
+        if (player == null || !prepared || !wanted || hostPaused || seeking || muted) return;
         if (!ensureFocus()) return;
         try {
             if (restartPending) {

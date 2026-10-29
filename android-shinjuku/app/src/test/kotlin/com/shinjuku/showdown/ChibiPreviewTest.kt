@@ -24,7 +24,7 @@ class ChibiPreviewTest {
         private val bg = BitmapFactory.decodeResource(resources, R.drawable.bg_battle)
         private val gojo = Chibi(Chibi.GOJO)
         private val sukuna = Chibi(Chibi.SUKUNA)
-        private val pose = Chibi.Pose()
+        private val pose = Rig.Pose()
 
         override fun onDraw(c: Canvas) {
             c.drawBitmap(bg, null, Rect(0, 0, width, height), null)
@@ -47,7 +47,7 @@ class ChibiPreviewTest {
     class Closeup(ctx: Context) : View(ctx) {
         private val gojo = Chibi(Chibi.GOJO)
         private val sukuna = Chibi(Chibi.SUKUNA)
-        private val pose = Chibi.Pose()
+        private val pose = Rig.Pose()
         override fun onDraw(c: Canvas) {
             c.drawColor(0xFF2A2350.toInt())
             val s = height / 120f

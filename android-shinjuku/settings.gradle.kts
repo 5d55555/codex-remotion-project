@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "ShinjukuShowdown"
-include(":app")
+include(":app", ":core")
