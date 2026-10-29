@@ -22,7 +22,6 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
         AudioManager.OnAudioFocusChangeListener {
 
     private static final float VOLUME = 1.0f; // 原曲原样播放，不改音量
-    private static final float DUCK_VOLUME = 0.25f;
     @android.annotation.SuppressLint("StaticFieldLeak") // 只持有 Application Context，不会泄漏 Activity
     private static Bgm instance;
 
@@ -163,14 +162,10 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
         switch (change) {
             case AudioManager.AUDIOFOCUS_GAIN:
                 hasFocus = true;
-                if (player != null) player.setVolume(VOLUME, VOLUME);
                 if (focusPaused) {
                     focusPaused = false;
                     resumeIfWanted();
                 }
-                break;
-            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-                if (player != null) player.setVolume(DUCK_VOLUME, DUCK_VOLUME);
                 break;
             case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
                 focusPaused = true;
