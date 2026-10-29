@@ -132,8 +132,7 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
     @Override
     public void onPrepared(MediaPlayer mp) {
         if (mp != player) return;
-        prepared = true;
-        retries = 0;
+        prepared = true; // 重试计数只在用户点击时清零，避免“准备成功、播放失败”无限重建
         drive();
     }
 
@@ -146,6 +145,9 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
         if (!ensureFocus()) return;
         try {
             if (restartPending) {
+                // 先停住，跳回开头，等最后一次 seek 完成再统一开播（连点也不会先响一小段）
+                pauseNow();
+                if (player == null) return; // 暂停时播放器坏了，已安排重建
                 restartPending = false;
                 seeking = true;
                 player.seekTo(0, MediaPlayer.SEEK_CLOSEST);
