@@ -11,6 +11,7 @@ import android.graphics.RecordingCanvas;
 import android.graphics.Rect;
 import android.graphics.RenderNode;
 import android.graphics.Shader;
+import android.hardware.display.DisplayManager;
 import android.os.Build;
 import android.os.SystemClock;
 import android.util.AttributeSet;
@@ -32,7 +33,7 @@ import java.util.Random;
  * - 自己用 Choreographer 调度：按显示刷新率整数分频，最多约 60–90 帧/秒（120Hz 屏隔一帧画一次）。
  * - 只有“前台 + 可见 + 系统允许动画”时才动；停下时动画时间冻结，恢复后接着播。
  */
-public class ShinjukuView extends View implements Choreographer.FrameCallback {
+public class ShinjukuView extends View implements Choreographer.FrameCallback, DisplayManager.DisplayListener {
 
     private static final int TOWER = 0xFF1B2050; // 都厅双塔，比远处的楼亮一档
     private static final int NEAR = 0xFF07081A;
@@ -408,20 +409,43 @@ public class ShinjukuView extends View implements Choreographer.FrameCallback {
     /** 所有状态变化都走这里：决定开始还是停下，并保证只有一条回调链。 */
     private void sync() {
         boolean run = shouldRun();
+        DisplayManager dm = getContext().getSystemService(DisplayManager.class);
         if (run && runStartMs < 0) {
             runStartMs = SystemClock.uptimeMillis();
-            Display d = getDisplay();
-            float hz = d != null ? d.getRefreshRate() : 60f;
-            vsyncDivisor = Math.max(1, (int) (hz / 60f + 0.25f));
-            vsyncCount = 0;
+            updateDivisor();
+            if (dm != null) dm.registerDisplayListener(this, getHandler());
             invalidate();
             schedule();
         } else if (!run && runStartMs >= 0) {
             activeMs += SystemClock.uptimeMillis() - runStartMs;
             runStartMs = -1;
+            if (dm != null) dm.unregisterDisplayListener(this);
             Choreographer.getInstance().removeFrameCallback(this);
             scheduled = false;
         }
+    }
+
+    /** 按当前刷新率决定隔几个 vsync 画一次：60/90Hz 每帧，120/144Hz 隔一帧。 */
+    private void updateDivisor() {
+        Display d = getDisplay();
+        float hz = d != null ? d.getRefreshRate() : 60f;
+        vsyncDivisor = Math.max(1, (int) (hz / 60f + 0.25f));
+        vsyncCount = 0;
+    }
+
+    // 运行中系统切换了刷新率（比如 60↔120Hz）：重新分频
+    @Override
+    public void onDisplayChanged(int displayId) {
+        Display d = getDisplay();
+        if (d != null && d.getDisplayId() == displayId) updateDivisor();
+    }
+
+    @Override
+    public void onDisplayAdded(int displayId) {
+    }
+
+    @Override
+    public void onDisplayRemoved(int displayId) {
     }
 
     /** Activity 在 onResume/onPause 调用。 */

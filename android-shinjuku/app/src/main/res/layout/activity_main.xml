@@ -11,8 +11,10 @@
 
     <!-- 正常高度时内容居中铺满；窗口太矮（分屏、超大字体）时可以滚动，不会被裁掉 -->
     <ScrollView
+        android:id="@+id/menu_scroll"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToPadding="true"
         android:fillViewport="true"
         android:overScrollMode="never"
         android:scrollbars="none">

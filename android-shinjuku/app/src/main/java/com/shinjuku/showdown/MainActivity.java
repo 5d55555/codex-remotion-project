@@ -32,11 +32,11 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         scene = findViewById(R.id.scene);
         stats = findViewById(R.id.frame_stats);
-        applySafeInsets(findViewById(R.id.content), stats);
+        applySafeInsets(findViewById(R.id.menu_scroll), stats); // 安全区给滚动容器：滚动时内容也不会钻到状态栏下面
 
-        // 背景音乐：第一帧画完再开始准备（在它自己的线程上），点开始游戏时就能立刻从头播
+        // 背景音乐：现在就开始准备（在它自己的线程上），点开始游戏时就能立刻从头播
         bgm = Bgm.get(this);
-        getWindow().getDecorView().post(bgm::prepare);
+        bgm.prepare();
 
         // 开始游戏：游戏本体还没做；先把背景音乐从头放起来（循环）
         findViewById(R.id.btn_start).setOnClickListener(v -> bgm.playFromStart());

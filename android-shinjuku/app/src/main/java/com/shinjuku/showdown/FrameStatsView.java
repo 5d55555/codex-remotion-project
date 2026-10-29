@@ -7,7 +7,6 @@ import android.graphics.Paint;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.view.Display;
 import android.view.FrameMetrics;
@@ -18,7 +17,8 @@ import java.util.Locale;
 
 /**
  * 帧率监视：长按版本号打开。用 FrameMetrics 读窗口每一帧真正的绘制耗时（不是 Choreographer 回调频率），
- * 每半秒汇总一次：画出了多少帧、最慢一帧多少毫秒、超时（超过本帧截止时间）几帧，以及屏幕刷新率。
+ * 每半秒汇总一次：窗口帧率（含面板自己每半秒的那一次刷新）、最慢一帧多少毫秒、
+ * 超时（超过本帧截止时间）几帧、系统漏报了几帧的数据，以及屏幕刷新率。
  * 统计在后台线程，面板每半秒才重画一次，不给界面添负担。
  * 注意：这是应用这一侧的帧耗时，最终有没有准时上屏，要用 Perfetto 的 FrameTimeline 确认。
  */
@@ -33,18 +33,30 @@ public class FrameStatsView extends View implements Window.OnFrameMetricsAvailab
     private Window window;
     private Handler statsHandler;
 
+    /** 一次汇总的结果；整体替换，主线程读到的永远是同一批数。 */
+    private static final class Snapshot {
+        final float fps, worstMs;
+        final int overruns, lost;
+
+        Snapshot(float fps, float worstMs, int overruns, int lost) {
+            this.fps = fps;
+            this.worstMs = worstMs;
+            this.overruns = overruns;
+            this.lost = lost;
+        }
+    }
+
     // 后台线程累计，半秒一结
-    private int frames, overruns;
-    private long worstNs, windowStartMs;
-    // 结果（主线程读）
-    private volatile int shownFrames = -1, shownOverruns;
-    private volatile float shownWorstMs, shownFps;
-    private volatile long lastFrameAtMs;
-    private float refreshHz = 60f;
+    private int frames, overruns, lost;
+    private long worstNs, firstVsyncNs, lastVsyncNs;
+    private volatile Snapshot shown;
+    private volatile float refreshHz = 60f; // 主线程每半秒更新，统计线程读
 
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
+            Display d = getDisplay();
+            if (d != null) refreshHz = d.getRefreshRate(); // 运行中切换刷新率也能跟上
             invalidate();
             if (listening) postDelayed(this, 500);
         }
@@ -123,59 +135,59 @@ public class FrameStatsView extends View implements Window.OnFrameMetricsAvailab
                 } catch (IllegalArgumentException ignored) {
                     // 已经移除过
                 }
+                window = null;
             }
-            shownFrames = -1;
+            shown = null;
         }
     }
 
     private void resetWindow() {
         frames = 0;
         overruns = 0;
+        lost = 0;
         worstNs = 0;
-        windowStartMs = SystemClock.uptimeMillis();
+        firstVsyncNs = 0;
+        lastVsyncNs = 0;
     }
 
     /** 后台线程：每画完一帧系统回调一次。只做数值累计，不分配。 */
     @Override
     public void onFrameMetricsAvailable(Window w, FrameMetrics m, int dropped) {
+        lost += dropped; // 系统漏报的帧：耗时不可知，只计数，不算进超时
         if (m.getMetric(FrameMetrics.FIRST_DRAW_FRAME) == 1) return;
         long total = m.getMetric(FrameMetrics.TOTAL_DURATION);
-        if (total < 0) return;
+        long vsync = m.getMetric(FrameMetrics.INTENDED_VSYNC_TIMESTAMP);
+        if (total < 0 || vsync <= 0) return;
         long deadline = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? m.getMetric(FrameMetrics.DEADLINE) : 0;
-        if (deadline <= 0) deadline = (long) (1e9 / refreshHz);
+        if (deadline <= 0) deadline = (long) (1e9 / refreshHz); // 旧系统：用刷新周期近似
+        if (firstVsyncNs == 0) firstVsyncNs = vsync;
+        lastVsyncNs = vsync;
         frames++;
         if (total > worstNs) worstNs = total;
         if (total > deadline) overruns++;
-        long now = SystemClock.uptimeMillis();
-        lastFrameAtMs = now;
-        long span = now - windowStartMs;
-        if (span >= 500) {
-            shownFps = frames * 1000f / span;
-            shownFrames = frames;
-            shownWorstMs = worstNs / 1e6f;
-            shownOverruns = overruns;
+        long span = lastVsyncNs - firstVsyncNs; // 按帧本身的 vsync 时间算，不受回调排队影响
+        if (span >= 500_000_000L && frames > 1) {
+            shown = new Snapshot((frames - 1) * 1e9f / span, worstNs / 1e6f, overruns, lost);
             resetWindow();
         }
     }
 
     @Override
     protected void onMeasure(int wSpec, int hSpec) {
-        setMeasuredDimension(resolveSize(Math.round(250 * dp), wSpec), resolveSize(Math.round(44 * dp), hSpec));
+        setMeasuredDimension(resolveSize(Math.round(270 * dp), wSpec), resolveSize(Math.round(44 * dp), hSpec));
     }
 
     @Override
     protected void onDraw(Canvas c) {
         c.drawRoundRect(0, 0, getWidth(), getHeight(), 6 * dp, 6 * dp, bg);
+        Snapshot sn = shown;
         String l1, l2;
-        if (shownFrames < 0) {
+        if (sn == null) {
             l1 = "测量中…";
             l2 = "";
-        } else if (SystemClock.uptimeMillis() - lastFrameAtMs > 1000) {
-            l1 = String.format(Locale.ROOT, "静止：没有新帧 · 屏幕 %.0f Hz", refreshHz);
-            l2 = "";
         } else {
-            l1 = String.format(Locale.ROOT, "绘制 %.0f 帧/秒 · 屏幕 %.0f Hz", shownFps, refreshHz);
-            l2 = String.format(Locale.ROOT, "最慢一帧 %.1f ms · 超时 %d 帧", shownWorstMs, shownOverruns);
+            l1 = String.format(Locale.ROOT, "窗口 %.0f 帧/秒（含面板）· 屏幕 %.0f Hz", sn.fps, refreshHz);
+            l2 = String.format(Locale.ROOT, "最慢 %.1f ms · 超时 %d · 漏报 %d", sn.worstMs, sn.overruns, sn.lost);
         }
         c.drawText(l1, 10 * dp, 18 * dp, text);
         c.drawText(l2, 10 * dp, 36 * dp, text);
