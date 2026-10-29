@@ -13,8 +13,8 @@ android {
         applicationId = "com.shinjuku.showdown"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.4"
+        versionCode = 5
+        versionName = "0.5"
     }
 
     // 测试签名：放在仓库里，保证每次构建的签名一致，新包能直接覆盖安装旧包。只用于测试，不用于上架。
@@ -40,9 +40,9 @@ android {
         }
     }
 
-    // 背景音乐用 openRawResourceFd 直接从 APK 里读，必须不压缩
+    // 背景音乐和领域展开的过场视频用 openRawResourceFd 直接从 APK 里读，必须不压缩
     androidResources {
-        noCompress += "mp3"
+        noCompress += listOf("mp3", "mp4")
     }
 
     // Kotlin 只用在截图测试里；它的插件生成的元数据文件不需要进 APK

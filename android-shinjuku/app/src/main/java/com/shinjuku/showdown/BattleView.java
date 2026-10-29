@@ -29,15 +29,17 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
     private final BattleLoop loop;
     private float safeL, safeT, safeR, safeB;
 
-    BattleView(Context context, World world, Difficulty difficulty, Controls.Actions actions, Bgm bgm) {
+    BattleView(Context context, World world, Difficulty difficulty, Controls.Actions actions, Bgm bgm, BattleLoop.CutsceneHost cutsceneHost) {
         super(context);
         controls = new Controls(actions);
         Atlas atlas = new Atlas();
         BitmapFactory.Options o = new BitmapFactory.Options();
         o.inScaled = false; // 像素背景必须 1:1
         Bitmap bg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_battle_px, o);
-        scene = new PixelScene(atlas, bg.getWidth(), bg.getHeight(), bg.getPixel(0, 0), difficulty, controls, bgm);
-        loop = new BattleLoop(world, controls, scene, new GlTarget(new AndroidGl(), atlas.bitmap, bg), new CanvasTarget(atlas.bitmap, bg));
+        Bitmap voidBg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_void_px, o);
+        scene = new PixelScene(atlas, bg, voidBg, difficulty, controls, bgm);
+        loop = new BattleLoop(world, controls, scene, new GlTarget(new AndroidGl(), atlas.bitmap, bg, voidBg),
+                new CanvasTarget(atlas.bitmap, bg, voidBg), cutsceneHost);
         getHolder().setFormat(PixelFormat.OPAQUE);
         getHolder().addCallback(this);
         setFocusable(true);
@@ -46,6 +48,15 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
     void setResumed(boolean resumed) {
         if (!resumed) controls.releaseAll();
         loop.setResumed(resumed);
+    }
+
+    /** 放过场时战斗不收触摸（按着的全部松开）。 */
+    void setInputBlocked(boolean blocked) {
+        controls.setBlocked(blocked);
+    }
+
+    void endCutscene(int castId) {
+        loop.endCutscene(castId);
     }
 
     void toggleStats() {

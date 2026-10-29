@@ -1,7 +1,9 @@
 package com.shinjuku.showdown;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
 import android.content.Intent;
@@ -20,6 +22,7 @@ import org.robolectric.shadows.ShadowLog;
 import org.robolectric.shadows.ShadowMediaPlayer;
 
 import java.lang.reflect.Field;
+import java.time.Duration;
 
 /**
  * 整条路径：主页 → 点开始游戏 → 选难度 → 点每一张卡 → 战斗 → 暂停、恢复、退出。
@@ -71,7 +74,8 @@ public class SmokeTest {
 
         ActivityController<SelectActivity> select = Robolectric.buildActivity(SelectActivity.class, toSelect).setup();
         LinearLayout cards = select.get().findViewById(R.id.cards);
-        assertEquals(4, cards.getChildCount());
+        assertEquals(Difficulty.values().length, cards.getChildCount());
+        assertEquals(5, cards.getChildCount());
         for (int i = 0; i < cards.getChildCount(); i++) {
             cards.getChildAt(i).performClick();
             idle();
@@ -95,6 +99,37 @@ public class SmokeTest {
         }
         select.pause().stop().destroy();
         main.restart().start().resume().pause().stop().destroy();
+        idle();
+    }
+
+    /**
+     * 领域展开的过场：开始时盖上幕布、战斗不收触摸；视频起不来（这里没有真的 Surface）时 2 秒后自己结束，
+     * 幕布撤掉、战斗接着打。切后台不计时。
+     */
+    @Test
+    public void cutsceneEndsEvenWithoutVideoSurface() throws Exception {
+        Intent i = new Intent().putExtra(BattleActivity.EXTRA_DIFFICULTY, Difficulty.TEST.name());
+        ActivityController<BattleActivity> battle = Robolectric.buildActivity(BattleActivity.class, i).setup();
+        idle();
+        Field cf = BattleActivity.class.getDeclaredField("cutscene");
+        cf.setAccessible(true);
+        CutscenePlayer cutscene = (CutscenePlayer) cf.get(battle.get());
+        battle.get().startCutscene(1);
+        assertTrue(cutscene.isPlaying());
+        // 后台：不计时
+        battle.pause();
+        for (int k = 0; k < 30; k++) {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100));
+            Thread.sleep(5);
+        }
+        assertTrue("后台不该超时", cutscene.isPlaying());
+        battle.resume();
+        for (int k = 0; k < 60 && cutscene.isPlaying(); k++) {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100));
+            Thread.sleep(5); // cutscene 线程是真线程
+        }
+        assertFalse("首帧超时后应该自己结束", cutscene.isPlaying());
+        battle.pause().stop().destroy();
         idle();
     }
 

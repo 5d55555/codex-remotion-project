@@ -21,8 +21,15 @@ import java.util.concurrent.CountDownLatch;
  * 再用剩下的零头做插值画一帧。逻辑和画面都在这个线程，World 不跨线程。
  * 画面用 GLES2（GlTarget）；GL 起不来就用 Canvas（lockHardwareCanvas + CanvasTarget）兜底。
  * Surface 的生死由主线程通知；surfaceGone() 会等战斗线程放开这个 Surface 才返回。
+ * 领域展开的过场：World 停住（cutscene）后，这一帧剩下的 tick 不再推进，战斗帧回调也停掉（线程留着收消息），
+ * 通知主线程放视频；放完 endCutscene() 回到这个线程展开领域，从下一帧重新计时（不补放视频那几秒的 tick），积压的按键全丢掉。
  */
 final class BattleLoop implements Choreographer.FrameCallback {
+    interface CutsceneHost {
+        /** 要放领域展开的过场了（主线程）。 */
+        void startCutscene(int castId);
+    }
+
     private static final String TAG = "BattleLoop";
     private static final long TICK_NS = 1_000_000_000L / Tuning.HZ;
     private static final int MAX_STEPS = 8;
@@ -32,6 +39,8 @@ final class BattleLoop implements Choreographer.FrameCallback {
     private final PixelScene scene;
     private final GlTarget gl;
     private final CanvasTarget canvasTarget;
+    private final CutsceneHost cutsceneHost;
+    private final Handler mainHandler = new Handler(android.os.Looper.getMainLooper());
     private final TickInput input = new TickInput();
     private final HandlerThread thread = new HandlerThread("battle");
     private final Handler handler;
@@ -46,16 +55,18 @@ final class BattleLoop implements Choreographer.FrameCallback {
     private Surface surface;
     private int surfaceW, surfaceH;
     private boolean resumed, hasSurface, scheduled, useCanvas, needAttach;
+    private boolean cutscenePaused; // 在放过场：不推进、不画
     private long lastFrameNs, accNs, simNs; // simNs：最近一个 tick 对应的时刻（和触摸事件同一个时钟）
     private float renderTime;               // 画面时钟（秒），暂停期间不走
     private float tickMsAvg, drawMsAvg;
 
-    BattleLoop(World world, Controls controls, PixelScene scene, GlTarget gl, CanvasTarget canvasTarget) {
+    BattleLoop(World world, Controls controls, PixelScene scene, GlTarget gl, CanvasTarget canvasTarget, CutsceneHost cutsceneHost) {
         this.world = world;
         this.controls = controls;
         this.scene = scene;
         this.gl = gl;
         this.canvasTarget = canvasTarget;
+        this.cutsceneHost = cutsceneHost;
         thread.start();
         handler = new Handler(thread.getLooper());
         handler.post(() -> {
@@ -127,6 +138,17 @@ final class BattleLoop implements Choreographer.FrameCallback {
         });
     }
 
+    /** 过场放完（或放不了）：回到战斗线程展开领域，接着打。castId 不对的（旧的）忽略。 */
+    void endCutscene(int castId) {
+        handler.post(() -> {
+            world.endCutscene(castId);
+            if (world.cutscene || !cutscenePaused) return;
+            cutscenePaused = false;
+            controls.discardPending();
+            update();
+        });
+    }
+
     void quit() {
         handler.post(() -> {
             try {
@@ -142,7 +164,7 @@ final class BattleLoop implements Choreographer.FrameCallback {
     /* ---------------- 战斗线程 ---------------- */
 
     private void update() {
-        boolean run = resumed && hasSurface;
+        boolean run = resumed && hasSurface && !cutscenePaused;
         if (run && !scheduled) {
             lastFrameNs = 0; // 恢复后从这一帧重新计时，不补暂停期间的 tick
             scheduled = true;
@@ -176,6 +198,14 @@ final class BattleLoop implements Choreographer.FrameCallback {
             controls.sample(input, accNs >= TICK_NS ? simNs : Long.MAX_VALUE);
             world.step(input);
             input.clearEdges();
+            if (world.cutscene) break;
+        }
+        if (world.cutscene && !cutscenePaused) {
+            // 按了领域展开：世界停住，这一帧剩下的时间不要了；画面停在这一帧，主线程盖上视频
+            cutscenePaused = true;
+            accNs = 0;
+            int id = world.castId;
+            mainHandler.post(() -> cutsceneHost.startCutscene(id));
         }
         long t1 = System.nanoTime();
         draw(accNs / (float) TICK_NS);
@@ -184,7 +214,8 @@ final class BattleLoop implements Choreographer.FrameCallback {
         drawMsAvg += ((t2 - t1) * 1e-6f - drawMsAvg) * 0.05f;
         scene.reportFrame(dt, tickMsAvg, drawMsAvg);
 
-        choreographer.postFrameCallback(this);
+        if (cutscenePaused) update(); // 停掉帧回调（线程还在，等过场结束的消息）
+        else choreographer.postFrameCallback(this);
     }
 
     private void draw(float alpha) {

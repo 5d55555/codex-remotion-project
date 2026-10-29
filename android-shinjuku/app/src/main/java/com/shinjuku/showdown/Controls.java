@@ -8,7 +8,7 @@ import com.shinjuku.showdown.core.TickInput;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 
 /**
- * 触屏操作：左下浮动摇杆，右下 体术 / 跳 / 苍 / 赫 / 茈 五个键，顶部 返回 和 音乐 两个小按钮。
+ * 触屏操作：左下浮动摇杆，右下 体术 / 跳 / 苍 / 赫 / 茈 / 领域 六个键，顶部 返回 和 音乐 两个小按钮。
  * 主线程处理触摸；战斗线程每个 tick 取一次（sample）。
  * 按键：主线程把“第几个键、按下还是松开、什么时候”写进预分配的事件环（单写单读，不加锁、不分配），
  * 战斗线程按时间顺序取。同一个键在一个 tick 里最多取一次按下加一次松开（点按不丢），再多的顺延到下一个 tick，
@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicIntegerArray;
  * 摇杆是连续量，只传最新值：两个分量打包在一个 volatile long 里，读到的总是同一次写入。
  */
 final class Controls {
-    static final int MELEE = 0, JUMP = 1, BLUE = 2, RED = 3, PURPLE = 4, BUTTONS = 5;
+    static final int MELEE = 0, JUMP = 1, BLUE = 2, RED = 3, PURPLE = 4, DOMAIN = 5, BUTTONS = 6;
 
     /** 布局（视图像素）。尺寸或安全区变化时在主线程重建一个新的，渲染线程只读。 */
     static final class Layout {
@@ -39,13 +39,14 @@ final class Controls {
             knobR = 26 * dp;
             stickX = sl + 40 * dp + stickR;
             stickY = h - sb - 34 * dp - stickR;
-            // 体术在右下角最大；跳、苍、茈、赫沿一道弧排在它的左上方（彼此留出空隙）
+            // 体术在右下角最大；跳、苍、茈、赫沿一道弧排在它的左上方（彼此留出空隙），领域在外圈
             float ax = w - sr - 34 * dp - 44 * dp, ay = h - sb - 30 * dp - 44 * dp;
             set(MELEE, ax, ay, 44 * dp);
             set(JUMP, ax - 110 * dp, ay + 19 * dp, 30 * dp);
             arc(BLUE, ax, ay, 125 * dp, 152, 31 * dp);
             arc(PURPLE, ax, ay, 125 * dp, 121, 31 * dp);
             arc(RED, ax, ay, 125 * dp, 90, 31 * dp);
+            arc(DOMAIN, ax, ay, 196 * dp, 114, 27 * dp);
             smallR = 19 * dp;
             backX = sl + 14 * dp + smallR;
             backY = st + 12 * dp + smallR;
@@ -102,7 +103,8 @@ final class Controls {
     private static final float DEADZONE = 0.12f;
     private final Actions actions;
     private int stickPointer = -1;
-    private final int[] buttonPointer = {-1, -1, -1, -1, -1};
+    private final int[] buttonPointer = {-1, -1, -1, -1, -1, -1};
+    private boolean blocked; // 放过场时：战斗不收触摸
     private int hudPointer = -1, hudTarget = -1;
     private long hudDownAt;
 
@@ -123,12 +125,7 @@ final class Controls {
         if (overflow) {
             // 事件环满过（几乎不可能）：丢掉积压的，按住状态以主线程为准。
             // 在锁里做：拿到的写指针和按住状态是同一时刻的，主线程也不会在中间插进新事件或新的溢出标记。
-            synchronized (ringLock) {
-                evRead = evWrite;
-                overflow = false;
-                heldBits = 0;
-                for (int b = 0; b < BUTTONS; b++) if (held.get(b) != 0) heldBits |= 1 << b;
-            }
+            discardPending();
         }
         int downs = 0, ups = 0;
         long r = evRead, w = evWrite;
@@ -153,9 +150,29 @@ final class Controls {
         in.jump = (downs & (1 << JUMP)) != 0;
         in.red = (downs & (1 << RED)) != 0;
         in.purple = (downs & (1 << PURPLE)) != 0;
+        in.domain = (downs & (1 << DOMAIN)) != 0;
         in.blueDown = (downs & (1 << BLUE)) != 0;
         in.blueUp = (ups & (1 << BLUE)) != 0;
         in.blueHeld = (heldBits & (1 << BLUE)) != 0;
+        in.meleeHeld = (heldBits & (1 << MELEE)) != 0;
+        in.redHeld = (heldBits & (1 << RED)) != 0;
+        in.purpleHeld = (heldBits & (1 << PURPLE)) != 0;
+    }
+
+    /** 战斗线程：过场结束、接着打之前，把积压的按键事件全丢掉，按住状态以主线程为准（放过场时主线程已全部松开）。 */
+    void discardPending() {
+        synchronized (ringLock) {
+            evRead = evWrite;
+            overflow = false;
+            heldBits = 0;
+            for (int b = 0; b < BUTTONS; b++) if (held.get(b) != 0) heldBits |= 1 << b;
+        }
+    }
+
+    /** 主线程：放过场时不收触摸（先把按着的全部松开），放完再收。 */
+    void setBlocked(boolean b) {
+        if (b) releaseAll();
+        blocked = b;
     }
 
     /** 主线程：按键按下/松开。按住状态和事件一起改，溢出恢复时看到的两者一致。 */
@@ -185,6 +202,7 @@ final class Controls {
         Layout l = layout;
         if (l == null) return false;
         int action = e.getActionMasked();
+        if (blocked) return true;
         switch (action) {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_DOWN: {

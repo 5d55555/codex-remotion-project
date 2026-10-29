@@ -16,12 +16,14 @@ JOBS = {
     'emblem_uraume.png': (360, True),
     'emblem_yorozu.png': (360, True),
     'emblem_strongest.png': (360, True),
+    'emblem_test.png': (360, True),
 }
 
-def pixel_background():
-    """像素战斗背景：Luna 的“像素风”原图像素并不对齐网格，这里按面积缩到 266 高（每个像素块就是游戏里的一个虚拟像素），
-    量化到 64 色、不抖动，边缘锐利；上面再补 80 行分档的天空，给比较高的屏幕用。存成无损 PNG。"""
-    src = os.path.join(ART, 'bg_battle_px.png')
+def pixel_background(name, sky_shift=(-34, -30, -6), mirror=False):
+    """像素背景：Luna 的“像素风”原图像素并不对齐网格，这里按面积缩到 266 高（每个像素块就是游戏里的一个虚拟像素），
+    量化到 64 色、不抖动，边缘锐利；上面再补 80 行分档的天空，给比较高的屏幕用。存成无损 PNG。
+    两张背景都缩到同样高度，脚底所在的行（游戏里 BG_FEET）对得上。"""
+    src = os.path.join(ART, name + '.png')
     if not os.path.exists(src):
         print('缺少', src)
         return
@@ -32,7 +34,7 @@ def pixel_background():
     q = small.quantize(colors=64, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert('RGB')
     top = [q.getpixel((x, 0)) for x in range(0, W, 7)]
     avg = tuple(sum(c[i] for c in top) // len(top) for i in range(3))
-    deep = (max(0, avg[0] - 34), max(0, avg[1] - 30), min(255, avg[2] - 6))
+    deep = tuple(max(0, min(255, avg[i] + sky_shift[i])) for i in range(3))
     out = Image.new('RGB', (W, H + SKY), avg)
     bands = 5
     for b in range(bands):
@@ -40,13 +42,16 @@ def pixel_background():
         c = tuple(round(deep[i] + (avg[i] - deep[i]) * k) for i in range(3))
         y0, y1 = round(SKY * b / bands), round(SKY * (b + 1) / bands)
         out.paste(c, (0, y0, W, y1))
+    if mirror:  # 星空：把顶上一段上下翻过来接在上面，星星接得上
+        out.paste(q.crop((0, 0, W, SKY)).transpose(Image.Transpose.FLIP_TOP_BOTTOM), (0, 0))
     out.paste(q, (0, SKY))
-    dst = os.path.join(OUT, 'bg_battle_px.png')
+    dst = os.path.join(OUT, name + '.png')
     out.save(dst, optimize=True)
     print(f'{dst}  {out.width}x{out.height}  {os.path.getsize(dst) // 1024} KB')
 
 
-pixel_background()
+pixel_background('bg_battle_px')
+pixel_background('bg_void_px', mirror=True)  # 无量空处：上面接的是镜像的星空
 
 for name, (edge, alpha) in JOBS.items():
     src = os.path.join(ART, name)

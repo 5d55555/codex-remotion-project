@@ -1,6 +1,6 @@
 # 新宿决战 像素角色（面朝右画；朝左时整体水平翻转）。
 # 每个字符是调色板里的一个颜色，. 是透明。pivot 是这个部件挂到骨骼上的点（关节）。
-# 骨骼（以脚底中心为原点，向上为负）：胯 (0,-15)，左右腿挂在 (±2,-15)，肩 (±7,-28)，脖子 (0,-29)。
+# 骨骼（以脚底中心为原点，向上为负）：腿挂在 (±2,-13)，身体底边在 (0,-12)，肩 (±6,-24)，脖子 (0,-26)。
 # 改完运行：python3 scripts/pixel_art.py java   （预览：python3 scripts/pixel_art.py preview /tmp/x.png）
 
 palette gojo
@@ -81,59 +81,56 @@ KghhhHHHHHHHHHHHHHHHHHHHHHhhK.
 ...........KKKKKKKKKK.........
 end
 
-sprite gojo.torso palette gojo pivot 8 15
-....KKKKKKKKK....
-....KCcCCCCcCK...
-....KCcCCCCcCK...
-...KKcCCCCCCCKK..
-..KCCCCCCCCCCCCK.
-.KCcCCCCzCCCCCcCK
-.KCcCCCCzCCCCCcCK
-.KCcCCCCzCCCCCdCK
-.KCcCCCCzCCCCCdCK
-.KCCCCCCzCCCCCdCK
-.KCCCCCCzCCCCCdCK
-.KdCCCCCzCCCCddCK
-.KdddddddddddddK.
-.KnnnnnnnnnnnnnK.
-.KnNnnnnnnnnnnnK.
-..KKKKKKKKKKKKK..
+sprite gojo.torso palette gojo pivot 7 14
+.....KKKKK.....
+....KcCCCdK....
+...KKcCzCdKK...
+..KcCCCzCCCdK..
+.KcCCCCzCCCCdK.
+KcCCCCCzCCCCCdK
+KcCCCCCzCCCCCdK
+KcCCCCCzCCCCCdK
+.KcCCCCzCCCCdK.
+.KcCCCCzCCCCdK.
+..KdddddddddK..
+..KnNnnnnnndK..
+..KnNnnnnnndK..
+..KnnnnKnnndK..
+...KKKK.KKKK...
 end
 
 sprite gojo.arm palette gojo pivot 2 1
-.KKKK.
-KCcCCK
-KCcCCK
-KCcCCK
-KCcCCK
-KCcCdK
-KCcCdK
-KCCCdK
-KCCCdK
-KCCCdK
-KKKKKK
-KSSSsK
-KSSSsK
-.KSsK.
-..KK..
+.KKK.
+KcCCK
+KcCCK
+KcCdK
+KcCdK
+KcCdK
+KcCdK
+.KCdK
+.KCdK
+.KKKK
+KSSsK
+KSSsK
+.KKK.
 end
 
-sprite gojo.leg palette gojo pivot 3 1
-KnnnnnK..
-KnNnnnK..
-KnNnnnK..
-KnNnndK..
-KnNnndK..
-KnnnndK..
-KnnnndK..
-KnnnndK..
-KnnnndK..
-KnnnndK..
-KnnnndK..
-KKnnndKK.
-KOooooooK
-KoooooooK
-.KKKKKKK.
+sprite gojo.leg palette gojo pivot 2 1
+KnnnK..
+KnNnK..
+KnNnK..
+KnNnK..
+KnNdK..
+KnNdK..
+KnNdK..
+KnndK..
+KnndK..
+KnndK..
+KnndK..
+KOooKK.
+KoOoooK
+KoooooK
+.KKKKK.
 end
 
 sprite sukuna.head palette sukuna pivot 15 27
@@ -166,59 +163,56 @@ KghhhHHHHHHHHHHHHHHHHHHHHHhhhK
 ...........KKKKKKKKKK.........
 end
 
-sprite sukuna.torso palette sukuna pivot 8 15
-....KKKKKKKKK....
-....KCcCCCCcCK...
-....KCcCzCCcCK...
-...KKcCCCCCCCKK..
-..KCCCCCCCCCCCCK.
-.KCcCCCCzCCCCCcCK
-.KCcCCCCzCCCCCcCK
-.KCcCCCCzCCCCCdCK
-.KCcCCCCzCCCCCdCK
-.KCCCCCCzCCCCCdCK
-.KCCCCCCzCCCCCdCK
-.KdCCCCCzCCCCddCK
-.KdddddddddddddK.
-.KnnnnnnnnnnnnnK.
-.KnNnnnnnnnnnnnK.
-..KKKKKKKKKKKKK..
+sprite sukuna.torso palette sukuna pivot 7 14
+.....KKKKK.....
+....KcCCCdK....
+...KKcCzCdKK...
+..KcCCCzCCCdK..
+.KcCCCCzCCCCdK.
+KcCCCCCzCCCCCdK
+KcCCCCCzCCCCCdK
+KcCCCCCzCCCCCdK
+.KcCCCCzCCCCdK.
+.KcCCCCzCCCCdK.
+..KdddddddddK..
+..KnNnnnnnndK..
+..KnNnnnnnndK..
+..KnnnnKnnndK..
+...KKKK.KKKK...
 end
 
 sprite sukuna.arm palette sukuna pivot 2 1
-.KKKK.
-KCcCCK
-KCcCCK
-KCcCCK
-KCcCCK
-KCcCdK
-KCcCdK
-KCCCdK
-KCCCdK
-KCCCdK
-KKKKKK
-KqqqqK
-KSSSsK
-.KSsK.
-..KK..
+.KKK.
+KcCCK
+KcCCK
+KcCdK
+KcCdK
+KcCdK
+KcCdK
+.KCdK
+.KCdK
+.KqqK
+KSSsK
+KSSsK
+.KKK.
 end
 
-sprite sukuna.leg palette sukuna pivot 3 1
-KnnnnnK..
-KnNnnnK..
-KnNnnnK..
-KnNnndK..
-KnNnndK..
-KnnnndK..
-KnnnndK..
-KnnnndK..
-KnnnndK..
-KnnnndK..
-KnnnndK..
-KKnnndKK.
-KOooooooK
-KoooooooK
-.KKKKKKK.
+sprite sukuna.leg palette sukuna pivot 2 1
+KnnnK..
+KnNnK..
+KnNnK..
+KnNnK..
+KnNdK..
+KnNdK..
+KnNdK..
+KnndK..
+KnndK..
+KnndK..
+KnndK..
+KOooKK.
+KoOoooK
+KoooooK
+.KKKKK.
 end
 
 # ---------------- 像素数字（5×7，白色；描边在运行时自动加 1 像素） ----------------

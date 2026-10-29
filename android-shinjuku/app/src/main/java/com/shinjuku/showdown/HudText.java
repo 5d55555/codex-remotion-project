@@ -11,9 +11,12 @@ import android.graphics.Typeface;
  */
 final class HudText {
     static final int GOJO = 0, SUKUNA = 1, DIFF_TITLE = 2, DIFF_TIER = 3;
-    static final int BTN_MELEE = 4, BTN_JUMP = 5, BTN_BLUE = 6, BTN_RED = 7, BTN_PURPLE = 8;
-    static final int SUB_BLUE = 9, SUB_BLUE_MAX = 10, SUB_RED = 11, SUB_PURPLE = 12, SUB_HOLLOW = 13;
-    static final int COUNT = 14;
+    static final int BTN_MELEE = 4, BTN_JUMP = 5, BTN_BLUE = 6, BTN_RED = 7, BTN_PURPLE = 8, BTN_DOMAIN = 9; // 和 Controls 的键顺序一致
+    static final int SUB_BLUE = 10, SUB_BLUE_MAX = 11, SUB_RED = 12, SUB_PURPLE = 13, SUB_HOLLOW = 14;
+    static final int SUB_RED_MAX = 15, SUB_PURPLE_200 = 16, SUB_FIST = 17, SUB_DOMAIN = 18;
+    static final int CHANT0 = 19;   // 四段咒词：九纲、偏光、乌与声明、表里之间
+    static final int DISMANTLE = 23; // 宿傩的“解”
+    static final int COUNT = 24;
 
     final Bitmap bitmap;
     final float dp;
@@ -22,9 +25,11 @@ final class HudText {
 
     HudText(float dp, Difficulty d) {
         this.dp = dp;
-        String[] text = {"五条悟", "两面宿傩", d.title, d.tier, "体术", "跳", "苍", "赫", "茈",
-                "术式顺转", "术式顺转 · 出力最大", "术式反转", "虚式", "虚式 · 无指向"};
-        float[] size = {13, 13, 16, 10, 15, 15, 22, 22, 22, 15, 15, 15, 15, 15};
+        String[] text = {"五条悟", "两面宿傩", d.title, d.tier, "体术", "跳", "苍", "赫", "茈", "领域",
+                "术式顺转", "术式顺转 · 出力最大", "术式反转", "虚式", "虚式 · 无指向",
+                "术式反转 · 最大输出", "虚式 · 200%", "术式顺转 · 苍拳", "领域展开",
+                "九纲", "偏光", "乌与声明", "表里之间", "解"};
+        float[] size = {13, 13, 16, 10, 15, 15, 22, 22, 22, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 17, 17, 17, 17, 16};
         Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         fill.setTypeface(Typeface.DEFAULT_BOLD);
         fill.setColor(0xFFFFFFFF);

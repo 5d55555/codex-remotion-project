@@ -51,10 +51,11 @@ class GlParityTest {
             val world = World(BattleConfig())
             val ca = Controls(noActions).also { it.layout = Controls.Layout(W.toFloat(), H.toFloat(), dp, 0f, 0f, 0f, 0f) }
             val cb = Controls(noActions).also { it.layout = ca.layout }
-            val sc = PixelScene(atlas, bg.width, bg.height, bg.getPixel(0, 0), Difficulty.MIWA, ca, null)
-            val sg = PixelScene(atlas, bg.width, bg.height, bg.getPixel(0, 0), Difficulty.MIWA, cb, null)
-            val ct = CanvasTarget(atlas.bitmap, bg)
-            val gt = GlTarget(LwjglGl(), atlas.bitmap, bg)
+            val voidBg = BitmapFactory.decodeResource(ctx.resources, R.drawable.bg_void_px, BitmapFactory.Options().apply { inScaled = false })
+            val sc = PixelScene(atlas, bg, voidBg, Difficulty.TEST, ca, null)
+            val sg = PixelScene(atlas, bg, voidBg, Difficulty.TEST, cb, null)
+            val ct = CanvasTarget(atlas.bitmap, bg, voidBg)
+            val gt = GlTarget(LwjglGl(), atlas.bitmap, bg, voidBg)
             gt.initForTest()
             sc.layout(W, H)
             sg.layout(W, H)
@@ -119,6 +120,23 @@ class GlParityTest {
             input.purple = true
             steps(60)
             check("purple")
+            // 赫·最大输出（大球、尾迹）
+            world.gojo.x = 200f
+            world.sukuna.x = 1100f
+            steps(400)
+            input.red = true; input.redHeld = true
+            steps(36 + 24 + 8)
+            input.redHeld = false
+            check("redMax")
+            // 无量空处：铺开一半（按行贴图）和铺满
+            steps(200)
+            input.domain = true
+            steps(1)
+            world.endCutscene(world.castId)
+            steps(42)
+            check("voidOpening")
+            steps(120)
+            check("void")
         }
     }
 

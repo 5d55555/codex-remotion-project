@@ -19,11 +19,11 @@ final class Atlas {
     // 图标
     static final int ICON_BACK = 19, ICON_NOTE = 20;
     // 像素大字（白字黑边，画的时候按颜色乘）
-    static final int BIG_BLUE = 21, BIG_RED = 22, BIG_PURPLE = 23, BIG_BLACK_FLASH = 24, BIG_KO = 25;
-    static final int COUNT = 26;
+    static final int BIG_BLUE = 21, BIG_RED = 22, BIG_PURPLE = 23, BIG_BLACK_FLASH = 24, BIG_KO = 25, BIG_FIST = 26, BIG_VOID = 27;
+    static final int COUNT = 28;
 
-    static final String[] BIG_TEXT = {"「苍」", "「赫」", "「茈」", "黑闪", "击倒"};
-    static final int[] BIG_SIZE = {28, 28, 28, 30, 15};
+    static final String[] BIG_TEXT = {"「苍」", "「赫」", "「茈」", "黑闪", "击倒", "「苍拳」", "「无量空处」"};
+    static final int[] BIG_SIZE = {28, 28, 28, 30, 15, 28, 28};
 
     final Bitmap bitmap;
     final int[] x = new int[COUNT], y = new int[COUNT], w = new int[COUNT], h = new int[COUNT];

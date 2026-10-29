@@ -6,6 +6,7 @@ public final class Shot {
     public int tick, instanceId;
     public float x, y, px, py;   // 当前位置、上一 tick 位置（画面插值用）
     public float dir;            // +1 向右，-1 向左
+    public boolean max;          // 赫的最大输出 / 200% 的茈
     boolean hit;                 // 已经打中过宿傩（同一发只算一次）
 
     void start(int id, float x, float y, float dir) {
@@ -16,5 +17,6 @@ public final class Shot {
         this.y = py = y;
         this.dir = dir;
         hit = false;
+        max = false;
     }
 }

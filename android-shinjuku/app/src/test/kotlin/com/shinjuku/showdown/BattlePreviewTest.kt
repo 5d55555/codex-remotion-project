@@ -38,14 +38,35 @@ class BattlePreviewTest {
         internal val controls = Controls(noActions)
         private val atlas = Atlas()
         private val bg = BitmapFactory.decodeResource(ctx.resources, R.drawable.bg_battle_px, BitmapFactory.Options().apply { inScaled = false })
-        internal val scene = PixelScene(atlas, bg.width, bg.height, bg.getPixel(0, 0), d, controls, null)
-        private val target = CanvasTarget(atlas.bitmap, bg)
+        private val voidBg = BitmapFactory.decodeResource(ctx.resources, R.drawable.bg_void_px, BitmapFactory.Options().apply { inScaled = false })
+        internal val scene = PixelScene(atlas, bg, voidBg, d, controls, null)
+        private val target = CanvasTarget(atlas.bitmap, bg, voidBg)
         private val scratch = Canvas(android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888))
         val input = TickInput()
         private val dm = ctx.resources.displayMetrics
         private var setup = script
         private var w = 0
         private var h = 0
+
+        /** 一直推进到出现某种事件（最多 limit 个 tick），返回是否出现了。 */
+        fun stepsUntil(type: Int, limit: Int): Boolean {
+            var seen = world.events.written
+            repeat(limit) {
+                steps(1)
+                while (seen < world.events.written) {
+                    if (world.events.type[(seen and Events.MASK.toLong()).toInt()] == type) return true
+                    seen++
+                }
+            }
+            return false
+        }
+
+        /** 按领域展开：过场直接算放完（截图里没有视频），无量空处展开。 */
+        fun openDomain() {
+            input.domain = true
+            steps(1)
+            world.endCutscene(world.castId)
+        }
 
         fun steps(n: Int) {
             repeat(n) {
@@ -150,6 +171,122 @@ class BattlePreviewTest {
                 steps(1)
                 if (world.hollow.active && !formed) { formed = true; steps(9); break }
             }
+        })
+    }
+
+    @Test
+    fun blueFistCharging() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 520f
+            world.sukuna.x = 640f
+            steps(10)
+            input.melee = true; input.meleeHeld = true
+            steps(18 + 10)
+        })
+    }
+
+    @Test
+    fun blueFistHit() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 560f
+            world.sukuna.x = 640f
+            steps(10)
+            input.melee = true; input.meleeHeld = true
+            stepsUntil(Events.HIT, 60)
+            input.meleeHeld = false
+            steps(4)
+        })
+    }
+
+    @Test
+    fun meleeHit() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 580f
+            world.sukuna.x = 640f
+            steps(10)
+            input.melee = true
+            stepsUntil(Events.HIT, 30)
+            steps(3)
+        })
+    }
+
+    @Test
+    fun redMax() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 200f
+            world.sukuna.x = 1000f
+            steps(10)
+            input.red = true; input.redHeld = true
+            steps(36 + 24 + 8)
+            input.redHeld = false
+        })
+    }
+
+    @Test
+    fun redMaxBurst() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 200f
+            world.sukuna.x = 700f
+            steps(10)
+            input.red = true; input.redHeld = true
+            stepsUntil(Events.RED_BURST, 200)
+            input.redHeld = false
+            steps(10)
+        })
+    }
+
+    @Test
+    fun purpleChant() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 360f
+            world.sukuna.x = 900f
+            steps(10)
+            input.purple = true; input.purpleHeld = true
+            steps(24 + 54 * 2 + 30)
+        })
+    }
+
+    @Test
+    fun purple200() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 300f
+            world.sukuna.x = 1000f
+            steps(10)
+            input.purple = true; input.purpleHeld = true
+            stepsUntil(Events.PURPLE_FIRE, 400)
+            steps(24)
+        })
+    }
+
+    @Test
+    fun domainOpening() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 420f
+            world.sukuna.x = 820f
+            steps(10)
+            openDomain()
+            steps(40)
+        })
+    }
+
+    @Test
+    fun domainVoid() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) {
+            world.gojo.x = 420f
+            world.sukuna.x = 820f
+            steps(10)
+            openDomain()
+            steps(200)
+        })
+    }
+
+    @Test
+    fun dismantle() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) {
+            world.gojo.x = 400f
+            world.sukuna.x = 800f
+            stepsUntil(Events.SLASH, 3000)
+            steps(4)
         })
     }
 

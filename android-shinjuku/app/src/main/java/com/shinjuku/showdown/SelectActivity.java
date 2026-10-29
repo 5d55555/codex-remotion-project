@@ -18,7 +18,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-/** 难度选择：从左到右 三轮（标准）、里梅（困难）、万（疯狂）、史上最强（噩梦）。 */
+/** 难度选择：从左到右 三轮（标准）、里梅（困难）、万（疯狂）、史上最强（噩梦）、测试模式。 */
 public class SelectActivity extends Activity {
 
     private LinearLayout row;
@@ -72,7 +72,7 @@ public class SelectActivity extends Activity {
         emblem.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         card.addView(emblem, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        TextView title = text(ctx, d.title, nightmare ? 30 : 32, Color.WHITE, true);
+        TextView title = text(ctx, d.title, d.title.length() >= 4 ? 30 : 32, Color.WHITE, true);
         title.setShadowLayer(8 * dp, 0, 0, d.accent);
         int glow = (int) (10 * dp); // 给光晕留地方，不然会被 TextView 自己的边界裁成方块
         title.setPadding(glow, glow / 2, glow, glow / 2);
@@ -112,7 +112,7 @@ public class SelectActivity extends Activity {
         return t;
     }
 
-    /** 进场：四张卡从左到右依次升起。 */
+    /** 进场：卡片从左到右依次升起。 */
     private void playEntrance() {
         float rise = getResources().getDisplayMetrics().density * 28;
         for (int i = 0; i < row.getChildCount(); i++) {

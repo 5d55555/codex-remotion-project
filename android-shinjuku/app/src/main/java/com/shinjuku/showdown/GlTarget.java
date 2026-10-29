@@ -70,11 +70,11 @@ final class GlTarget implements PixelTarget {
     private boolean glReady;
     private int program, vbo, ibo, locSize, locTex;
     private int aPos, aUv, aMul, aAdd, aShape;
-    private final int[] tex = new int[3];        // 图集、背景、文字
-    private final int[] texW = new int[3], texH = new int[3];
-    private static final int TEX_HUD = 2;
+    private final int[] tex = new int[4];        // 图集、新宿背景、无量空处背景、文字
+    private final int[] texW = new int[4], texH = new int[4];
+    private static final int TEX_HUD = 3;
     private int fbo, fboTex, fboW, fboH;
-    private final Bitmap atlasBitmap, bgBitmap;
+    private final Bitmap atlasBitmap, bgBitmap, voidBitmap;
     private Bitmap hudBitmap;
     private boolean hudDirty;
 
@@ -91,10 +91,11 @@ final class GlTarget implements PixelTarget {
 
     private final Gl gl;
 
-    GlTarget(Gl gl, Bitmap atlas, Bitmap bg) {
+    GlTarget(Gl gl, Bitmap atlas, Bitmap bg, Bitmap voidBg) {
         this.gl = gl;
         atlasBitmap = atlas;
         bgBitmap = bg;
+        voidBitmap = voidBg;
         vbuf = ByteBuffer.allocateDirect(verts.length * 4).order(ByteOrder.nativeOrder()).asFloatBuffer();
     }
 
@@ -240,9 +241,10 @@ final class GlTarget implements PixelTarget {
         gl.glBufferData(GLES20.GL_ELEMENT_ARRAY_BUFFER, MAX_QUADS * 6 * 2, idx, GLES20.GL_STATIC_DRAW);
         gl.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vbo);
         gl.glBufferData(GLES20.GL_ARRAY_BUFFER, verts.length * 4, null, GLES20.GL_STREAM_DRAW);
-        gl.glGenTextures(3, tex, 0);
+        gl.glGenTextures(4, tex, 0);
         upload(TEX_ATLAS, atlasBitmap, GLES20.GL_NEAREST);
         upload(TEX_BG, bgBitmap, GLES20.GL_NEAREST);
+        upload(TEX_VOID, voidBitmap, GLES20.GL_NEAREST);
         hudDirty = true;
         fbo = 0;
         fboTex = 0;
@@ -257,7 +259,7 @@ final class GlTarget implements PixelTarget {
     private void deleteGl() {
         gl.glDeleteProgram(program);
         gl.glDeleteBuffers(2, new int[]{vbo, ibo}, 0);
-        gl.glDeleteTextures(3, tex, 0);
+        gl.glDeleteTextures(4, tex, 0);
         if (fbo != 0) {
             gl.glDeleteFramebuffers(1, new int[]{fbo}, 0);
             gl.glDeleteTextures(1, new int[]{fboTex}, 0);
