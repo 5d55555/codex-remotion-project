@@ -3,7 +3,8 @@ package com.shinjuku.showdown.core;
 /**
  * 战斗世界：每秒 120 tick 固定步长推进。完全确定：同一个配置 + 同一串输入 = 同一个结果。
  * 一个 tick 的顺序：五条悟的操作与动作 → 宿傩（AI 意图 → 动作执行）→ 体术命中 → 苍的位置 → 赫（遇到苍变无指向茈；命中）
- * → 茈 → 无指向茈的扩张 → 苍的吸力与持续伤害 → 积分（重力、外力）→ 地面与墙 → 计时器、领域、倒地与复活。
+ * → 茈 → 无指向茈的扩张 → 苍的吸力与持续伤害 → 宿傩的世界斩（这一 tick 没被打断才斩出去）→ 积分（重力、外力）→ 地面与墙
+ * → 计时器、领域、倒地与复活。
  * 领域展开先放过场：cutscene 为真时整个世界停住（时间也不走），直到画面调用 endCutscene()。
  * 热路径不分配对象。
  */
@@ -24,9 +25,24 @@ public final class World {
 
     public int tick;
     public int hitstop;               // >0 时整个世界停住（打中的顿挫）
-    public int meleeCd, blueCd, redCd, purpleCd, domainCd, blueFailLock, purpleFailLock;
+    public int meleeCd, blueCd, redCd, purpleCd, domainCd, blueFailLock, purpleFailLock, redFailLock, dodgeCd, tpCd;
     public int blueCdMax = Tuning.BLUE_COOLDOWN, redCdMax = Tuning.RED_COOLDOWN, purpleCdMax = Tuning.PURPLE_COOLDOWN;
     public int sMeleeCd, dismantleCd, sAttackGap;
+
+    // 宿傩：领域展延、魔虚罗的适应、世界斩、反转术式（画面也读）
+    public int ampTicks;              // 领域展延还剩多久（>0 时体术能破无限）
+    public int ampCd, ampLock;        // 展延冷却（关闭后起算）；刚关闭这段时间不能用术式
+    public int adaptPoints;           // 适应点（每 2 点轮转一格，满 8 点）
+    public int fightTicks;            // 有效战斗时间（命中停顿、过场不算）
+    public boolean worldUnlocked;     // 学会了世界斩
+    public boolean worldBound;        // 束缚：第一次世界斩免结印咏唱（用掉就是 true）
+    public int worldCd, worldWindup;  // 世界斩冷却；这一次起手要多久（第一次 48，之后 144）
+    public float worldY;              // 斩带中心离地高度（指向时锁定）
+    public int worldDir;              // 斩的方向（指向时锁定）
+    public int rctUses, rctCd;
+    public int sStagger;              // 宿傩的招被打断后这么久不能行动（和受击硬直同时计）
+    private boolean adaptPending, worldLocked, worldPending;
+    private int adaptLastTick = -100_000, adaptTimer;
 
     // 领域
     public boolean cutscene;          // 正在放领域展开的过场：全场暂停
@@ -34,14 +50,17 @@ public final class World {
     public int domainTicks;           // 无量空处还剩多久（>0 时宿傩无法主动行动）
 
     // 招式状态（画面也读）
-    public int chantPhase = -1;       // 200% 茈念到第几段
+    public int chantPhase = -1;       // 念到第几段（200% 茈、出力最大的苍、最大输出的赫）
+    public int chantKind;             // 在念哪个：Attack.PURPLE / BLUE_FIELD / RED
     public int meleeCombo;            // 第几下体术（画面轮换拳、踢、上勾）
     private boolean pendingCharged, redMax, purple200;
-    private boolean meleeReleased, redReleased, purpleReleased;
+    private boolean redReleased, purpleReleased, fistAir;
+    private int dodgeDir = 1, tpKind, tpHits, tpEndAt;
+    private float tpBaseY, tpFromX, tpToX;
     private float aimX = 1, aimY;     // 苍的瞄准方向（单位向量）；0 表示自动瞄准
     private int attackSeq;            // 每次出招一个编号，同一招对同一目标只命中一次
     private int meleeHitId = -1, gMeleeSeq = -2, sMeleeHitId = -1;
-    private int bufMelee, bufRed, bufJump, bufPurple, bufDomain;
+    private int bufMelee, bufRed, bufJump, bufPurple, bufDomain, bufDodge;
     // 苍的按下/松开按发生顺序排队（停顿期间按的也留着）；只有用得上的状态才取，过一会儿没用上就作废
     private static final int BQ = 8;
     private final boolean[] bqDown = new boolean[BQ];
@@ -84,6 +103,7 @@ public final class World {
             return;
         }
         controlGojo(in);
+        gojo.invuln = gojo.state == Fighter.DODGE || gojo.state == Fighter.TP_BLUE || gojo.state == Fighter.TP_RED;
         if (cutscene) return; // 这一 tick 按了领域展开：停在这里等过场
         if (config.sukunaAi) ai.think(this, sukunaIntent);
         controlSukuna(sukunaIntent);
@@ -95,6 +115,7 @@ public final class World {
         updatePurple();
         updateHollow();
         applyBlue();
+        resolveWorldSlash();
         integrate(gojo);
         integrate(sukuna);
         timers();
@@ -109,6 +130,7 @@ public final class World {
         if (in.jump) bufJump = Tuning.INPUT_BUFFER;
         if (in.purple) bufPurple = Tuning.INPUT_BUFFER;
         if (in.domain) bufDomain = Tuning.INPUT_BUFFER;
+        if (in.dodge) bufDodge = Tuning.INPUT_BUFFER;
         if (in.blueDown) bluePush(true);
         if (in.blueUp) bluePush(false);
     }
@@ -135,7 +157,7 @@ public final class World {
     }
 
     private void clearInputs() {
-        bufMelee = bufRed = bufJump = bufPurple = bufDomain = 0;
+        bufMelee = bufRed = bufJump = bufPurple = bufDomain = bufDodge = 0;
         bqSize = 0;
     }
 
@@ -155,15 +177,9 @@ public final class World {
             case Fighter.FREE:
                 free(g, in);
                 break;
-            case Fighter.MELEE: // 体术起手：松开就出拳；一直按住到 FIST_HOLD 就蓄成苍拳
+            case Fighter.MELEE: // 体术起手
                 drive(g, 0);
-                if (!in.meleeHeld) meleeReleased = true;
-                if (!meleeReleased && st >= Tuning.FIST_HOLD) {
-                    enter(g, Fighter.FIST_WINDUP);
-                    events.emit(Events.CAST, g.x, g.centerY(), 0, Attack.BLUE_FIST, tick);
-                } else if (meleeReleased && st >= Tuning.MELEE_STARTUP) {
-                    enter(g, Fighter.MELEE_ACTIVE);
-                }
+                if (st >= Tuning.MELEE_STARTUP) enter(g, Fighter.MELEE_ACTIVE);
                 break;
             case Fighter.MELEE_ACTIVE:
                 drive(g, g.facing * Tuning.MELEE_LUNGE);
@@ -174,23 +190,35 @@ public final class World {
                 if (st >= Tuning.MELEE_RECOVERY) enter(g, Fighter.FREE);
                 else if (st >= Tuning.MELEE_CANCEL && wantsToAct(in)) cancelInto(g, in);
                 break;
-            case Fighter.FIST_WINDUP:
+            case Fighter.FIST_WINDUP: // 苍拳的前摇：空中停住，拳头举过头顶聚苍
                 drive(g, 0);
-                if (st >= Tuning.FIST_WINDUP) enter(g, Fighter.FIST_ACTIVE);
+                if (fistAir) {
+                    g.vy = 0;
+                    g.gravityScale = 0;
+                }
+                if (st >= Tuning.FIST_WINDUP) {
+                    enter(g, Fighter.FIST_ACTIVE);
+                    if (fistAir) g.vy = Tuning.FIST_DIVE_VY;
+                }
                 break;
-            case Fighter.FIST_ACTIVE:
-                drive(g, g.facing * Tuning.FIST_LUNGE);
-                if (st >= Tuning.FIST_ACTIVE) enter(g, Fighter.FIST_RECOVER);
+            case Fighter.FIST_ACTIVE: // 往下砸：空中俯冲到落地；地上往下劈
+                if (fistAir) {
+                    drive(g, g.facing * Tuning.FIST_DIVE_VX);
+                    g.vy = Math.min(g.vy, Tuning.FIST_DIVE_VY);
+                    if (g.onGround || st >= Tuning.FIST_DIVE_MAX) enter(g, Fighter.FIST_RECOVER);
+                } else {
+                    drive(g, 0);
+                    if (st >= Tuning.FIST_ACTIVE) enter(g, Fighter.FIST_RECOVER);
+                }
                 break;
             case Fighter.FIST_RECOVER:
                 drive(g, 0);
                 if (st >= Tuning.FIST_RECOVERY) enter(g, Fighter.FREE);
-                else if (st >= Tuning.FIST_CANCEL && wantsToAct(in)) cancelInto(g, in);
                 break;
             case Fighter.BLUE_HOLD:
                 move(g, in.moveX, 1f);
                 updateAim(in);
-                if (bufJump > 0 || bufMelee > 0 || bufRed > 0 || bufPurple > 0 || bufDomain > 0) {
+                if (bufJump > 0 || bufMelee > 0 || bufRed > 0 || bufPurple > 0 || bufDomain > 0 || bufDodge > 0) {
                     enter(g, Fighter.FREE); // 长按确认前可以取消，不进冷却；缓冲着的那个动作下一 tick 就出
                 } else if (blueNextIsUp()) {
                     bluePop();
@@ -198,12 +226,32 @@ public final class World {
                 } else if (bqSize == 0 && !in.blueHeld) {
                     startBlueWindup(false); // 保险：松开事件没收到（触屏事件环溢出时）
                 } else if (st >= Tuning.BLUE_HOLD_THRESHOLD) {
-                    startBlueWindup(true);
+                    startChant(Fighter.BLUE_CHANT, Attack.BLUE_FIELD); // 一直按着：念咒（位相、黄昏、智慧之瞳）
                 }
                 break;
+            case Fighter.BLUE_CHANT: { // 念咒：不能动；松手或被攻击碰到就打断；方向跟着摇杆
+                drive(g, 0);
+                updateAim(in);
+                if (blueNextIsUp()) {
+                    bluePop();
+                    breakChant();
+                    break;
+                }
+                if (bqSize == 0 && !in.blueHeld) {
+                    breakChant();
+                    break;
+                }
+                if (chantStep(st, Tuning.CHANT3_PHRASE, Tuning.CHANT3_PHRASES)) {
+                    chantPhase = -1;
+                    events.emit(Events.CAST, g.x, g.centerY(), 1, Attack.BLUE_FIELD, tick);
+                    spawnBlue(true);
+                    enter(g, Fighter.BLUE_RECOVER);
+                }
+                break;
+            }
             case Fighter.BLUE_WINDUP: {
                 move(g, in.moveX, Tuning.BLUE_WINDUP_MOVE);
-                int windup = pendingCharged ? Tuning.BLUE_WINDUP_CHARGED : Tuning.BLUE_WINDUP;
+                int windup = Tuning.BLUE_WINDUP;
                 if (st <= windup - Tuning.BLUE_AIM_LOCK) updateAim(in); // 最后几 tick 锁定方向
                 if (st >= windup) {
                     spawnBlue(pendingCharged);
@@ -219,15 +267,22 @@ public final class World {
                 drive(g, 0);
                 if (!in.redHeld) redReleased = true;
                 if (!redReleased && st >= Tuning.RED_HOLD) {
-                    enter(g, Fighter.RED_WINDUP);
                     events.emit(Events.CAST, g.x, g.centerY(), 1, Attack.RED, tick);
+                    startChant(Fighter.RED_CHANT, Attack.RED); // 一直按着：念咒（位相、波罗蜜、光之柱）
                 } else if (redReleased && st >= Tuning.RED_WINDUP) {
                     fireRed(false);
                 }
                 break;
-            case Fighter.RED_WINDUP: // 最大输出的前摇
+            case Fighter.RED_CHANT: // 念咒：不能动；松手或被攻击碰到就打断
                 drive(g, 0);
-                if (st >= Tuning.RED_MAX_WINDUP) fireRed(true);
+                if (!in.redHeld) {
+                    breakChant();
+                    break;
+                }
+                if (chantStep(st, Tuning.CHANT3_PHRASE, Tuning.CHANT3_PHRASES)) {
+                    chantPhase = -1;
+                    fireRed(true);
+                }
                 break;
             case Fighter.RED_ACTIVE:
                 drive(g, 0);
@@ -242,9 +297,7 @@ public final class World {
                 drive(g, 0);
                 if (!in.purpleHeld) purpleReleased = true;
                 if (!purpleReleased && st >= Tuning.PURPLE_HOLD) {
-                    enter(g, Fighter.PURPLE_CHANT);
-                    chantPhase = 0;
-                    events.emit(Events.CHANT, g.x, g.centerY(), 0, Attack.PURPLE, tick);
+                    startChant(Fighter.PURPLE_CHANT, Attack.PURPLE);
                 } else if (purpleReleased && st >= Tuning.PURPLE_WINDUP) {
                     firePurple(false);
                 }
@@ -255,12 +308,7 @@ public final class World {
                     breakChant();
                     break;
                 }
-                int phase = Math.min(Tuning.CHANT_PHRASES - 1, st / Tuning.CHANT_PHRASE);
-                if (phase != chantPhase) {
-                    chantPhase = phase;
-                    events.emit(Events.CHANT, g.x, g.centerY(), phase, Attack.PURPLE, tick);
-                }
-                if (st >= Tuning.CHANT_PHRASES * Tuning.CHANT_PHRASE) firePurple(true);
+                if (chantStep(st, Tuning.CHANT_PHRASE, Tuning.CHANT_PHRASES)) firePurple(true);
                 break;
             }
             case Fighter.PURPLE_RECOVER:
@@ -271,8 +319,192 @@ public final class World {
             case Fighter.DOMAIN_CAST:
                 drive(g, 0);
                 break;
+            case Fighter.DODGE: // 闪避：无敌，横着冲一段；按住闪避再点苍 / 赫，直接接瞬移
+                drive(g, dodgeDir * Tuning.DODGE_SPEED);
+                g.vy = 0;
+                g.gravityScale = 0;
+                if (in.dodgeHeld && canTeleport() && blueNextIsDown() && blueCd == 0) {
+                    bluePop();
+                    startTeleport(Attack.BLUE_FIST);
+                } else if (in.dodgeHeld && canTeleport() && bufRed > 0 && redCd == 0) {
+                    bufRed = 0;
+                    startTeleport(Attack.RED);
+                } else if (st >= Tuning.DODGE_TICKS) {
+                    enter(g, Fighter.FREE);
+                }
+                break;
+            case Fighter.TP_WINDUP: // 瞬移的前摇：停住，身上聚起术式；被攻击碰到就打断
+                drive(g, 0);
+                g.vy = 0;
+                g.gravityScale = 0;
+                if (sukuna.state == Fighter.KO) enter(g, Fighter.FREE);
+                else if (st >= Tuning.TP_WINDUP) teleportBehind();
+                break;
+            case Fighter.TP_BLUE:
+                scriptBlue(st);
+                break;
+            case Fighter.TP_RED:
+                scriptRed(st);
+                break;
             default:
                 break;
+        }
+    }
+
+    /** 开始念咒（苍、赫、茈都一样：不能动，松手或被攻击碰到就打断）。 */
+    private void startChant(int state, int kind) {
+        enter(gojo, state);
+        chantKind = kind;
+        chantPhase = 0;
+        events.emit(Events.CHANT, gojo.x, gojo.centerY(), 0, kind, tick);
+    }
+
+    /** 念到第几段了（每段换一次就发一个事件）；念完返回 true。 */
+    private boolean chantStep(int st, int phraseTicks, int phrases) {
+        int phase = Math.min(phrases - 1, st / phraseTicks);
+        if (phase != chantPhase) {
+            chantPhase = phase;
+            events.emit(Events.CHANT, gojo.x, gojo.centerY(), phase, chantKind, tick);
+        }
+        return st >= phrases * phraseTicks;
+    }
+
+    /* ---------------- 闪避、苍拳、瞬移 ---------------- */
+
+    /** 闪避：推着摇杆就往摇杆的方向，不推就往面朝的方向。 */
+    private void startDodge(Fighter g, TickInput in) {
+        dodgeDir = in.moveX > 0.3f ? 1 : in.moveX < -0.3f ? -1 : g.facing;
+        enter(g, Fighter.DODGE);
+        dodgeCd = Tuning.DODGE_COOLDOWN;
+        events.emit(Events.DODGE, g.x, g.centerY(), dodgeDir, tick);
+    }
+
+    /** 苍拳：在空中就往下俯冲，在地上就举起来往下劈。 */
+    private void startFist(Fighter g) {
+        fistAir = !g.onGround;
+        if (fistAir) g.vy = 0; // 空中：马上停住
+        enter(g, Fighter.FIST_WINDUP);
+        meleeCd = Tuning.MELEE_COOLDOWN;
+        gMeleeSeq = ++attackSeq;
+        events.emit(Events.CAST, g.x, g.centerY(), 0, Attack.BLUE_FIST, tick);
+    }
+
+    private boolean canTeleport() {
+        return tpCd == 0 && sukuna.state != Fighter.KO;
+    }
+
+    /** 瞬移的前摇（按住闪避时点苍 / 点赫）。 */
+    private void startTeleport(int kind) {
+        tpKind = kind;
+        enter(gojo, Fighter.TP_WINDUP);
+        drive(gojo, 0);
+        events.emit(Events.CAST, gojo.x, gojo.centerY(), 4, kind, tick);
+    }
+
+    /** 出现在宿傩背后（背后是墙就出现在另一边），把他定住，进入固定动作。 */
+    private void teleportBehind() {
+        Fighter g = gojo, s = sukuna;
+        float lo = Tuning.BODY_HALF_W, hi = Tuning.WIDTH - Tuning.BODY_HALF_W;
+        int side = g.x <= s.x ? 1 : -1;
+        float tx = s.x + side * Tuning.TP_BEHIND;
+        if (tx < lo || tx > hi) {
+            side = -side;
+            tx = s.x + side * Tuning.TP_BEHIND;
+        }
+        tx = clamp(tx, lo, hi);
+        events.emit(Events.TELEPORT, g.x, g.centerY(), tx, tpKind, tick);
+        g.x = g.px = tx;
+        g.y = g.py = s.y;
+        g.vx = g.vy = 0;
+        g.facing = -side;
+        g.scripted = true;
+        interruptSukuna();
+        s.scripted = true;
+        s.captured = false;
+        s.knockedAir = false;
+        s.vx = s.vy = 0;
+        tpCd = Tuning.TP_COOLDOWN;
+        if (tpKind == Attack.RED) redCd = redCdMax = Tuning.RED_COOLDOWN;
+        else blueCd = blueCdMax = Tuning.BLUE_COOLDOWN;
+        tpHits = 0;
+        tpBaseY = s.y;
+        enter(g, tpKind == Attack.RED ? Fighter.TP_RED : Fighter.TP_BLUE);
+    }
+
+    private void endScript() {
+        gojo.scripted = false;
+        sukuna.scripted = false;
+    }
+
+    /** 苍：把宿傩吸到空中，自己跟上去，苍拳连打 5 下；最后一下击飞、击倒。 */
+    private void scriptBlue(int st) {
+        Fighter g = gojo, s = sukuna;
+        if (s.state == Fighter.KO) {
+            endScript();
+            enter(g, Fighter.FREE);
+            return;
+        }
+        if (tpHits < Tuning.TP_BLUE_HITS) {
+            float k = Math.min(1f, st / (float) Tuning.TP_BLUE_LIFT), e = k * k * (3 - 2 * k);
+            s.y = tpBaseY + (Tuning.TP_BLUE_HEIGHT - tpBaseY) * e;
+            s.vx = s.vy = 0;
+            g.y = s.y;
+            g.x = clamp(s.x - g.facing * 60, Tuning.BODY_HALF_W, Tuning.WIDTH - Tuning.BODY_HALF_W);
+            g.vx = g.vy = 0;
+            if (st >= Tuning.TP_BLUE_FIRST_HIT && (st - Tuning.TP_BLUE_FIRST_HIT) % Tuning.TP_BLUE_HIT_GAP == 0) {
+                tpHits++;
+                boolean last = tpHits == Tuning.TP_BLUE_HITS;
+                if (last) { // 放开：最后一下把他打飞
+                    endScript();
+                    s.downTicks = Tuning.DOWN_TICKS;
+                }
+                attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.BLUE_FIST, ++attackSeq, Tuning.FIST_DAMAGE_MILLI,
+                        last ? g.facing * Tuning.TP_BLUE_LAUNCH_X : 0, last ? Tuning.TP_BLUE_LAUNCH_Y : 0, last ? 60 : 40, 0);
+                apply(attack);
+                hitstop = last ? Tuning.FIST_HITSTOP : Tuning.TP_BLUE_HITSTOP;
+                tpEndAt = st + Tuning.TP_BLUE_AFTER;
+            }
+        } else if (st >= tpEndAt && g.onGround) {
+            enter(g, Fighter.FREE);
+        }
+    }
+
+    /** 赫：在背后蓄一发很大的赫，把宿傩轰出战场宽度 85%（撞墙就停），落地击倒。 */
+    private void scriptRed(int st) {
+        Fighter g = gojo, s = sukuna;
+        if (s.state == Fighter.KO) {
+            endScript();
+            if (st > Tuning.TP_RED_CHARGE) enter(g, Fighter.FREE);
+        }
+        if (st < Tuning.TP_RED_CHARGE) {
+            s.vx = s.vy = 0;
+            g.vx = g.vy = 0;
+        } else if (st == Tuning.TP_RED_CHARGE) {
+            float hx = g.x + g.facing * 24;
+            events.emit(Events.RED_FIRE, hx, g.y + 56, g.facing, 2, tick);
+            tpFromX = s.x;
+            tpToX = clamp(s.x + g.facing * Tuning.TP_RED_DISTANCE, Tuning.BODY_HALF_W, Tuning.WIDTH - Tuning.BODY_HALF_W);
+            g.scripted = false;
+            attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.RED, ++attackSeq, Tuning.TP_RED_DAMAGE_MILLI, 0, 0, Tuning.TP_RED_FLIGHT + 20, 0);
+            apply(attack);
+            events.emit(Events.RED_BURST, s.x, s.centerY(), g.facing, 2, tick);
+            hitstop = Tuning.RED_MAX_HITSTOP;
+        } else {
+            int ft = st - Tuning.TP_RED_CHARGE;
+            if (s.scripted) {
+                float k = Math.min(1f, ft / (float) Tuning.TP_RED_FLIGHT);
+                s.x = tpFromX + (tpToX - tpFromX) * k;
+                s.y = 4 * Tuning.TP_RED_ARC * k * (1 - k);
+                s.vx = s.vy = 0;
+                if (k >= 1) {
+                    s.scripted = false;
+                    s.y = 0;
+                    s.onGround = true;
+                    s.downTicks = Tuning.DOWN_TICKS;
+                    events.emit(Events.LAND, s.x, 0, 900, tick);
+                }
+            }
+            if (ft >= Tuning.TP_RED_AFTER && !s.scripted) enter(g, Fighter.FREE);
         }
     }
 
@@ -286,17 +518,26 @@ public final class World {
             g.vy = Tuning.JUMP_SPEED;
             g.onGround = false;
         }
-        if (bufDomain > 0 && domainCd == 0 && domainTicks == 0) {
+        if (bufDodge > 0 && dodgeCd == 0) {
+            bufDodge = 0;
+            startDodge(g, in);
+        } else if (bufDomain > 0 && domainCd == 0 && domainTicks == 0) {
             bufDomain = 0;
             startDomain();
         } else if (bufMelee > 0 && meleeCd == 0) {
             bufMelee = 0;
-            enter(g, Fighter.MELEE);
-            meleeReleased = !in.meleeHeld;
-            meleeCd = Tuning.MELEE_COOLDOWN;
-            gMeleeSeq = ++attackSeq;
-            meleeCombo++;
-        } else if (bufRed > 0 && redCd == 0) {
+            if (in.jumpHeld) { // 按住跳跃时点体术：苍拳
+                startFist(g);
+            } else {
+                enter(g, Fighter.MELEE);
+                meleeCd = Tuning.MELEE_COOLDOWN;
+                gMeleeSeq = ++attackSeq;
+                meleeCombo++;
+            }
+        } else if (bufRed > 0 && redCd == 0 && redFailLock == 0 && in.dodgeHeld && canTeleport()) {
+            bufRed = 0;
+            startTeleport(Attack.RED); // 按住闪避时点赫：瞬移
+        } else if (bufRed > 0 && redCd == 0 && redFailLock == 0) {
             bufRed = 0;
             enter(g, Fighter.RED_HOLD);
             redReleased = !in.redHeld;
@@ -306,6 +547,10 @@ public final class World {
             enter(g, Fighter.PURPLE_WINDUP);
             purpleReleased = !in.purpleHeld;
             events.emit(Events.CAST, g.x, g.centerY(), 0, Attack.PURPLE, tick);
+        } else if (blueNextIsDown() && blueCd == 0 && blueFailLock == 0 && in.dodgeHeld && canTeleport()) {
+            bluePop();
+            if (blueNextIsUp()) bluePop();
+            startTeleport(Attack.BLUE_FIST); // 按住闪避时点苍：瞬移
         } else if (blueNextIsDown() && blueCd == 0 && blueFailLock == 0 && !blue.active()) {
             bluePop();
             enter(g, Fighter.BLUE_HOLD);
@@ -325,7 +570,7 @@ public final class World {
     }
 
     private boolean wantsToAct(TickInput in) {
-        return Math.abs(in.moveX) > 0.3f || bufJump > 0 || bufMelee > 0 || bufRed > 0 || bufPurple > 0 || bufDomain > 0 || blueNextIsDown();
+        return Math.abs(in.moveX) > 0.3f || bufJump > 0 || bufMelee > 0 || bufRed > 0 || bufPurple > 0 || bufDomain > 0 || bufDodge > 0 || blueNextIsDown();
     }
 
     private void enter(Fighter f, int state) {
@@ -434,13 +679,78 @@ public final class World {
         events.emit(Events.PURPLE_FIRE, hx, g.y + 56, g.facing, is200 ? 1 : 0, tick);
     }
 
-    /** 念咒被打断（松手、被攻击；按住茈还没开始念的起手也算）：什么都不放，短时间内不能再按。 */
+    /**
+     * 念咒被打断（松手、被攻击；按住苍、赫、茈还没开始念的起手也算）：什么都不放，短时间内不能再按。
+     * 苍拳和瞬移的前摇也一样，被攻击碰到就断（“容易被打断”）。
+     */
     private void breakChant() {
-        if (gojo.state != Fighter.PURPLE_CHANT && !(gojo.state == Fighter.PURPLE_WINDUP && !purpleReleased)) return;
-        enter(gojo, Fighter.FREE);
+        Fighter g = gojo;
+        int kind;
+        switch (g.state) {
+            case Fighter.PURPLE_CHANT:
+                kind = Attack.PURPLE;
+                purpleFailLock = Tuning.CHANT_BROKEN_LOCK;
+                break;
+            case Fighter.PURPLE_WINDUP:
+                if (purpleReleased) return; // 点按的普通茈不受影响
+                kind = Attack.PURPLE;
+                purpleFailLock = Tuning.CHANT_BROKEN_LOCK;
+                break;
+            case Fighter.BLUE_CHANT:
+            case Fighter.BLUE_HOLD:
+                kind = Attack.BLUE_FIELD;
+                blueFailLock = Tuning.CHANT_BROKEN_LOCK;
+                break;
+            case Fighter.RED_CHANT:
+                kind = Attack.RED;
+                redFailLock = Tuning.CHANT_BROKEN_LOCK;
+                break;
+            case Fighter.RED_HOLD:
+                if (redReleased) return;    // 点按的普通赫不受影响
+                kind = Attack.RED;
+                redFailLock = Tuning.CHANT_BROKEN_LOCK;
+                break;
+            case Fighter.FIST_WINDUP:
+            case Fighter.TP_WINDUP:
+                enter(g, Fighter.FREE);
+                events.emit(Events.CHANT, g.x, g.centerY(), -1, Attack.BLUE_FIST, tick);
+                return;
+            default:
+                return;
+        }
+        enter(g, Fighter.FREE);
         chantPhase = -1;
-        purpleFailLock = Tuning.CHANT_BROKEN_LOCK;
-        events.emit(Events.CHANT, gojo.x, gojo.centerY(), -1, Attack.PURPLE, tick);
+        events.emit(Events.CHANT, g.x, g.centerY(), -1, kind, tick);
+    }
+
+    /** 五条悟挨打（硬直）：手上的动作作废（念咒算打断；蓄苍被打断短时间内不能再按）。还没放出去的招不进冷却。 */
+    private void interruptGojo() {
+        Fighter g = gojo;
+        switch (g.state) {
+            case Fighter.FREE:
+            case Fighter.KO:
+            case Fighter.DOMAIN_CAST:
+                return;
+            case Fighter.TP_BLUE:
+            case Fighter.TP_RED:
+                return; // 固定动作里无敌
+            case Fighter.PURPLE_CHANT:
+            case Fighter.PURPLE_WINDUP:
+            case Fighter.BLUE_CHANT:
+            case Fighter.RED_CHANT:
+            case Fighter.RED_HOLD:
+            case Fighter.FIST_WINDUP:
+            case Fighter.TP_WINDUP:
+                breakChant();
+                break;
+            case Fighter.BLUE_HOLD:
+            case Fighter.BLUE_WINDUP:
+                blueFailLock = Tuning.BLUE_FAIL_LOCK;
+                break;
+            default:
+                break;
+        }
+        if (g.state != Fighter.FREE) enter(g, Fighter.FREE);
     }
 
     /* ---------------- 领域展开 ---------------- */
@@ -463,7 +773,8 @@ public final class World {
         clearInputs();
         domainTicks = Tuning.DOMAIN_DURATION;
         domains.sureHit[Fighter.GOJO][Fighter.SUKUNA] = true;
-        if (sukuna.state == Fighter.S_MELEE || sukuna.state == Fighter.S_DISMANTLE) enter(sukuna, Fighter.FREE);
+        interruptSukuna();
+        if (ampTicks > 0) closeAmp(); // 无量空处生效：展延被迫关闭
         events.emit(Events.DOMAIN_OPEN, gojo.x, gojo.centerY(), Tuning.DOMAIN_DURATION, tick);
     }
 
@@ -472,7 +783,8 @@ public final class World {
     /** 宿傩现在能不能主动行动（倒地、硬直、被苍吸住/抓住、被领域困住时不能）。 */
     public boolean sukunaCanAct() {
         Fighter s = sukuna;
-        return s.state != Fighter.KO && s.hitstun == 0 && !s.captured && domainTicks == 0 && !inBlueField(s) && !s.knockedAir;
+        return s.state != Fighter.KO && s.hitstun == 0 && !s.captured && domainTicks == 0 && !inBlueField(s) && !s.knockedAir
+                && !s.scripted && s.downTicks == 0;
     }
 
     boolean inBlueField(Fighter f) {
@@ -485,21 +797,27 @@ public final class World {
         Fighter s = sukuna;
         if (s.state == Fighter.KO) return;
         if (!sukunaCanAct()) {
-            // 被控住：手上的动作作废；击飞、吸引的速度不去动它
-            if (s.state == Fighter.S_MELEE || s.state == Fighter.S_DISMANTLE) enter(s, Fighter.FREE);
+            interruptSukuna(); // 被控住：手上的动作作废；击飞、吸引的速度不去动它
             return;
         }
         s.stateTick++;
         int st = s.stateTick;
         switch (s.state) {
-            case Fighter.FREE:
-                if (!config.sukunaAi && i.moveX == 0 && !i.melee && !i.dismantle && !i.jump) return; // 活靶子：什么都不做
+            case Fighter.FREE: {
+                if (sStagger > 0) { // 招被打断的硬直
+                    drive(s, 0);
+                    return;
+                }
+                if (!config.sukunaAi && i.moveX == 0 && !i.melee && !i.dismantle && !i.jump && !i.amp && !i.ampOff && !i.world && !i.rct) return; // 活靶子：什么都不做
                 drive(s, i.moveX * Tuning.SUKUNA_SPEED);
                 if (i.jump && s.onGround) {
                     s.vy = Tuning.JUMP_SPEED;
                     s.onGround = false;
                 }
-                if (sAttackGap == 0 && i.melee && sMeleeCd == 0) {
+                boolean amp = ampTicks > 0, technique = !amp && ampLock == 0; // 展延期间、刚关掉时不能用生得术式
+                if (i.ampOff && amp) {
+                    closeAmp();
+                } else if (sAttackGap == 0 && i.melee && sMeleeCd == 0) {
                     enter(s, Fighter.S_MELEE);
                     drive(s, 0);
                     sMeleeCd = Tuning.S_MELEE_COOLDOWN;
@@ -507,24 +825,171 @@ public final class World {
                     attackSeq++;
                     sMeleeHitId = -1;
                     sMeleeSeq = attackSeq;
-                } else if (sAttackGap == 0 && i.dismantle && dismantleCd == 0) {
+                } else if (technique && sAttackGap == 0 && i.dismantle && dismantleCd == 0) {
                     enter(s, Fighter.S_DISMANTLE);
                     drive(s, 0);
                     dismantleCd = Tuning.DISMANTLE_COOLDOWN;
                     sAttackGap = Tuning.S_ATTACK_GAP;
+                    adaptPending = false;
+                } else if (i.amp && !amp && ampCd == 0 && s.onGround) {
+                    enter(s, Fighter.S_AMP_START);
+                    drive(s, 0);
+                } else if (technique && i.world && worldUnlocked && worldCd == 0 && s.onGround) {
+                    startWorldSlash();
+                } else if (technique && i.rct && rctUses < Tuning.S_RCT_MAX_USES && rctCd == 0 && s.onGround && s.hpMilli < s.maxHpMilli) {
+                    enter(s, Fighter.S_RCT);
+                    drive(s, 0);
+                    rctCd = Tuning.S_RCT_COOLDOWN;
                 }
                 break;
-            case Fighter.S_MELEE:
-                drive(s, st > Tuning.S_MELEE_STARTUP && st <= Tuning.S_MELEE_STARTUP + Tuning.S_MELEE_ACTIVE ? s.facing * 120f : 0);
+            }
+            case Fighter.S_MELEE: {
+                boolean active = st > Tuning.S_MELEE_STARTUP && st <= Tuning.S_MELEE_STARTUP + Tuning.S_MELEE_ACTIVE;
+                drive(s, active ? s.facing * Tuning.S_MELEE_LUNGE : 0);
                 if (st >= Tuning.S_MELEE_STARTUP + Tuning.S_MELEE_ACTIVE + Tuning.S_MELEE_RECOVERY) enter(s, Fighter.FREE);
                 break;
+            }
             case Fighter.S_DISMANTLE:
                 drive(s, 0);
                 if (st == Tuning.DISMANTLE_WINDUP) fireDismantle();
-                if (st >= Tuning.DISMANTLE_WINDUP + Tuning.DISMANTLE_RECOVERY) enter(s, Fighter.FREE);
+                if (st >= Tuning.DISMANTLE_WINDUP + Tuning.DISMANTLE_RECOVERY) {
+                    enter(s, Fighter.FREE);
+                    settleAdaptation(); // 收完招才算一次有效的试探
+                }
                 break;
+            case Fighter.S_AMP_START:
+                drive(s, 0);
+                if (st >= Tuning.S_AMP_STARTUP) {
+                    enter(s, Fighter.FREE);
+                    ampTicks = Tuning.S_AMP_DURATION;
+                    domains.amplification[Fighter.SUKUNA] = true;
+                    events.emit(Events.AMP, s.x, s.centerY(), 1, tick);
+                }
+                break;
+            case Fighter.S_WORLD: {
+                drive(s, 0);
+                int lockAt = worldWindup - (worldWindup == Tuning.S_WORLD_FIRST_WINDUP ? worldWindup : Tuning.S_WORLD_POINT);
+                if (!worldLocked) s.facing = gojo.x >= s.x ? 1 : -1; // 锁定之前跟着五条悟转
+                if (!worldLocked && st >= lockAt) lockWorldSlash();
+                if (worldWindup == Tuning.S_WORLD_WINDUP) { // 咏唱版：结印 → 龙鳞 → 反发 → 番之流星 → 指向
+                    int t = st - Tuning.S_WORLD_SIGN;
+                    if (t >= 0 && t < Tuning.S_WORLD_CHANT_PHRASE * Tuning.S_WORLD_CHANT_PHRASES && t % Tuning.S_WORLD_CHANT_PHRASE == 0) {
+                        events.emit(Events.WORLD_CHANT, s.x, s.centerY(), 1 + t / Tuning.S_WORLD_CHANT_PHRASE, Attack.WORLD_SLASH, tick);
+                    }
+                }
+                if (st >= worldWindup) worldPending = true; // 这一 tick 结束前没被打断才斩出去（resolveWorldSlash）
+                break;
+            }
+            case Fighter.S_WORLD_RECOVER:
+                drive(s, 0);
+                if (st >= Tuning.S_WORLD_RECOVERY) enter(s, Fighter.FREE);
+                break;
+            case Fighter.S_RCT: {
+                drive(s, 0);
+                int healFrom = Tuning.S_RCT_STARTUP, healTo = healFrom + Tuning.S_RCT_DURATION;
+                if (st == healFrom + 1) {
+                    rctUses++; // 进入回复阶段就算用掉一次（被打断不退）
+                    events.emit(Events.RCT, s.x, s.centerY(), 1, tick);
+                }
+                if (st > healFrom && st <= healTo) s.hpMilli = Math.min(s.maxHpMilli, s.hpMilli + Tuning.S_RCT_HEAL_PER_TICK_MILLI);
+                if (st == healTo) events.emit(Events.RCT, s.x, s.centerY(), 0, tick);
+                if (st >= healTo + Tuning.S_RCT_RECOVERY) enter(s, Fighter.FREE);
+                break;
+            }
             default:
                 break;
+        }
+    }
+
+    /** 宿傩的动作被打断（受击硬直、被苍控制、领域生效）：起手、咏唱、回复都作废；世界斩的咏唱被打断还要僵一会儿。 */
+    private void interruptSukuna() {
+        Fighter s = sukuna;
+        switch (s.state) {
+            case Fighter.S_WORLD:
+                sStagger = Tuning.S_WORLD_BREAK_LOCK;
+                events.emit(Events.WORLD_CHANT, s.x, s.centerY(), -1, Attack.WORLD_SLASH, tick);
+                break;
+            case Fighter.S_RCT:
+                if (s.stateTick > Tuning.S_RCT_STARTUP && s.stateTick < Tuning.S_RCT_STARTUP + Tuning.S_RCT_DURATION) {
+                    events.emit(Events.RCT, s.x, s.centerY(), 0, tick);
+                }
+                break;
+            case Fighter.S_MELEE:
+            case Fighter.S_DISMANTLE:
+            case Fighter.S_AMP_START:
+            case Fighter.S_WORLD_RECOVER:
+                break;
+            default:
+                return;
+        }
+        enter(s, Fighter.FREE);
+        adaptPending = false;
+        worldPending = false;
+    }
+
+    private void closeAmp() {
+        ampTicks = 0;
+        domains.amplification[Fighter.SUKUNA] = false;
+        ampCd = Tuning.S_AMP_COOLDOWN;
+        ampLock = Tuning.S_AMP_EXIT;
+        events.emit(Events.AMP, sukuna.x, sukuna.centerY(), 0, tick);
+    }
+
+    /** 解碰到了无限、而且收完了招：魔虚罗的法阵转一格（展延期间不会走到这里）。 */
+    private void settleAdaptation() {
+        if (!adaptPending) return;
+        adaptPending = false;
+        turnWheel();
+    }
+
+    /** 法阵转一格（两格之间至少隔 1 秒）。 */
+    private void turnWheel() {
+        if (adaptPoints >= Tuning.S_ADAPT_POINTS || fightTicks - adaptLastTick < Tuning.S_ADAPT_POINT_GAP) return;
+        adaptPoints++;
+        adaptLastTick = fightTicks;
+        adaptTimer = 0;
+        events.emit(Events.ADAPT, sukuna.x, sukuna.centerY() + 70, adaptPoints, 0, tick);
+    }
+
+    private void startWorldSlash() {
+        Fighter s = sukuna;
+        enter(s, Fighter.S_WORLD);
+        boolean first = !worldBound;
+        worldBound = true; // 束缚的“第一次”起手就用掉，被打断也不退
+        worldWindup = first ? Tuning.S_WORLD_FIRST_WINDUP : Tuning.S_WORLD_WINDUP;
+        worldCd = Tuning.S_WORLD_COOLDOWN;
+        worldLocked = worldPending = false;
+        s.facing = gojo.x >= s.x ? 1 : -1;
+        if (first) lockWorldSlash(); // 第一次：起手就锁定
+        events.emit(Events.CAST, s.x, s.centerY(), first ? 3 : 1, Attack.WORLD_SLASH, tick);
+        events.emit(Events.WORLD_CHANT, s.x, s.centerY(), 0, Attack.WORLD_SLASH, tick);
+    }
+
+    private void lockWorldSlash() {
+        Fighter s = sukuna;
+        worldLocked = true;
+        worldDir = s.facing;
+        worldY = s.y + Tuning.S_WORLD_HEIGHT;
+        if (worldWindup == Tuning.S_WORLD_WINDUP) events.emit(Events.WORLD_CHANT, s.x, worldY, 4, Attack.WORLD_SLASH, tick);
+    }
+
+    /** 世界斩：前方一道水平的斩带，斩的是空间（能破无限）；五条悟跳过斩带高度就躲开。 */
+    private void resolveWorldSlash() {
+        if (!worldPending) return;
+        worldPending = false;
+        Fighter s = sukuna, g = gojo;
+        if (s.state != Fighter.S_WORLD) return; // 这一 tick 里被打断了
+        enter(s, Fighter.S_WORLD_RECOVER);
+        float sx = s.x + worldDir * 20;
+        float dx = (g.x - sx) * worldDir;
+        boolean hit = g.state != Fighter.KO && dx >= -Tuning.BODY_HALF_W && dx <= Tuning.S_WORLD_RANGE + Tuning.BODY_HALF_W
+                && g.y <= worldY + Tuning.S_WORLD_HALF_THICKNESS && g.y + Tuning.BODY_H >= worldY - Tuning.S_WORLD_HALF_THICKNESS;
+        float endX = clamp(sx + worldDir * Tuning.S_WORLD_RANGE, 0, Tuning.WIDTH);
+        events.emit(Events.SLASH, sx, worldY, endX, Attack.WORLD_SLASH, tick);
+        if (hit) {
+            attack.set(Fighter.SUKUNA, Fighter.GOJO, Attack.WORLD_SLASH, ++attackSeq, Tuning.S_WORLD_DAMAGE_MILLI,
+                    worldDir * Tuning.S_WORLD_IMPULSE_X, Tuning.S_WORLD_IMPULSE_Y, Tuning.S_WORLD_HITSTUN, Attack.SPECIAL_BYPASS);
+            apply(attack);
         }
     }
 
@@ -538,8 +1003,9 @@ public final class World {
         float dx = (g.x - s.x) * s.facing, dy = Math.abs(g.y - s.y);
         if (dx >= -10 && dx <= Tuning.S_MELEE_REACH && dy <= 80) {
             sMeleeHitId = sMeleeSeq;
+            // 声明领域展延；只有展延真的开着（Domains.amplification）才中和得了无限
             attack.set(Fighter.SUKUNA, Fighter.GOJO, Attack.S_MELEE, sMeleeSeq, Tuning.S_MELEE_DAMAGE_MILLI,
-                    s.facing * Tuning.S_MELEE_IMPULSE, 0, Tuning.S_MELEE_HITSTUN, 0);
+                    s.facing * Tuning.S_MELEE_IMPULSE, 0, Tuning.S_MELEE_HITSTUN, Attack.DOMAIN_AMPLIFICATION);
             apply(attack);
         }
     }
@@ -553,7 +1019,7 @@ public final class World {
         float endX = hit ? g.x : clamp(sx + s.facing * Tuning.DISMANTLE_RANGE, 0, Tuning.WIDTH);
         events.emit(Events.SLASH, sx, sy, endX, Attack.DISMANTLE, tick);
         if (hit) {
-            attack.set(Fighter.SUKUNA, Fighter.GOJO, Attack.DISMANTLE, ++attackSeq, Tuning.DISMANTLE_DAMAGE_MILLI, 0, 0, 8, 0);
+            attack.set(Fighter.SUKUNA, Fighter.GOJO, Attack.DISMANTLE, ++attackSeq, Tuning.DISMANTLE_DAMAGE_MILLI, 0, 0, Tuning.DISMANTLE_HITSTUN, 0);
             apply(attack);
         }
     }
@@ -566,7 +1032,12 @@ public final class World {
         boolean fist = g.state == Fighter.FIST_ACTIVE;
         if (g.state != Fighter.MELEE_ACTIVE && !fist) return;
         float dx = (s.x - g.x) * g.facing, dy = Math.abs(s.y - g.y);
-        if (dx < -10 || dx > (fist ? Tuning.FIST_REACH : Tuning.MELEE_REACH) || dy > 80) return;
+        if (fist && fistAir) { // 俯冲：在五条悟前下方
+            float above = g.y - s.y;
+            if (dx < -30 || dx > Tuning.FIST_REACH || above < -40 || above > 160) return;
+        } else if (dx < -10 || dx > (fist ? Tuning.FIST_REACH : Tuning.MELEE_REACH) || dy > 80) {
+            return;
+        }
         meleeHitId = gMeleeSeq;
         boolean bf = blackFlash.roll(rng); // 只在真正命中时判定（苍拳也算）
         int kind;
@@ -592,11 +1063,13 @@ public final class World {
     /** 一次攻击接触：交给防御裁决，再按允许的部分生效。返回裁决位掩码。 */
     public int apply(Attack a) {
         Fighter t = fighter(a.target);
+        if (t.invuln) return 0; // 闪避、瞬移的固定动作：碰不到
         int mask = Defense.resolve(this, a);
-        // 200% 茈的念咒：被攻击就打断（被无限挡住也算：攻击碰到了）
+        // 念咒、苍拳和瞬移的前摇：被攻击就打断（被无限挡住也算：攻击碰到了）
         if (t == gojo && a.source == Fighter.SUKUNA) breakChant();
         if ((mask & Defense.SHOW_INFINITY) != 0) {
             events.emit(Events.INFINITY_BLOCK, t.x, t.centerY(), a.kind, a.kind, tick);
+            if (a.kind == Attack.DISMANTLE && sukuna.state == Fighter.S_DISMANTLE) adaptPending = true; // 收完招再结算
             return mask;
         }
         if ((mask & Defense.ALLOW_DAMAGE) != 0 && a.damageMilli > 0) {
@@ -611,9 +1084,18 @@ public final class World {
                 t.knockedAir = true; // 被打飞了：落地之前不能主动行动（不去改飞行的速度）
             }
         }
-        if ((mask & Defense.ALLOW_STUN) != 0) {
-            t.hitstun = Math.max(t.hitstun, a.hitstun);
-            if (t.state == Fighter.S_MELEE || t.state == Fighter.S_DISMANTLE) enter(t, Fighter.FREE); // 宿傩出招被打断
+        if ((mask & Defense.ALLOW_STUN) != 0 && a.hitstun > 0) {
+            // 连段衰减：同一串连击里，轻拳（体术）打到第 COMBO_STUN_HITS 下以后只扣血、不再造成硬直（打不成无限连）
+            t.comboHits = t.comboTimer > 0 ? t.comboHits + 1 : 1;
+            t.comboTimer = Tuning.COMBO_RESET;
+            boolean light = a.kind == Attack.MELEE || a.kind == Attack.S_MELEE;
+            if (!light || t.comboHits <= Tuning.COMBO_STUN_HITS) {
+                t.hitstun = Math.max(t.hitstun, a.hitstun);
+                if (t == sukuna) interruptSukuna(); // 宿傩出招、咏唱、回复被打断
+                else interruptGojo();
+            } else if (t == sukuna && (sukuna.state == Fighter.S_WORLD || sukuna.state == Fighter.S_RCT)) {
+                interruptSukuna(); // 咏唱和回复挨打就断（不管有没有硬直）
+            }
         }
         if (a.kind != Attack.BLUE_FIELD) {
             t.lastHitTick = tick;
@@ -843,7 +1325,9 @@ public final class World {
     private void integrate(Fighter f) {
         float dt = Tuning.DT;
         if (f.captured && blue.phase != BlueOrb.PULL) f.captured = false; // 苍没了，捕获也没了
-        if (f.captured) {
+        if (f.scripted) {
+            f.onGround = f.y <= 0;
+        } else if (f.captured) {
             f.x = blue.cx;
             f.y = blue.cy - Tuning.BODY_H * 0.5f;
             f.vx = f.vy = 0;
@@ -916,9 +1400,26 @@ public final class World {
         if (purpleCd > 0) purpleCd--;
         if (blueFailLock > 0) blueFailLock--;
         if (purpleFailLock > 0) purpleFailLock--;
+        if (redFailLock > 0) redFailLock--;
+        if (dodgeCd > 0) dodgeCd--;
+        if (tpCd > 0) tpCd--;
         if (sMeleeCd > 0) sMeleeCd--;
         if (dismantleCd > 0) dismantleCd--;
         if (sAttackGap > 0) sAttackGap--;
+        fightTicks++;
+        if (ampTicks > 0 && --ampTicks == 0) closeAmp();
+        else if (ampTicks == 0 && ampCd > 0) ampCd--;
+        if (ampLock > 0) ampLock--;
+        if (worldCd > 0) worldCd--;
+        if (rctCd > 0) rctCd--;
+        if (sStagger > 0) sStagger--;
+        // 法阵自己慢慢转（没开展延、没倒下时）
+        if (adaptPoints < Tuning.S_ADAPT_POINTS && ampTicks == 0 && sukuna.state != Fighter.KO && ++adaptTimer >= Tuning.S_ADAPT_PASSIVE) turnWheel();
+        if (!worldUnlocked && adaptPoints >= Tuning.S_ADAPT_POINTS && fightTicks >= Tuning.S_ADAPT_UNLOCK_MIN_TICKS) {
+            worldUnlocked = true; // 适应完成：学会了世界斩
+            domains.specialBypass[Fighter.SUKUNA] = true;
+            events.emit(Events.ADAPT, sukuna.x, sukuna.centerY() + 70, adaptPoints, 1, tick);
+        }
         if (domainTicks > 0 && --domainTicks == 0) {
             domains.sureHit[Fighter.GOJO][Fighter.SUKUNA] = false;
             domainCd = Tuning.DOMAIN_COOLDOWN;
@@ -936,6 +1437,8 @@ public final class World {
         for (int i = 0; i < 2; i++) {
             Fighter f = fighter(i);
             if (f.hitstun > 0) f.hitstun--;
+            if (f.comboTimer > 0 && --f.comboTimer == 0) f.comboHits = 0;
+            if (f.downTicks > 0 && f.onGround && !f.knockedAir && !f.scripted) f.downTicks--; // 被击倒：落地后才开始算
             if (f.pullResist > 0) f.pullResist--;
         }
         // 打空血量就倒地，过一会儿满血站起来（训练：宿傩是靶子；五条悟被自己的无指向茈打空也一样）
@@ -943,6 +1446,12 @@ public final class World {
             Fighter f = fighter(i);
             if (f.state != Fighter.KO && f.hpMilli == 0) {
                 if (f == gojo) breakChant(); // 念咒（或按住茈的起手）中倒下：打断
+                endScript();
+                f.downTicks = 0;
+                if (f != gojo) {
+                    interruptSukuna();
+                    if (ampTicks > 0) closeAmp();
+                }
                 f.state = Fighter.KO;
                 f.stateTick = 0;
                 f.captured = false;

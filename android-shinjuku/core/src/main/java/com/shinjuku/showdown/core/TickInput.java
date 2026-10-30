@@ -6,17 +6,18 @@ package com.shinjuku.showdown.core;
  */
 public final class TickInput {
     public float moveX, moveY;     // -1..1，y 向上
-    public boolean jump, melee, red, purple, domain;
+    public boolean jump, melee, red, purple, domain, dodge;
     public boolean blueDown, blueUp, blueHeld;
-    public boolean meleeHeld, redHeld, purpleHeld; // 按住（体术→苍拳、赫→最大输出、茈→念咒）
+    public boolean redHeld, purpleHeld;  // 按住：赫、茈念咒
+    public boolean jumpHeld, dodgeHeld;  // 按住跳跃时点体术是苍拳；按住闪避时点苍、点赫是瞬移
 
     public void clearEdges() {
-        jump = melee = red = purple = domain = blueDown = blueUp = false;
+        jump = melee = red = purple = domain = dodge = blueDown = blueUp = false;
     }
 
     public void clearAll() {
         clearEdges();
-        blueHeld = meleeHeld = redHeld = purpleHeld = false;
+        blueHeld = redHeld = purpleHeld = jumpHeld = dodgeHeld = false;
         moveX = moveY = 0;
     }
 }

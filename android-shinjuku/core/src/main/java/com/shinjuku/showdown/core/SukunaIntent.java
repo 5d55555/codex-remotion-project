@@ -4,9 +4,10 @@ package com.shinjuku.showdown.core;
 public final class SukunaIntent {
     public float moveX;
     public boolean jump, melee, dismantle;
+    public boolean amp, ampOff, world, rct; // 开 / 关领域展延、世界斩、反转术式
 
     void clear() {
         moveX = 0;
-        jump = melee = dismantle = false;
+        jump = melee = dismantle = amp = ampOff = world = rct = false;
     }
 }

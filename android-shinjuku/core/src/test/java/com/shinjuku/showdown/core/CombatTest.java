@@ -135,23 +135,61 @@ public class CombatTest {
         assertTrue("越近伤害越高 " + early + " < " + late, late > early);
     }
 
-    /** 长按苍：范围和吸力翻倍，前摇更长。 */
+    /** 长按苍：念完三段咒词（位相、黄昏、智慧之瞳）才放，范围和吸力翻倍；念的时候不能动。 */
     @Test
-    public void chargedBlueDoublesRangeAndPull() {
+    public void chargedBlueChantsThenDoublesRangeAndPull() {
         World w = world();
         TickInput in = new TickInput();
         in.blueDown = in.blueHeld = true;
         w.step(in);
         in.clearEdges();
         run(w, in, Tuning.BLUE_HOLD_THRESHOLD);
-        assertEquals(Fighter.BLUE_WINDUP, w.gojo.state);
-        assertTrue(w.pendingCharged());
-        run(w, in, Tuning.BLUE_WINDUP_CHARGED - 2);
-        assertFalse("前摇还没结束", w.blue.active());
-        run(w, in, 4);
+        assertEquals(Fighter.BLUE_CHANT, w.gojo.state);
+        assertEquals(Attack.BLUE_FIELD, w.chantKind);
+        in.moveX = 1;
+        float x = w.gojo.x;
+        run(w, in, Tuning.CHANT3_PHRASE * Tuning.CHANT3_PHRASES - 4);
+        assertEquals("念的时候不能动", x, w.gojo.x, 0.01f);
+        assertEquals(2, w.chantPhase);
+        assertFalse("还没念完", w.blue.active());
+        in.moveX = 0;
+        run(w, in, 6);
         assertTrue(w.blue.charged);
         assertEquals(Tuning.BLUE_RADIUS * 2, w.blue.radius, 0.01f);
         assertEquals(Tuning.BLUE_ACCEL * 2, w.blue.accel, 0.01f);
+    }
+
+    /** 苍、赫的咏唱：松手就断（什么都不放）；被宿傩的攻击碰到也断（哪怕被无限挡住）。 */
+    @Test
+    public void blueAndRedChantsBreakOnReleaseOrAttack() {
+        World w = world();
+        TickInput in = new TickInput();
+        in.blueDown = in.blueHeld = true;
+        w.step(in);
+        in.clearEdges();
+        run(w, in, Tuning.BLUE_HOLD_THRESHOLD + 10);
+        assertEquals(Fighter.BLUE_CHANT, w.gojo.state);
+        in.blueHeld = false;
+        in.blueUp = true;
+        run(w, in, 2);
+        assertEquals(Fighter.FREE, w.gojo.state);
+        run(w, in, 200);
+        assertFalse("松手：什么都没放", w.blue.active());
+
+        World v = world();
+        v.gojo.x = 400;
+        v.sukuna.x = 700;
+        in.red = in.redHeld = true;
+        run(v, in, Tuning.RED_HOLD + 10);
+        assertEquals(Fighter.RED_CHANT, v.gojo.state);
+        v.sukunaIntent.dismantle = true;
+        run(v, in, Tuning.DISMANTLE_WINDUP + 2);
+        assertEquals("被解碰到（无限挡住了）也断", Fighter.FREE, v.gojo.state);
+        assertEquals(v.gojo.maxHpMilli, v.gojo.hpMilli);
+        run(v, in, 200);
+        assertFalse(v.red.active);
+        assertEquals("没放出去", v.sukuna.maxHpMilli, v.sukuna.hpMilli);
+        in.redHeld = false;
     }
 
     /** 出力最大：同样相对位置（距离按范围等比）上，实际吸引加速度正好是普通苍的 2 倍。 */
@@ -228,9 +266,10 @@ public class CombatTest {
     public void staleBluePressExpires() {
         World w = world();
         TickInput in = new TickInput();
-        in.melee = in.meleeHeld = true;
-        run(w, in, Tuning.FIST_HOLD + 2);
-        in.meleeHeld = false;
+        in.jumpHeld = true;
+        in.melee = true;
+        run(w, in, 2);
+        in.jumpHeld = false;
         assertEquals(Fighter.FIST_WINDUP, w.gojo.state);
         in.blueDown = true;
         in.blueHeld = false;
@@ -299,30 +338,31 @@ public class CombatTest {
 
     /* ---------------- 苍拳 ---------------- */
 
-    /** 按住体术变苍拳：伤害是体术的 1.7 倍（85），黑闪也是 1.7 倍（595）；后摇比体术大。 */
+    /** 苍拳：按住跳跃时点体术。地上是举起来往下劈，115；黑闪按同样倍数（805）；有前摇和后摇。 */
     @Test
-    public void heldMeleeBecomesBlueFist() {
-        assertEquals(85_000, Tuning.FIST_DAMAGE_MILLI);
-        assertEquals(595_000, Tuning.FIST_BLACK_FLASH_DAMAGE_MILLI);
+    public void jumpHeldMeleeIsBlueFist() {
+        assertEquals(115_000, Tuning.FIST_DAMAGE_MILLI);
         assertTrue(Tuning.FIST_RECOVERY > Tuning.MELEE_RECOVERY);
         World w = world();
         TickInput in = new TickInput();
         int fists = 0, flashes = 0;
         for (int round = 0; round < 120; round++) {
             w.gojo.x = w.sukuna.x - 70;
+            w.gojo.y = 0;
             w.sukuna.vx = w.sukuna.vy = 0;
             w.sukuna.y = 0;
             w.sukuna.hpMilli = w.sukuna.maxHpMilli;
-            in.melee = in.meleeHeld = true;
+            in.jumpHeld = true;
+            in.melee = true;
             boolean sawFist = false;
-            for (int i = 0; i < Tuning.FIST_HOLD + Tuning.FIST_WINDUP + 4; i++) {
+            for (int i = 0; i < Tuning.FIST_WINDUP + 4; i++) {
                 w.step(in);
                 in.clearEdges();
                 if (w.gojo.state == Fighter.FIST_WINDUP) sawFist = true;
             }
-            in.meleeHeld = false;
-            run(w, in, Tuning.FIST_ACTIVE + Tuning.FIST_RECOVERY + 16);
-            assertTrue("按住变成了苍拳", sawFist);
+            in.jumpHeld = false;
+            run(w, in, Tuning.FIST_ACTIVE + Tuning.FIST_RECOVERY + 140);
+            assertTrue("按住跳跃时点体术：苍拳", sawFist);
             long dealt = w.sukuna.maxHpMilli - w.sukuna.hpMilli;
             if (dealt == Tuning.FIST_BLACK_FLASH_DAMAGE_MILLI) flashes++;
             else assertEquals(Tuning.FIST_DAMAGE_MILLI, dealt);
@@ -331,18 +371,55 @@ public class CombatTest {
         assertTrue("苍拳也会出黑闪 " + flashes + "/" + fists, flashes > 5);
     }
 
-    /** 点一下体术还是普通体术（松开得早，不会多等）。 */
+    /** 苍拳在空中：停一下，然后往下俯冲砸到下面的宿傩。 */
+    @Test
+    public void airBlueFistDivesDown() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = w.sukuna.x - 90;
+        in.jump = in.jumpHeld = true;
+        run(w, in, 18);
+        assertFalse(w.gojo.onGround);
+        float y = w.gojo.y;
+        in.melee = true;
+        run(w, in, Tuning.FIST_WINDUP - 2);
+        assertEquals(Fighter.FIST_WINDUP, w.gojo.state);
+        assertEquals("前摇：停在空中", y, w.gojo.y, 1f);
+        run(w, in, 40);
+        in.jumpHeld = false;
+        assertTrue("俯冲落地", w.gojo.onGround);
+        long dealt = w.sukuna.maxHpMilli - w.sukuna.hpMilli;
+        assertTrue("砸中了：" + dealt, dealt == Tuning.FIST_DAMAGE_MILLI || dealt == Tuning.FIST_BLACK_FLASH_DAMAGE_MILLI);
+    }
+
+    /** 苍拳的前摇容易被打断：被宿傩的攻击碰到（被无限挡住也算）就断。 */
+    @Test
+    public void blueFistWindupIsFragile() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 400;
+        w.sukuna.x = 700;
+        in.jumpHeld = true;
+        in.melee = true;
+        run(w, in, 3);
+        assertEquals(Fighter.FIST_WINDUP, w.gojo.state);
+        w.sukunaIntent.dismantle = true;
+        run(w, in, Tuning.DISMANTLE_WINDUP + 1);
+        assertEquals(Fighter.FREE, w.gojo.state);
+        in.jumpHeld = false;
+    }
+
+    /** 点一下体术就是普通体术（不再有长按蓄力，不会多等）。 */
     @Test
     public void tappedMeleeIsNormalAndNotDelayed() {
         World w = world();
         TickInput in = new TickInput();
         w.gojo.x = w.sukuna.x - 60;
-        in.melee = in.meleeHeld = true;
-        run(w, in, 3);
-        in.meleeHeld = false;
+        in.melee = true;
         int hitAt = -1;
         for (int i = 0; i < 20 && hitAt < 0; i++) {
             w.step(in);
+            in.clearEdges();
             if (w.sukuna.hpMilli < w.sukuna.maxHpMilli) hitAt = w.tick;
         }
         assertTrue(hitAt > 0);
@@ -363,22 +440,25 @@ public class CombatTest {
         assertEquals(w.sukuna.maxHpMilli - Tuning.RED_DAMAGE_MILLI, w.sukuna.hpMilli);
     }
 
-    /** 长按赫：最大输出，飞满整个战场，550 伤害，击飞比普通赫猛。 */
+    /** 长按赫：念完三段咒词（位相、波罗蜜、光之柱）放最大输出，飞满整个战场，550 伤害，击飞比普通赫猛。 */
     @Test
-    public void heldRedIsMaxOutput() {
+    public void heldRedChantsThenMaxOutput() {
         World w = world();
         TickInput in = new TickInput();
         w.gojo.x = 60;
         w.sukuna.x = 1220; // 战场另一头
         in.red = in.redHeld = true;
         run(w, in, Tuning.RED_HOLD + 2);
-        assertEquals(Fighter.RED_WINDUP, w.gojo.state);
-        in.redHeld = false;
+        assertEquals(Fighter.RED_CHANT, w.gojo.state);
+        assertEquals(Attack.RED, w.chantKind);
+        run(w, in, Tuning.CHANT3_PHRASE * Tuning.CHANT3_PHRASES - 6);
+        assertEquals(Fighter.RED_CHANT, w.gojo.state);
         float vx = 0;
-        for (int i = 0; i < Tuning.RED_MAX_WINDUP + 60 && w.sukuna.hpMilli == w.sukuna.maxHpMilli; i++) {
+        for (int i = 0; i < 80 && w.sukuna.hpMilli == w.sukuna.maxHpMilli; i++) {
             w.step(in);
             vx = w.sukuna.vx;
         }
+        in.redHeld = false;
         assertEquals(w.sukuna.maxHpMilli - Tuning.RED_MAX_DAMAGE_MILLI, w.sukuna.hpMilli);
         assertTrue("排斥比普通赫强", vx > Tuning.RED_IMPULSE_X);
         assertTrue(w.redMax());
@@ -876,7 +956,9 @@ public class CombatTest {
             in.red = r.nextUnitDouble() < 0.01;
             in.purple = r.nextUnitDouble() < 0.003;
             in.domain = r.nextUnitDouble() < 0.0005;
-            in.meleeHeld = r.nextUnitDouble() < 0.3;
+            in.dodge = r.nextUnitDouble() < 0.01;
+            in.jumpHeld = r.nextUnitDouble() < 0.2;
+            in.dodgeHeld = r.nextUnitDouble() < 0.2;
             in.redHeld = r.nextUnitDouble() < 0.4;
             in.purpleHeld = r.nextUnitDouble() < 0.6;
             boolean held = in.blueHeld;
@@ -898,5 +980,366 @@ public class CombatTest {
         assertEquals(a.rng.state(), b.rng.state());
         assertEquals(a.gojo.hpMilli, b.gojo.hpMilli);
         assertTrue(a.gojo.hpMilli >= 0 && a.sukuna.hpMilli >= 0);
+    }
+
+    /* ---------------- 宿傩的技能组：领域展延、魔虚罗的适应、世界斩、反转术式 ---------------- */
+
+    private static void ampOn(World w, TickInput in) {
+        w.sukunaIntent.amp = true;
+        run(w, in, Tuning.S_AMP_STARTUP + 2);
+        assertTrue("展延开了", w.ampTicks > 0);
+    }
+
+    /** 没开展延，宿傩的体术被无限挡住；开了展延，体术破无限，正好 75。解永远被挡住（展延时还用不了）。 */
+    @Test
+    public void amplifiedMeleeBypassesInfinityButDismantleNever() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 500;
+        w.sukuna.x = 570;
+        w.sukunaIntent.melee = true;
+        run(w, in, Tuning.S_MELEE_STARTUP + Tuning.S_MELEE_ACTIVE + Tuning.S_MELEE_RECOVERY + Tuning.S_ATTACK_GAP);
+        assertEquals("没展延：挡住", w.gojo.maxHpMilli, w.gojo.hpMilli);
+        ampOn(w, in);
+        w.sukunaIntent.dismantle = true;
+        run(w, in, 10);
+        assertEquals("展延时不能用解", Fighter.FREE, w.sukuna.state);
+        w.gojo.x = w.sukuna.x - 70;
+        w.sukunaIntent.melee = true;
+        run(w, in, Tuning.S_MELEE_STARTUP + Tuning.S_MELEE_ACTIVE + 2);
+        assertEquals("展延：破无限，75", w.gojo.maxHpMilli - Tuning.S_MELEE_DAMAGE_MILLI, w.gojo.hpMilli);
+        // 关掉展延：刚关的一小段时间也不能用术式；之后解照样被无限挡住
+        run(w, in, Tuning.S_ATTACK_GAP);
+        w.sukunaIntent.ampOff = true;
+        run(w, in, 1);
+        assertEquals(0, w.ampTicks);
+        assertFalse(w.domains.amplification[Fighter.SUKUNA]);
+        w.sukunaIntent.dismantle = true;
+        run(w, in, 1);
+        assertEquals("刚关展延：不能马上用解", Fighter.FREE, w.sukuna.state);
+        run(w, in, Tuning.S_AMP_EXIT);
+        long before = w.gojo.hpMilli;
+        w.sukunaIntent.dismantle = true;
+        run(w, in, Tuning.DISMANTLE_WINDUP + Tuning.DISMANTLE_RECOVERY + 2);
+        assertEquals("解永远被无限挡住", before, w.gojo.hpMilli);
+        // 展延到时间自己关，冷却从关闭开始算
+        ampOnAfterCooldown(w, in);
+        run(w, in, Tuning.S_AMP_DURATION);
+        assertEquals(0, w.ampTicks);
+        assertEquals(Tuning.S_AMP_COOLDOWN, w.ampCd, 2);
+    }
+
+    private static void ampOnAfterCooldown(World w, TickInput in) {
+        run(w, in, Tuning.S_AMP_COOLDOWN + 2);
+        ampOn(w, in);
+    }
+
+    /** 魔虚罗的法阵：没开展延时每 4 秒自己转一格；解碰到无限能马上转一格（两格至少隔 1 秒）；转满 4 格且打满 12 秒才学会世界斩。 */
+    @Test
+    public void wheelTurnsAndUnlocksWorldSlash() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 500;
+        w.sukuna.x = 800;
+        w.sukunaIntent.dismantle = true;
+        run(w, in, Tuning.DISMANTLE_WINDUP + Tuning.DISMANTLE_RECOVERY + 1);
+        assertEquals("解被挡住、收完招：转一格", 1, w.adaptPoints);
+        w.sukunaIntent.dismantle = true;
+        run(w, in, Tuning.DISMANTLE_WINDUP + Tuning.DISMANTLE_RECOVERY + Tuning.DISMANTLE_COOLDOWN);
+        assertTrue("两格至少隔 1 秒", w.adaptPoints <= 2);
+        while (w.adaptPoints < Tuning.S_ADAPT_POINTS) run(w, in, 1);
+        assertTrue("转满了，但打满 12 秒才学会：" + w.fightTicks, w.fightTicks < Tuning.S_ADAPT_UNLOCK_MIN_TICKS || w.worldUnlocked);
+        run(w, in, Tuning.S_ADAPT_UNLOCK_MIN_TICKS);
+        assertTrue(w.worldUnlocked);
+        assertTrue("世界斩是被规则认可的破无限手段", w.domains.specialBypass[Fighter.SUKUNA]);
+        // 展延期间法阵不转
+        World v = world();
+        ampOn(v, in);
+        run(v, in, Tuning.S_AMP_DURATION - 10);
+        assertEquals(0, v.adaptPoints);
+    }
+
+    private static World unlocked(TickInput in) {
+        World w = world();
+        w.gojo.x = 300;
+        w.sukuna.x = 700;
+        while (!w.worldUnlocked) run(w, in, 1);
+        w.gojo.hpMilli = w.gojo.maxHpMilli;
+        return w;
+    }
+
+    /** 世界斩：第一次靠束缚只要 48 tick；之后要结印 + 三段咏唱 + 指向，共 144 tick。斩的是空间，破无限，400。 */
+    @Test
+    public void worldSlashFirstIsBoundThenChanted() {
+        TickInput in = new TickInput();
+        World w = unlocked(in);
+        w.sukunaIntent.world = true;
+        run(w, in, Tuning.S_WORLD_FIRST_WINDUP - 1);
+        assertEquals("第一次：还没斩出去", w.gojo.maxHpMilli, w.gojo.hpMilli);
+        run(w, in, 2);
+        assertEquals("第一次：48 tick 斩出去，破无限 400", w.gojo.maxHpMilli - Tuning.S_WORLD_DAMAGE_MILLI, w.gojo.hpMilli);
+        run(w, in, Tuning.S_WORLD_COOLDOWN + 40);
+        w.gojo.hpMilli = w.gojo.maxHpMilli;
+        w.gojo.x = 300;
+        w.sukuna.x = 700;
+        run(w, in, 60);
+        long seen = w.events.written;
+        w.sukunaIntent.world = true;
+        run(w, in, Tuning.S_WORLD_FIRST_WINDUP + 4);
+        assertEquals("之后：要咏唱，48 tick 时还没斩", w.gojo.maxHpMilli, w.gojo.hpMilli);
+        assertEquals(Fighter.S_WORLD, w.sukuna.state);
+        run(w, in, Tuning.S_WORLD_WINDUP - Tuning.S_WORLD_FIRST_WINDUP);
+        int phrases = 0, locks = 0;
+        for (long k = Math.max(seen, w.events.written - Events.CAP); k < w.events.written; k++) {
+            int i = (int) (k & Events.MASK);
+            if (w.events.type[i] == Events.WORLD_CHANT && w.events.value[i] >= 1 && w.events.value[i] <= 3) phrases++;
+            if (w.events.type[i] == Events.WORLD_CHANT && w.events.value[i] == 4) locks++;
+        }
+        assertEquals("龙鳞、反发、番之流星", 3, phrases);
+        assertEquals("指向：锁定一次", 1, locks);
+        assertEquals("144 tick 斩出去", w.gojo.maxHpMilli - Tuning.S_WORLD_DAMAGE_MILLI, w.gojo.hpMilli);
+    }
+
+    /** 世界斩是一道水平的斩带：算好时间跳过去就躲开；咏唱时挨一拳就断，还要僵一会儿。 */
+    @Test
+    public void worldSlashCanBeJumpedOrInterrupted() {
+        TickInput in = new TickInput();
+        World w = unlocked(in);
+        w.sukunaIntent.world = true;
+        run(w, in, Tuning.S_WORLD_FIRST_WINDUP - 25);
+        in.jump = true;
+        run(w, in, 40);
+        assertEquals("跳过斩带：没事", w.gojo.maxHpMilli, w.gojo.hpMilli);
+
+        World v = unlocked(in);
+        v.gojo.x = v.sukuna.x - 70;
+        v.gojo.facing = 1;
+        v.sukunaIntent.world = true;
+        run(v, in, 10);
+        in.melee = true;
+        run(v, in, 20);
+        assertEquals("被打断", Fighter.FREE, v.sukuna.state);
+        assertTrue("打断后僵住", v.sStagger > 0 || v.sukuna.hitstun > 0);
+        run(v, in, Tuning.S_WORLD_FIRST_WINDUP + 20);
+        assertEquals("没斩出去", v.gojo.maxHpMilli, v.gojo.hpMilli);
+        assertTrue("束缚的“第一次”起手就用掉了", v.worldBound);
+    }
+
+    /** 反转术式：起手 36，之后 180 tick 每 tick 回 2.5（共 450）；挨打就断；一局最多两次。 */
+    @Test
+    public void reverseTechniqueHealsAndCanBeInterrupted() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 100;
+        w.sukuna.x = 1100;
+        w.sukuna.hpMilli = w.sukuna.maxHpMilli - 1_000_000;
+        long hp0 = w.sukuna.hpMilli;
+        w.sukunaIntent.rct = true;
+        run(w, in, Tuning.S_RCT_STARTUP + Tuning.S_RCT_DURATION + Tuning.S_RCT_RECOVERY + 2);
+        assertEquals(hp0 + Tuning.S_RCT_HEAL_PER_TICK_MILLI * Tuning.S_RCT_DURATION, w.sukuna.hpMilli);
+        assertEquals(1, w.rctUses);
+        run(w, in, Tuning.S_RCT_COOLDOWN);
+        w.gojo.x = w.sukuna.x - 70;
+        w.gojo.facing = 1;
+        long hp1 = w.sukuna.hpMilli;
+        w.sukunaIntent.rct = true;
+        run(w, in, Tuning.S_RCT_STARTUP + 20);
+        in.melee = true;
+        run(w, in, 20);
+        assertEquals("挨打就断", Fighter.FREE, w.sukuna.state);
+        assertTrue("回到一半就停", w.sukuna.hpMilli < hp1 + Tuning.S_RCT_HEAL_PER_TICK_MILLI * 40);
+        assertEquals("进入回复就算一次", 2, w.rctUses);
+        run(w, in, Tuning.S_RCT_COOLDOWN + 10);
+        w.gojo.x = 100;
+        w.sukunaIntent.rct = true;
+        run(w, in, 5);
+        assertEquals("用完两次了", Fighter.FREE, w.sukuna.state);
+    }
+
+    /** 连段衰减：同一串连击里第 4 下起，轻拳不再造成硬直（但照样扣血）；1 秒没挨打重新算。 */
+    @Test
+    public void lightMeleeComboStopsStunningAfterThreeHits() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 500;
+        w.sukuna.x = 560;
+        int stunned = 0, hits = 0;
+        long seen = w.events.written;
+        for (int t = 0; t < 120 * 3 && hits < 6; t++) {
+            in.melee = w.meleeCd == 0 && w.gojo.state == Fighter.FREE;
+            int before = w.sukuna.hitstun;
+            w.step(in);
+            in.clearEdges();
+            w.sukuna.x = w.gojo.x + 60; // 一直贴着
+            for (; seen < w.events.written; seen++) {
+                int i = (int) (seen & Events.MASK);
+                if (w.events.type[i] == Events.HIT && w.events.kind[i] == Attack.MELEE) {
+                    hits++;
+                    if (w.sukuna.hitstun > before) stunned++;
+                }
+            }
+        }
+        assertTrue("打了好几下：" + hits, hits >= 5);
+        assertEquals("只有前三下有硬直", Tuning.COMBO_STUN_HITS, stunned);
+    }
+
+    /** 五条悟挨打：手上的招作废（没放出去的不进冷却）。 */
+    @Test
+    public void gojoIsInterruptedWhenHit() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 500;
+        w.sukuna.x = 570;
+        ampOn(w, in);
+        in.red = in.redHeld = true;
+        run(w, in, 4);
+        assertEquals(Fighter.RED_HOLD, w.gojo.state);
+        w.sukunaIntent.melee = true;
+        run(w, in, Tuning.S_MELEE_STARTUP + 2);
+        assertTrue(w.gojo.hitstun > 0);
+        assertEquals("赫的起手被打断", Fighter.FREE, w.gojo.state);
+        assertEquals("没放出去，不进冷却", 0, w.redCd);
+    }
+
+    /** 三轮的 AI 对固定的五条悟脚本：会开展延打出伤害，结果可复现。 */
+    @Test
+    public void sukunaAiUsesAmplificationAgainstABot() {
+        int sukunaWins = 0, gojoWins = 0;
+        for (int seed = 0; seed < 20; seed++) {
+            BattleConfig c = new BattleConfig();
+            c.sukunaAi = true;
+            BalanceSim.Result a = BalanceSim.play(GojoBot.STANDARD, seed, c);
+            BattleConfig c2 = new BattleConfig();
+            c2.sukunaAi = true;
+            BalanceSim.Result b = BalanceSim.play(GojoBot.STANDARD, seed, c2);
+            assertEquals("可复现", a.ticks, b.ticks);
+            assertEquals(a.winner, b.winner);
+            if (a.winner == 1) sukunaWins++;
+            if (a.winner == 0) gojoWins++;
+            assertTrue("宿傩打出了伤害", a.ampMelee > 0);
+        }
+        assertTrue("宿傩赢得了几局：" + sukunaWins, sukunaWins >= 3);
+        assertTrue("五条悟也赢得了几局：" + gojoWins, gojoWins >= 3);
+    }
+
+    /* ---------------- 闪避、瞬移 ---------------- */
+
+    /** 闪避：不推摇杆往面朝的方向，推着往摇杆的方向；闪的时候无敌（展延的体术也打不到）；冷却 0.5 秒。 */
+    @Test
+    public void dodgeFollowsStickAndIsInvulnerable() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 500;
+        w.sukuna.x = 800;
+        run(w, in, 2);
+        assertEquals(1, w.gojo.facing);
+        float x0 = w.gojo.x;
+        in.dodge = true;
+        run(w, in, Tuning.DODGE_TICKS + 2);
+        assertTrue("面朝右：往右闪", w.gojo.x > x0 + 100);
+        run(w, in, Tuning.DODGE_COOLDOWN);
+        x0 = w.gojo.x;
+        in.moveX = -1;
+        in.dodge = true;
+        run(w, in, Tuning.DODGE_TICKS);
+        in.moveX = 0;
+        assertTrue("推着往左：往左闪", w.gojo.x < x0 - 100);
+        run(w, in, Tuning.DODGE_COOLDOWN);
+        // 冷却：刚闪完马上再按，闪不出来
+        in.dodge = true;
+        run(w, in, 1);
+        assertEquals(Fighter.DODGE, w.gojo.state);
+        run(w, in, Tuning.DODGE_TICKS);
+        in.dodge = true;
+        run(w, in, 1);
+        assertTrue("冷却中", w.gojo.state != Fighter.DODGE || w.dodgeCd > 0);
+        // 无敌：展延的体术打不到闪避中的五条悟
+        World v = world();
+        v.gojo.x = 500;
+        v.sukuna.x = 570;
+        v.sukunaIntent.amp = true;
+        run(v, in, Tuning.S_AMP_STARTUP + 2);
+        v.gojo.x = v.sukuna.x - 70;
+        v.sukunaIntent.melee = true;
+        run(v, in, Tuning.S_MELEE_STARTUP - 1);
+        in.dodge = true;
+        in.moveX = -1;
+        run(v, in, 3);
+        in.moveX = 0;
+        run(v, in, 20);
+        assertEquals("闪避中无敌", v.gojo.maxHpMilli, v.gojo.hpMilli);
+    }
+
+    /** 按住闪避点苍：前摇后出现在宿傩背后，把他吸起来，苍拳连打 5 下（每下 115），最后击飞、击倒。 */
+    @Test
+    public void dodgeHeldBlueTeleportsBehindAndCombos() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 300;
+        w.sukuna.x = 700;
+        in.dodgeHeld = true;
+        in.blueDown = in.blueUp = true;
+        run(w, in, 1);
+        assertEquals(Fighter.TP_WINDUP, w.gojo.state);
+        in.dodgeHeld = false;
+        run(w, in, Tuning.TP_WINDUP + 1);
+        assertEquals(Fighter.TP_BLUE, w.gojo.state);
+        assertTrue("出现在背后（另一边）", w.gojo.x > w.sukuna.x);
+        assertEquals("面向宿傩", -1, w.gojo.facing);
+        boolean wasDown = false;
+        for (int i = 0; i < 400 && w.gojo.state != Fighter.FREE; i++) {
+            w.step(in);
+            in.clearEdges();
+            if (w.sukuna.downTicks > 0) wasDown = true;
+        }
+        assertEquals(w.sukuna.maxHpMilli - 5 * Tuning.FIST_DAMAGE_MILLI, w.sukuna.hpMilli);
+        assertTrue("击倒", wasDown);
+        assertTrue("被打飞了", w.sukuna.x < 700);
+        assertTrue(w.tpCd > 0 && w.blueCd > 0);
+    }
+
+    /** 按住闪避点赫：出现在背后放一发很大的赫，把宿傩轰出战场宽度 85%（这里有足够的空间），击倒。 */
+    @Test
+    public void dodgeHeldRedBlastsAcrossTheField() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 40;
+        w.sukuna.x = 1180; // 宿傩在右边，五条悟瞬移到他右边（背后），往左轰
+        run(w, in, 2);
+        in.dodgeHeld = true;
+        in.red = true;
+        run(w, in, 1);
+        in.dodgeHeld = false;
+        assertEquals(Fighter.TP_WINDUP, w.gojo.state);
+        float x0 = w.sukuna.x;
+        boolean wasDown = false;
+        for (int i = 0; i < 300 && (w.gojo.state != Fighter.FREE || w.sukuna.scripted); i++) {
+            w.step(in);
+            in.clearEdges();
+            if (w.sukuna.downTicks > 0) wasDown = true;
+        }
+        assertEquals(w.sukuna.maxHpMilli - Tuning.TP_RED_DAMAGE_MILLI, w.sukuna.hpMilli);
+        assertEquals("轰出 85%", Tuning.TP_RED_DISTANCE, x0 - w.sukuna.x, 2f);
+        assertTrue(wasDown);
+    }
+
+    /** 瞬移的前摇可以被打断（被宿傩的攻击碰到就断），不进冷却。 */
+    @Test
+    public void teleportWindupIsInterruptible() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 400;
+        w.sukuna.x = 700;
+        in.dodgeHeld = true;
+        in.red = true;
+        run(w, in, 3);
+        in.dodgeHeld = false;
+        assertEquals(Fighter.TP_WINDUP, w.gojo.state);
+        w.sukunaIntent.dismantle = true;
+        run(w, in, Tuning.DISMANTLE_WINDUP + 1);
+        assertEquals(Fighter.FREE, w.gojo.state);
+        assertEquals(0, w.tpCd);
+        run(w, in, 60);
+        assertEquals(w.sukuna.maxHpMilli, w.sukuna.hpMilli);
     }
 }

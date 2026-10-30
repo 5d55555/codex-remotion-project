@@ -72,18 +72,23 @@ public class SelectActivity extends Activity {
         emblem.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         card.addView(emblem, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
-        TextView title = text(ctx, d.title, d.title.length() >= 4 ? 30 : 32, Color.WHITE, true);
+        TextView title = text(ctx, d.title, 32, Color.WHITE, true);
+        // 五张卡并排时卡片变窄：字号自动缩小到放得下整行（四个字的“史上最强”“测试模式”也不会被截掉）
+        title.setAutoSizeTextTypeUniformWithConfiguration(14, 32, 1, TypedValue.COMPLEX_UNIT_SP);
         title.setShadowLayer(8 * dp, 0, 0, d.accent);
-        int glow = (int) (10 * dp); // 给光晕留地方，不然会被 TextView 自己的边界裁成方块
-        title.setPadding(glow, glow / 2, glow, glow / 2);
-        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        int glow = (int) (6 * dp); // 给光晕留地方，不然会被 TextView 自己的边界裁成方块
+        title.setPadding(glow, glow, glow, glow / 2);
+        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (52 * dp));
         tl.topMargin = (int) (1 * dp);
         tl.bottomMargin = -glow / 2;
         card.addView(title, tl);
 
-        card.addView(text(ctx, d.subtitle, 13, 0xCCDDE2F5, false));
+        TextView sub = text(ctx, d.subtitle, 13, 0xCCDDE2F5, false);
+        sub.setAutoSizeTextTypeUniformWithConfiguration(8, 13, 1, TypedValue.COMPLEX_UNIT_SP);
+        card.addView(sub, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (20 * dp)));
 
         TextView tier = text(ctx, d.tier, 13, nightmare ? 0xFFFFE6A8 : Color.WHITE, true);
+        tier.setMaxLines(1);
         GradientDrawable pill = new GradientDrawable();
         pill.setCornerRadius(99 * dp);
         pill.setColor(nightmare ? 0xFF8E0F1C : (d.accent & 0x00FFFFFF) | 0x66000000);

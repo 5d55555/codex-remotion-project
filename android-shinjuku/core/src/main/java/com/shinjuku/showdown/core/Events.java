@@ -11,8 +11,16 @@ public final class Events {
             CHANT = 17,            // value：第几段咒词（0..3），-1 被打断
             DOMAIN_CUTSCENE = 18,  // 要放过场了（世界停住，等 endCutscene）
             DOMAIN_OPEN = 19, DOMAIN_CLOSE = 20,
-            SLASH = 21;            // 宿傩的解：从 (x, y) 斩到 value 那个 x
-    // CAST 的 value：0 普通，1 苍出力最大 / 赫最大输出，2 茈 200%
+            SLASH = 21,            // 宿傩的解 / 世界斩（kind 区分）：从 (x, y) 斩到 value 那个 x
+            AMP = 22,              // 宿傩的领域展延：value 1 开、0 关
+            ADAPT = 23,            // 魔虚罗的适应：value 是适应点数；kind 1 表示学会了世界斩
+            WORLD_CHANT = 24,      // 世界斩的起手：value 0 结印（第一次是裂纹预警）、1..3 咏唱、4 指向（锁定）、-1 被打断
+            RCT = 25,              // 宿傩的反转术式：value 1 开始回复、0 结束或被打断
+            DODGE = 26,            // 五条悟闪避：value 是方向
+            TELEPORT = 27;         // 五条悟瞬移到宿傩背后：从 (x, y) 到 value 那个 x；kind 是 Attack.BLUE_FIST（苍）或 Attack.RED（赫）
+    // CHANT 的 kind：Attack.PURPLE（200% 茈，四段）、Attack.BLUE_FIELD（出力最大的苍，三段）、Attack.RED（最大输出的赫，三段）
+    // CAST 的 value：0 普通，1 苍出力最大 / 赫最大输出 / 世界斩（咏唱版），2 茈 200%；世界斩第一次（束缚，免咏唱）是 3
+    // RED_FIRE / RED_BURST 的 kind：0 普通，1 最大输出，2 瞬移后的大赫
 
     public static final int CAP = 128, MASK = CAP - 1;
     public final int[] type = new int[CAP];

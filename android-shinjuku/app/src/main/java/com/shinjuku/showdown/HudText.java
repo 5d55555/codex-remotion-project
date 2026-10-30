@@ -16,7 +16,10 @@ final class HudText {
     static final int SUB_RED_MAX = 15, SUB_PURPLE_200 = 16, SUB_FIST = 17, SUB_DOMAIN = 18;
     static final int CHANT0 = 19;   // 四段咒词：九纲、偏光、乌与声明、表里之间
     static final int DISMANTLE = 23; // 宿傩的“解”
-    static final int COUNT = 24;
+    static final int AMP = 24, RCT = 25, ADAPTED = 26; // 宿傩头上的小字：领域展延、反转术式、适应完成
+    static final int WORLD_CHANT0 = 27;              // 世界斩的三段咏唱：龙鳞、反发、番之流星
+    static final int SUB_WORLD = 30, SUB_WORLD_BOUND = 31;
+    static final int COUNT = 32;
 
     final Bitmap bitmap;
     final float dp;
@@ -28,8 +31,12 @@ final class HudText {
         String[] text = {"五条悟", "两面宿傩", d.title, d.tier, "体术", "跳", "苍", "赫", "茈", "领域",
                 "术式顺转", "术式顺转 · 出力最大", "术式反转", "虚式", "虚式 · 无指向",
                 "术式反转 · 最大输出", "虚式 · 200%", "术式顺转 · 苍拳", "领域展开",
-                "九纲", "偏光", "乌与声明", "表里之间", "解"};
-        float[] size = {13, 13, 16, 10, 15, 15, 22, 22, 22, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 17, 17, 17, 17, 16};
+                "九纲", "偏光", "乌与声明", "表里之间", "解",
+                "领域展延", "反转术式", "适应完成",
+                "龙鳞", "反发", "番之流星",
+                "斩断世界的斩击", "斩断世界的斩击 · 束缚"};
+        float[] size = {13, 13, 16, 10, 15, 15, 22, 22, 22, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 17, 17, 17, 17, 16,
+                13, 13, 14, 17, 17, 17, 15, 15};
         Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         fill.setTypeface(Typeface.DEFAULT_BOLD);
         fill.setColor(0xFFFFFFFF);

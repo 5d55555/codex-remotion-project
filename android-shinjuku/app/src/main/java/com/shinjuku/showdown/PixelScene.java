@@ -27,6 +27,9 @@ final class PixelScene {
     private static final int PURPLE_CORE = 0xFFFFFFFF, PURPLE_LIGHT = 0xFFF2C7FF, PURPLE_HOT = 0xFFC77DFF, PURPLE = 0xFF873BEA, PURPLE_DARK = 0xFF35116F;
     private static final int BF_BLACK = 0xFF11131A, BF_RED = 0xFFFF3E3E;
     private static final int VOID_LIGHT = 0xFFCFF4FF, VOID_RING = 0xFF7A5CFF;
+    // 宿傩：领域展延的灰白轮廓、魔虚罗法阵的金色、世界斩的红、反转术式的白
+    private static final int AMP_LIGHT = 0xFFE9EAF2, AMP_DARK = 0xFF7D8294, WHEEL = 0xFFE0B25A, WHEEL_LIT = 0xFFFFF0B8,
+            CUT_RED = 0xFFB0101E, WORLD_RED = 0xFFFF3A4A, RCT_LIGHT = 0xFFE6FFF0;
 
     private final Atlas atlas;
     private final int bgW, bgH, skyColor;
@@ -79,6 +82,9 @@ final class PixelScene {
     private boolean purple200; // 最近一发茈是不是 200%（命中时的特效用）
     // 解：一道一闪而过的细白线，宿傩头上一个“解”字
     private float slashT0 = -99, slashX0, slashY0, slashX1, dismantleT0 = -99;
+    // 宿傩：头上小字（领域展延、反转术式、适应完成）出现的时刻、法阵转到的角度、世界斩斩出的那一道
+    private float ampT0 = -99, rctT0 = -99, adaptedT0 = -99, wheelAngle, wheelT0 = -99;
+    private float worldT0 = -99, worldX0, worldY0, worldX1;
 
     private float gojoLag = 1, sukunaLag = 1, lastTime;
     private long seenEvents;
@@ -172,7 +178,9 @@ final class PixelScene {
         if (h.active) hollowBack(t, h, X(h.x) + sx, Y(h.y) + sy, time);
 
         poseSukuna(w, time);
+        if (k.state != Fighter.KO) sukunaBack(t, w, kx, ky, time);
         figure(t, false, kx, ky);
+        if (k.state != Fighter.KO) sukunaFront(t, w, kx, ky, time, dt, sx, sy);
         if (w.domainTicks > 0 && k.state != Fighter.KO) overload(t, kx, ky, time);
         poseGojo(w, time);
         figure(t, true, gx, gy);
@@ -185,6 +193,7 @@ final class PixelScene {
         if (pu.active) purpleShot(t, X(lerp(pu.px, pu.x, alpha)) + sx, Y(lerp(pu.py, pu.y, alpha)) + sy, pu.dir, pu.max, time, dt);
         if (h.active) hollowFront(t, h, X(h.x) + sx, Y(h.y) + sy, time);
         slash(t, time, sx, sy);
+        worldSlash(t, time, sx, sy);
         drawEffects(t, time, sx, sy);
         drawParticles(t, sx, sy);
         drawNumbers(t, time, sx, sy);
@@ -294,6 +303,7 @@ final class PixelScene {
                 case Events.CAST: {
                     int v = Math.round(ev.value[i]);
                     if (kind == Attack.BLUE_FIST) banner(Atlas.BIG_FIST, HudText.SUB_FIST, BLUE_LIGHT, time);
+                    else if (kind == Attack.WORLD_SLASH) banner(Atlas.BIG_DISMANTLE, v == 3 ? HudText.SUB_WORLD_BOUND : HudText.SUB_WORLD, WORLD_RED, time);
                     else if (kind == Attack.RED) banner(Atlas.BIG_RED, v == 1 ? HudText.SUB_RED_MAX : HudText.SUB_RED, v == 1 ? 0xFFFF3A2A : 0xFFFF5A4A, time);
                     else if (kind == Attack.PURPLE) banner(Atlas.BIG_PURPLE, v == 2 ? HudText.SUB_PURPLE_200 : HudText.SUB_PURPLE, v == 2 ? 0xFFF7DDFF : 0xFFE3B0FF, time);
                     else if (v > 0) banner(Atlas.BIG_BLUE, HudText.SUB_BLUE_MAX, BLUE_CORE, time);
@@ -326,11 +336,60 @@ final class PixelScene {
                     fx(FX_RING_IN, x, y, 0.5f, 1, 120, VOID_LIGHT, 0);
                     break;
                 case Events.SLASH:
-                    slashT0 = time;
-                    slashX0 = x;
-                    slashY0 = y;
-                    slashX1 = X(ev.value[i]);
-                    dismantleT0 = time;
+                    if (kind == Attack.WORLD_SLASH) { // 世界斩：整条斩带一下子劈开
+                        worldT0 = time;
+                        worldX0 = x;
+                        worldY0 = y;
+                        worldX1 = X(ev.value[i]);
+                        flash(0xCCFFFFFF, time);
+                        shake(9, time);
+                        for (int k = 0; k < 12; k++) {
+                            float px = x + (worldX1 - x) * rnd();
+                            sparks(px, y, 3, 0xFFFFFFFF, WORLD_RED, 120);
+                        }
+                    } else {
+                        slashT0 = time;
+                        slashX0 = x;
+                        slashY0 = y;
+                        slashX1 = X(ev.value[i]);
+                        dismantleT0 = time;
+                    }
+                    break;
+                case Events.AMP:
+                    if (ev.value[i] > 0) {
+                        ampT0 = time;
+                        fx(FX_RING, x, y, 0.4f, 8, 34, AMP_LIGHT, AMP_DARK);
+                        sparks(x, y, 10, AMP_LIGHT, AMP_DARK, 70);
+                    } else {
+                        fx(FX_RING_IN, x, y, 0.25f, 1, 30, AMP_DARK, 0);
+                    }
+                    break;
+                case Events.ADAPT:
+                    wheelT0 = time;
+                    if (kind == 1) { // 适应完成：学会了世界斩
+                        adaptedT0 = time;
+                        flash(0x40FFF0B8, time);
+                        fx(FX_RING, x, y, 0.6f, 6, 40, WHEEL_LIT, WHEEL);
+                    }
+                    break;
+                case Events.WORLD_CHANT: {
+                    int v = Math.round(ev.value[i]);
+                    if (v < 0) {         // 被打断
+                        sparks(x, y, 14, CUT_RED, AMP_DARK, 80);
+                        fx(FX_RING, x, y, 0.3f, 12, 4, AMP_DARK, CUT_RED);
+                    } else if (v >= 1 && v <= 3) {
+                        fx(FX_RING, x, y, 0.4f, 8, 28 + 6 * v, WORLD_RED, CUT_RED);
+                        shake(1 + 0.5f * v, time);
+                    } else if (v == 4) { // 指向：锁定
+                        fx(FX_DISC, x, Y(ev.y[i]), 0.12f, 6, 0, 0xFFFFFFFF, 0);
+                    }
+                    break;
+                }
+                case Events.RCT:
+                    if (ev.value[i] > 0) {
+                        rctT0 = time;
+                        fx(FX_RING, x, y, 0.5f, 6, 30, RCT_LIGHT, 0xFF9FE0C0);
+                    }
                     break;
                 case Events.BLUE_LAND:
                     fx(FX_RING_IN, x, y, 0.28f, 1, Tuning.BLUE_RADIUS * (ev.value[i] > 0 ? 2 : 1) * PPU, BLUE_LIGHT, BLUE);
@@ -415,6 +474,13 @@ final class PixelScene {
             case Attack.DISMANTLE:
                 fx(FX_CUTS, x, y, 0.35f, 0, 16, 0xFFFFFFFF, 0xFFB0101E);
                 shake(2, time);
+                break;
+            case Attack.WORLD_SLASH: // 连空间一起被斩开
+                fx(FX_CUTS, x, y, 0.6f, 0, 30, 0xFFFFFFFF, CUT_RED);
+                fx(FX_STAR, x, y, 0.3f, 0, 40, WORLD_RED, 0);
+                sparks(x, y, 30, 0xFFFFFFFF, WORLD_RED, 220);
+                flash(0x99FF2A3A, time);
+                shake(11, time);
                 break;
             default:
                 break;
@@ -984,6 +1050,118 @@ final class PixelScene {
         t.additive(false);
     }
 
+    /** 宿傩身后：领域展延的灰白轮廓（开的时候从断续的几段合成一圈，快结束时闪）。 */
+    private void sukunaBack(PixelTarget t, World w, float kx, float ky, float time) {
+        Fighter s = w.sukuna;
+        float k;
+        if (s.state == Fighter.S_AMP_START) k = Math.min(1, s.stateTick / (float) Tuning.S_AMP_STARTUP);
+        else if (w.ampTicks > 0) k = w.ampTicks < 60 && ((int) (time * 16) & 1) == 0 ? 0.35f : 1;
+        else return;
+        float cx = Math.round(kx), cy = Math.round(ky) - 26, r = 31;
+        t.additive(true);
+        t.shape(cx, cy, r, 0, 0, 7, withAlpha(AMP_DARK, 0.18f * k));
+        int seg = 12, on = Math.max(1, Math.round(seg * k));
+        for (int i = 0; i < on; i++) {
+            float a0 = i * 6.2832f / seg + time * 0.8f;
+            t.shape(cx, cy, r + 1, r - 1, a0, 6.2832f / seg * (0.45f + 0.5f * k), withAlpha(AMP_LIGHT, 0.75f * k));
+        }
+        t.additive(false);
+    }
+
+    /** 宿傩身前：头上的魔虚罗法阵、世界斩的预警（第一次是往前裂开的空间，之后是锁定的斩线）、反转术式的光。 */
+    private void sukunaFront(PixelTarget t, World w, float kx, float ky, float time, float dt, int sx, int sy) {
+        Fighter s = w.sukuna;
+        // 法阵：八根辐条的轮，每适应一次转 45 度；展延时暗（不转），学会世界斩后发亮
+        float target = w.adaptPoints * 45f;
+        wheelAngle += (target - wheelAngle) * Math.min(1, dt * 8);
+        float wx = Math.round(kx), wy = Math.round(ky) - 64 + ((int) (time * 2) & 1);
+        boolean lit = w.worldUnlocked;
+        float turning = Math.max(0, 1 - (time - wheelT0) / 0.4f);
+        int c = lit ? WHEEL_LIT : WHEEL;
+        float a = w.ampTicks > 0 ? 0.4f : 0.9f;
+        if (lit || turning > 0) {
+            t.additive(true);
+            t.shape(wx, wy, 11, 0, 0, 7, withAlpha(c, (lit ? 0.18f + 0.1f * (float) Math.sin(time * 5) : 0) + 0.4f * turning));
+            t.additive(false);
+        }
+        double rad = Math.toRadians(wheelAngle);
+        for (int i = 0; i < 8; i++) {
+            double q = rad + i * Math.PI / 4;
+            float cs = (float) Math.cos(q), sn = (float) Math.sin(q);
+            t.line(Math.round(wx + cs * 2), Math.round(wy + sn * 2), Math.round(wx + cs * 7), Math.round(wy + sn * 7), 1, withAlpha(c, a));
+            t.rect(Math.round(wx + cs * 8.5f), Math.round(wy + sn * 8.5f), 1, 1, withAlpha(c, a));
+        }
+        t.shape(wx, wy, 6, 5, 0, 7, withAlpha(c, a));
+        t.shape(wx, wy, 1.5f, 0, 0, 7, withAlpha(c, a));
+
+        if (s.state == Fighter.S_WORLD) {
+            int st = s.stateTick;
+            float y = Y(w.worldY) + sy, x0 = Math.round(kx) + w.worldDir * 8;
+            float len = Tuning.S_WORLD_RANGE * PPU;
+            if (w.worldWindup == Tuning.S_WORLD_FIRST_WINDUP) {
+                // 束缚的第一次：空间从宿傩手前往前裂开（预警）
+                float k = Math.min(1, st / (float) Tuning.S_WORLD_FIRST_WINDUP);
+                crackLine(t, x0, y, w.worldDir, len * k, (int) (time * 30), withAlpha(CUT_RED, 0.5f + 0.5f * k));
+            } else {
+                // 结印、咏唱时手上一团暗红；指向之后：锁定的斩线一闪一闪
+                t.additive(true);
+                t.shape(Math.round(handX), Math.round(handY), 3 + 2 * Math.min(1, st / (float) Tuning.S_WORLD_SIGN), 0, 0, 7, withAlpha(WORLD_RED, 0.6f));
+                t.additive(false);
+                if (st >= Tuning.S_WORLD_WINDUP - Tuning.S_WORLD_POINT) {
+                    boolean on = ((int) (time * 20) & 1) == 0;
+                    for (float d = 0; d < len; d += 8) {
+                        float xa = x0 + w.worldDir * d;
+                        t.rect(Math.round(Math.min(xa, xa + w.worldDir * 5)), Math.round(y), 5, 1, withAlpha(on ? 0xFFFFFFFF : WORLD_RED, 0.8f));
+                    }
+                }
+            }
+        } else if (s.state == Fighter.S_RCT) {
+            int st = s.stateTick;
+            boolean healing = st > Tuning.S_RCT_STARTUP && st <= Tuning.S_RCT_STARTUP + Tuning.S_RCT_DURATION;
+            float k = healing ? 1 : Math.min(1, st / (float) Tuning.S_RCT_STARTUP) * 0.5f;
+            t.additive(true);
+            t.shape(Math.round(kx), Math.round(ky) - 26, 22, 0, 0, 7, withAlpha(RCT_LIGHT, 0.12f * k));
+            t.additive(false);
+            if (healing && dt > 0) {
+                for (int i = 0; i < 2; i++) {
+                    emit(kx + (rnd() - 0.5f) * 26, ky - rnd() * 40, (rnd() - 0.5f) * 10, -30 - 30 * rnd(), 0.5f, rnd() < 0.5f ? RCT_LIGHT : 0xFF9FE0C0, 1, -20, 1, 1);
+                }
+            }
+        }
+    }
+
+    /** 一道锯齿状的裂纹（空间裂开）：从 (x0, y) 往 dir 方向长 len；形状每 1/30 秒变一次。 */
+    private void crackLine(PixelTarget t, float x0, float y, int dir, float len, int seed, int color) {
+        long z = seed * 0x9E3779B97F4A7C15L;
+        float px = x0, py = y;
+        for (float d = 0; d < len; ) {
+            z = mix(z);
+            float step = 6 + 6 * unit(z);
+            d = Math.min(len, d + step);
+            z = mix(z);
+            float ny = y + (unit(z) - 0.5f) * 4;
+            float nx = x0 + dir * d;
+            t.line(Math.round(px), Math.round(py), Math.round(nx), Math.round(ny), 1, color);
+            px = nx;
+            py = ny;
+        }
+    }
+
+    /** 世界斩：整条斩带被劈开——白色的宽光、黑色的裂缝、红边，0.35 秒内收拢。 */
+    private void worldSlash(PixelTarget t, float time, int sx, int sy) {
+        float f = (time - worldT0) / 0.35f;
+        if (f < 0 || f >= 1) return;
+        float y = Math.round(worldY0) + sy, xa = Math.round(worldX0) + sx, xb = Math.round(worldX1) + sx;
+        float x0 = Math.min(xa, xb), w = Math.abs(xb - xa);
+        float th = Math.max(1, Math.round(5 * (1 - f)));
+        t.additive(true);
+        t.rect(x0, y - th - 2, w, th * 2 + 5, withAlpha(WORLD_RED, 0.35f * (1 - f)));
+        t.rect(x0, y - th, w, th * 2 + 1, withAlpha(0xFFFFFFFF, 0.9f * (1 - f)));
+        t.additive(false);
+        t.rect(x0, y, w, 1, withAlpha(0xFF05040A, 1 - f * f));
+        crackLine(t, xa, y - 2, xb >= xa ? 1 : -1, w, (int) (worldT0 * 30), withAlpha(CUT_RED, 0.8f * (1 - f)));
+    }
+
     /** 解：看不见的斩击，只留一道一闪而过的细白线。 */
     private void slash(PixelTarget t, float time, int sx, int sy) {
         float f = (time - slashT0) / 0.12f;
@@ -1114,9 +1292,10 @@ final class PixelScene {
             float f = (time - numT0[i]) / 0.9f;
             if (f < 0 || f >= 1 || numVal[i] <= 0) continue;
             int kind = numKind[i];
-            int scale = kind == Attack.BLACK_FLASH || kind == Attack.PURPLE || kind == Attack.HOLLOW ? 2 : 1;
+            int scale = kind == Attack.BLACK_FLASH || kind == Attack.PURPLE || kind == Attack.HOLLOW || kind == Attack.WORLD_SLASH ? 2 : 1;
             int color = kind == Attack.BLACK_FLASH ? BF_RED : kind == Attack.RED ? RED_LIGHT : kind == Attack.BLUE_FIELD ? BLUE_LIGHT
-                    : kind == Attack.PURPLE || kind == Attack.HOLLOW ? PURPLE_LIGHT : 0xFFFFFFFF;
+                    : kind == Attack.PURPLE || kind == Attack.HOLLOW ? PURPLE_LIGHT : kind == Attack.WORLD_SLASH ? WORLD_RED
+                    : kind == Attack.S_MELEE ? 0xFFFFC8C8 : 0xFFFFFFFF;
             float a = f < 0.75f ? 1 : (1 - f) / 0.25f;
             float x = X(numX[i]) + sx + (i % 3 - 1) * 5, y = Y(numY[i]) + sy - 14 * (1 - (1 - f) * (1 - f)) - 6;
             drawNumber(t, numVal[i], x, y, scale, withAlpha(color, a), true);
@@ -1464,6 +1643,36 @@ final class PixelScene {
                 p.lean = 4 * k;
                 return;
             }
+            case Fighter.S_AMP_START: // 开领域展延：沉肩、两手往下压
+                p.armFront = -20;
+                p.armBack = 20;
+                p.lean = -4;
+                p.legFront = 14;
+                p.legBack = -14;
+                return;
+            case Fighter.S_WORLD: { // 结印、咏唱：两手合在胸前；指向：前手笔直指出去
+                boolean pointing = w.worldWindup == Tuning.S_WORLD_FIRST_WINDUP || st >= w.worldWindup - Tuning.S_WORLD_POINT;
+                p.armFront = pointing ? 90 : 140;
+                p.armBack = pointing ? -30 : 130;
+                p.lean = pointing ? 6 : -2;
+                p.legFront = 18;
+                p.legBack = -18;
+                return;
+            }
+            case Fighter.S_WORLD_RECOVER: {
+                float k = Math.max(0, 1 - st / (float) Tuning.S_WORLD_RECOVERY);
+                p.armFront = 10 + 85 * k;
+                p.armBack = -30 * k;
+                p.lean = 8 * k;
+                p.legFront = 18 * k;
+                p.legBack = -18 * k;
+                return;
+            }
+            case Fighter.S_RCT: // 反转术式：站直，两手微微张开
+                p.armFront = 25;
+                p.armBack = -25;
+                p.lean = -2;
+                return;
             default:
                 break;
         }
@@ -1765,6 +1974,36 @@ final class PixelScene {
             float step = ht.h[HudText.CHANT0] * 0.8f;
             for (int k = 0; k < ph; k++) hudCenter(t, HudText.CHANT0 + k, cx, y - (ph - k) * step, 0x80D9C2F2);
             hudCenter(t, HudText.CHANT0 + ph, cx, y - 4 * dp * Math.max(0, 1 - local * 6), withAlpha(0xFFF7E6FF, Math.min(1, local * 6)));
+        }
+        // 宿傩头上：世界斩的咏唱（念到哪段亮哪段）；领域展延、反转术式、适应完成的小字
+        Fighter k = w.sukuna;
+        float kcx = Math.max(60 * dp, Math.min(laidW - 60 * dp, sukunaSX * s)), ktop = Math.max(l.hudTop + 44 * dp, (sukunaSY - 76) * s);
+        if (k.state == Fighter.S_WORLD && w.worldWindup == Tuning.S_WORLD_WINDUP) {
+            int tt = k.stateTick - Tuning.S_WORLD_SIGN;
+            if (tt >= 0) {
+                int ph = Math.min(2, tt / Tuning.S_WORLD_CHANT_PHRASE);
+                float local = (tt - ph * Tuning.S_WORLD_CHANT_PHRASE) / (float) Tuning.S_WORLD_CHANT_PHRASE;
+                float step = ht.h[HudText.WORLD_CHANT0] * 0.8f, y = ktop - ht.h[HudText.WORLD_CHANT0];
+                for (int q = 0; q < ph; q++) hudCenter(t, HudText.WORLD_CHANT0 + q, kcx, y - (ph - q) * step, 0x80F2B8B8);
+                hudCenter(t, HudText.WORLD_CHANT0 + ph, kcx, y, withAlpha(0xFFFFE0E0, Math.min(1, local * 6)));
+            }
+        } else {
+            int label = -1;
+            float lt = 99;
+            if (time - adaptedT0 < 1.2f) {
+                label = HudText.ADAPTED;
+                lt = time - adaptedT0;
+            } else if (time - rctT0 < 1.0f) {
+                label = HudText.RCT;
+                lt = time - rctT0;
+            } else if (time - ampT0 < 1.0f) {
+                label = HudText.AMP;
+                lt = time - ampT0;
+            }
+            if (label >= 0) {
+                float a = lt < 0.8f ? 1 : Math.max(0, (1.2f - lt) / 0.4f);
+                hudCenter(t, label, kcx, ktop - ht.h[label], withAlpha(label == HudText.ADAPTED ? 0xFFFFF0B8 : 0xFFEFF2FF, a));
+            }
         }
         // 解：宿傩头上一个“解”字
         float dt0 = time - dismantleT0;

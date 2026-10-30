@@ -22,6 +22,8 @@ public final class Tuning {
     public static final float JUMP_SPEED = 600f;   // 占位
     public static final float GROUND_FRICTION = 2400f; // 被打飞后在地上滑行减速
     public static final int INPUT_BUFFER = 14;     // 提前按下的体术/赫/跳跃保留约 0.12 秒，动作一结束就接上
+    // 连段衰减：轻拳（双方的体术）在同一串连击里打到第 3 下以后不再造成硬直；1 秒没挨打就重新算（防止贴身连打锁死对手）
+    public static final int COMBO_STUN_HITS = 3, COMBO_RESET = 120;
 
     // 体术：50 伤害；15% 黑闪（伪随机），黑闪 350 伤害（定）
     public static final long MELEE_DAMAGE_MILLI = 50_000;
@@ -39,14 +41,31 @@ public final class Tuning {
     public static final int BLACK_FLASH_HITSTUN = 40;
     public static final int BLACK_FLASH_HITSTOP = 10; // 命中停顿（逻辑计数，不 sleep）
 
-    // 苍拳：按住体术 FIST_HOLD tick 变成苍拳，苍附在手上再打；伤害是体术的 1.7 倍（黑闪也是）（定），后摇比体术大（定）
-    public static final int FIST_HOLD = 18;        // 占位：按住 0.15 秒
-    public static final int FIST_WINDUP = 14, FIST_ACTIVE = 5, FIST_RECOVERY = 30, FIST_CANCEL = 20; // 占位
-    public static final long FIST_DAMAGE_MILLI = MELEE_DAMAGE_MILLI * 17 / 10;              // 85
-    public static final long FIST_BLACK_FLASH_DAMAGE_MILLI = BLACK_FLASH_DAMAGE_MILLI * 17 / 10; // 595
-    public static final float FIST_REACH = 104f, FIST_LUNGE = 260f;
-    public static final float FIST_IMPULSE_X = 330f, FIST_IMPULSE_Y = 140f;
+    // 苍拳：长按跳跃时点体术（定）。从上往下砸：空中是往下俯冲一拳，地上是举起来往下劈；115 伤害（定），有前摇和后摇（定），
+    // 前摇时被宿傩的攻击碰到（哪怕被无限挡住）就打断（“容易被打断”，定）。黑闪照样能出，黑闪伤害按体术的同样倍数（×7）
+    public static final int FIST_WINDUP = 14, FIST_ACTIVE = 6, FIST_DIVE_MAX = 30, FIST_RECOVERY = 26; // 占位
+    public static final long FIST_DAMAGE_MILLI = 115_000;
+    public static final long FIST_BLACK_FLASH_DAMAGE_MILLI = FIST_DAMAGE_MILLI * 7; // 805
+    public static final float FIST_REACH = 100f, FIST_DIVE_VX = 220f, FIST_DIVE_VY = -1000f;
+    public static final float FIST_IMPULSE_X = 260f, FIST_IMPULSE_Y = 0f;
     public static final int FIST_HITSTUN = 30, FIST_HITSTOP = 7;
+
+    // 闪避（定）：默认往面朝的方向，推着摇杆就往摇杆的方向；闪避期间无敌；冷却 0.5 秒
+    public static final int DODGE_TICKS = 18, DODGE_COOLDOWN = 60; // 占位：闪 0.15 秒
+    public static final float DODGE_SPEED = 1000f;                 // 占位：闪 150 的距离
+
+    // 瞬移（长按闪避时点苍 / 点赫，定）：前摇可被打断（被宿傩的攻击碰到就断）；之后出现在宿傩背后，放固定动作，镜头拉近
+    // 苍：用苍把宿傩吸到空中，苍拳连打 5 下（每下 115），最后一下击飞、击倒。赫：在背后放一发很大的赫，把宿傩轰出战场宽度 85%，击倒
+    public static final int TP_WINDUP = 24, TP_COOLDOWN = 1200;    // 占位：前摇 0.2 秒；冷却 10 秒
+    public static final float TP_BEHIND = 70f;
+    public static final int TP_BLUE_LIFT = 30, TP_BLUE_FIRST_HIT = 36, TP_BLUE_HIT_GAP = 14, TP_BLUE_HITS = 5; // 占位
+    public static final float TP_BLUE_HEIGHT = 120f, TP_BLUE_LAUNCH_X = 620f, TP_BLUE_LAUNCH_Y = 420f;
+    public static final int TP_BLUE_HITSTOP = 3, TP_BLUE_AFTER = 20;
+    public static final int TP_RED_CHARGE = 24, TP_RED_FLIGHT = 40, TP_RED_AFTER = 30; // 占位
+    public static final long TP_RED_DAMAGE_MILLI = 550_000;        // 占位：和赫·最大输出一样
+    public static final float TP_RED_DISTANCE = 0.85f * WIDTH, TP_RED_ARC = 70f;
+    public static final int DOWN_TICKS = 60;                       // 被击倒：落地后这么久起不来
+
 
     // 苍：吸力；投掷最远不超过战场宽度 30%；离中心越近伤害越高，最高每秒 100（定）
     // 长按：波及范围和吸力翻倍，但有前摇（定）
@@ -63,9 +82,8 @@ public final class Tuning {
     public static final float BLUE_CORE = 10f;     // 核心捕获半径
     public static final int BLUE_FLY = 18;         // 飞到落点的时间
     public static final int BLUE_LIFE = 300;       // 占位：吸引持续 2.5 秒
-    public static final int BLUE_HOLD_THRESHOLD = 42; // 占位：按住 0.35 秒算长按
+    public static final int BLUE_HOLD_THRESHOLD = 24; // 占位：按住 0.2 秒开始念咒（位相、黄昏、智慧之瞳），念完就是出力最大
     public static final int BLUE_WINDUP = 8;       // 占位：普通苍前摇
-    public static final int BLUE_WINDUP_CHARGED = 30; // 占位：蓄满前摇 0.25 秒
     public static final int BLUE_RECOVERY = 6;
     public static final int BLUE_AIM_LOCK = 12;    // 前摇最后这几 tick 锁定方向
     public static final float BLUE_WINDUP_MOVE = 0.3f; // 蓄力前摇时的移动速度比例
@@ -88,8 +106,8 @@ public final class Tuning {
     public static final int RED_COOLDOWN = 480;   // 占位：4 秒
 
     // 赫·最大输出：长按赫，射程覆盖整个战场，550 伤害（定），排斥比普通赫强烈（定）
-    public static final int RED_HOLD = 36;         // 占位：按住 0.3 秒
-    public static final int RED_MAX_WINDUP = 24, RED_MAX_RECOVERY = 22; // 占位
+    public static final int RED_HOLD = 24;         // 占位：按住 0.2 秒开始念咒（位相、波罗蜜、光之柱），念完放最大输出
+    public static final int RED_MAX_RECOVERY = 22; // 占位
     public static final long RED_MAX_DAMAGE_MILLI = 550_000;
     public static final float RED_MAX_ORB_R = 50f, RED_MAX_RANGE = 0.12f * WIDTH;
     public static final float RED_MAX_IMPULSE_X = 1250f, RED_MAX_IMPULSE_Y = 560f;
@@ -115,22 +133,56 @@ public final class Tuning {
     public static final int PURPLE_200_HITSTUN = 110, PURPLE_200_HITSTOP = 14, PURPLE_200_RECOVER = 34;
     public static final int PURPLE_200_COOLDOWN = 3600; // 占位：30 秒
     public static final int CHANT_BROKEN_LOCK = 30;     // 被打断后 0.25 秒内不能再按
+    // 苍、赫长按的三段咏唱（定）：苍「位相、黄昏、智慧之瞳」，赫「位相、波罗蜜、光之柱」；和茈一样念的时候不能动，松手或被攻击碰到就打断
+    public static final int CHANT3_PHRASE = 36, CHANT3_PHRASES = 3; // 占位：每段 0.3 秒
 
     // 领域展开「无量空处」：先放过场（全场暂停），展开期间宿傩无法主动行动（定）
     public static final int DOMAIN_DURATION = 960;  // 占位：8 秒
     public static final int DOMAIN_COOLDOWN = 4800; // 占位：40 秒（领域结束后开始算）
 
-    // 宿傩：只有体术（75）和解（90，射程远、几乎没有前摇、冷却短）（定）
-    public static final float SUKUNA_SPEED = 250f;   // 占位
+    // 宿傩（新宿决战的技能组，Luna 查证、Astra 定的首轮数值，见 notes/宿傩平衡.md）。
+    // 体术 75、解 90 是定的；无限挡住一切，只有领域展延下的体术和世界斩能打到五条悟。
+    public static final float SUKUNA_SPEED = 330f;   // 比五条悟（300）快一点，追得上后撤
     public static final long S_MELEE_DAMAGE_MILLI = 75_000;
-    public static final int S_MELEE_STARTUP = 10, S_MELEE_ACTIVE = 6, S_MELEE_RECOVERY = 20; // 占位（Astra 的初值）
-    public static final float S_MELEE_REACH = 94f, S_MELEE_IMPULSE = 160f;
-    public static final int S_MELEE_HITSTUN = 18, S_MELEE_COOLDOWN = 36;
+    public static final int S_MELEE_STARTUP = 8, S_MELEE_ACTIVE = 4, S_MELEE_RECOVERY = 14; // 占位
+    public static final float S_MELEE_REACH = 100f, S_MELEE_LUNGE = 180f, S_MELEE_IMPULSE = 160f;
+    public static final int S_MELEE_HITSTUN = 16, S_MELEE_COOLDOWN = 30;
     public static final long DISMANTLE_DAMAGE_MILLI = 90_000;
     public static final int DISMANTLE_WINDUP = 2, DISMANTLE_RECOVERY = 18; // 几乎没有前摇
     public static final float DISMANTLE_RANGE = 560f;          // 占位：射程不俗（战场宽度 44%）
     public static final int DISMANTLE_COOLDOWN = 60;           // 占位：0.5 秒
-    public static final int S_ATTACK_GAP = 48;                 // 宿傩两次出手至少隔 0.4 秒
+    public static final int DISMANTLE_HITSTUN = 8;
+    public static final int S_ATTACK_GAP = 30;                 // 宿傩两次出手至少隔 0.25 秒
+
+    // 领域展延：以领域包住自己，体术碰到五条悟时中和无限。展延期间不能用生得术式（解、世界斩、反转术式）
+    public static final int S_AMP_STARTUP = 18, S_AMP_DURATION = 360; // 占位：开 0.15 秒，持续 3 秒
+    public static final int S_AMP_EXIT = 12;      // 关闭后这么久不能用术式
+    public static final int S_AMP_COOLDOWN = 240; // 占位：关闭后 2 秒
+
+    // 魔虚罗的适应（宿傩头上的法阵）：没开展延时，每 4 秒自然转一格；解碰到无限（被挡住）并收完招，立刻转一格。
+    // 两格之间至少隔 1 秒；展延期间不转（展延时用不了十种影法术）。转满 4 格且打了 12 秒以上，学会世界斩
+    public static final int S_ADAPT_STAGES = 4, S_ADAPT_POINTS_PER_STAGE = 1;
+    public static final int S_ADAPT_POINTS = S_ADAPT_STAGES * S_ADAPT_POINTS_PER_STAGE;
+    public static final int S_ADAPT_POINT_GAP = 120;
+    public static final int S_ADAPT_PASSIVE = 480;
+    public static final int S_ADAPT_UNLOCK_MIN_TICKS = 1440;
+
+    // 世界斩（斩断世界的斩击）：斩的是五条悟所在的空间，能破无限。第一次靠束缚免结印咏唱（仍有 0.4 秒裂纹预警），
+    // 之后要结印 + 三段咏唱（龙鳞、反发、番之流星）+ 指向，最后 0.2 秒锁定方向和高度。站在地上发动；一道水平的斩带，跳过去就躲开
+    public static final long S_WORLD_DAMAGE_MILLI = 400_000;
+    public static final int S_WORLD_FIRST_WINDUP = 48;
+    public static final int S_WORLD_SIGN = 24, S_WORLD_CHANT_PHRASE = 32, S_WORLD_CHANT_PHRASES = 3, S_WORLD_POINT = 24;
+    public static final int S_WORLD_WINDUP = S_WORLD_SIGN + S_WORLD_CHANT_PHRASE * S_WORLD_CHANT_PHRASES + S_WORLD_POINT; // 144
+    public static final int S_WORLD_RECOVERY = 72, S_WORLD_COOLDOWN = 1440; // 占位：冷却 12 秒（从起手算）
+    public static final int S_WORLD_BREAK_LOCK = 36; // 咏唱被打断：这么久不能行动（和受击硬直同时计）
+    public static final int S_WORLD_HITSTUN = 36;
+    public static final float S_WORLD_RANGE = 960f, S_WORLD_HEIGHT = 50f, S_WORLD_HALF_THICKNESS = 10f;
+    public static final float S_WORLD_IMPULSE_X = 420f, S_WORLD_IMPULSE_Y = 120f;
+
+    // 反转术式：起手 0.3 秒，之后 1.5 秒每 tick 回 2.5（共 450），收招 0.2 秒；一局最多 2 次，冷却 15 秒；受击、被控就断
+    public static final int S_RCT_STARTUP = 36, S_RCT_DURATION = 180, S_RCT_RECOVERY = 24;
+    public static final int S_RCT_COOLDOWN = 1800, S_RCT_MAX_USES = 2;
+    public static final long S_RCT_HEAL_PER_TICK_MILLI = 2_500;
 
     // 无指向茈：赫与苍重叠或互相在作用范围内时生成；伤害和茈一样 850（定），范围内的五条悟也挨，只有一半（定）
     public static final long HOLLOW_DAMAGE_MILLI = PURPLE_DAMAGE_MILLI;
