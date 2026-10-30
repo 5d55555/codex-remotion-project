@@ -21,7 +21,7 @@ package com.shinjuku.showdown.core;
  * - 魔虚罗：打了够久、血量不太满、离得够远、估计五条悟来不及打断咏唱时才召唤。
  * - 顎吐：中距离牵制（按难度的概率），或者念咒还剩够长时用来打断；魔虚罗在场时只用来打断。三轮没有解：顎吐冷却时就去贴身。
  * 恐惧（v0.11，四个难度都有；Astra 的方案，见 notes/宿傩AI.md）：每 1 秒一个窗口，开头按看得到的局势估这一秒会挨多少，
- * 结尾和实际挨到的比：多挨了恐惧涨、少挨了降。恐惧越高越不想出手、越攒着技能（展延、解、顎吐、世界斩、召唤、反转术式都打折扣，
+ * 结尾和实际挨到的比：多挨了恐惧涨、少挨了降；打到五条悟（宿傩、顎吐、魔虚罗）是奖励，恐惧再降（v0.12，惧怕损失：奖励只有损失的一半）。恐惧越高越不想出手、越攒着技能（展延、解、顎吐、世界斩、召唤、反转术式都打折扣，
  * 被拒绝后过一会儿才再想），60 以上一组一组地连连后退。打断大招（200% 茈、茈·最大输出、瞬移·茈）和脱身不受影响。
  * 空间斩（里梅以上）：恐惧低于 30、打了 20 秒以上、血量 25% 以下才会想；每次认真考虑都“看到代价”涨一点恐惧，恐惧越高越不愿意放。
  */
@@ -43,8 +43,8 @@ final class SukunaAi {
     private int fear = Tuning.FEAR_START;     // 0–10000
     private int fearTick, fearExpect;         // 窗口走到第几 tick；窗口开头估的这一秒会挨多少（血）
     private boolean fearStarted;
-    private long fearDmg0;                    // 窗口开头宿傩已经挨了多少（毫血）
-    int lastExpect = -1, lastActual, windows; // 上一个窗口估的和实际挨的（血）、结算过几个窗口（模拟统计用）
+    private long fearDmg0, fearDealt0;        // 窗口开头宿傩已经挨了多少、宿傩一方已经打掉五条悟多少（毫血）
+    int lastExpect = -1, lastActual, lastDealt, windows; // 上一个窗口估的、实际挨的、打掉五条悟的（血）、结算过几个窗口（模拟统计用）
     int spaceThinks;                          // 认真考虑过几次空间斩（模拟统计用）
     private boolean panic;                    // 惊惧：60 以上进入、45 以下退出
     private int retreatLeft, retreatTimer, retreatPause, retreatCool; // 这一组还剩几段、这一段还剩多久、段间停顿、两组之间
@@ -623,28 +623,39 @@ final class SukunaAi {
 
     /** 恐惧的窗口：开头估这一秒会挨多少，结尾拿实际挨到的比（反转术式、变原身回的血不抵消挨的打；魔虚罗挨打不算）。 */
     private void fearStep(World w) {
-        long now = w.damageTaken[Fighter.SUKUNA];
+        long now = w.damageTaken[Fighter.SUKUNA], dealt = w.gojoHurtByFoes;
         if (!fearStarted) {
             fearStarted = true;
             fearDmg0 = now;
+            fearDealt0 = dealt;
             fearExpect = expectedDamage(w);
         }
         if (++fearTick < Tuning.FEAR_WINDOW) return;
         fearTick = 0;
         // 两次 think 之间结算的伤害（包括 AI 停着的固定动作里挨的）都算进这个窗口；结算点直接交接给下一个窗口，不漏一 tick
-        settleFear(fearExpect, (int) ((now - fearDmg0) / 1000));
+        settleFear(fearExpect, (int) ((now - fearDmg0) / 1000), (int) ((dealt - fearDealt0) / 1000));
         fearDmg0 = now;
+        fearDealt0 = dealt;
         fearExpect = expectedDamage(w);
     }
 
-    /** 一个窗口结算：估了 expect、实际挨了 actual（血）。 */
     void settleFear(int expect, int actual) {
+        settleFear(expect, actual, 0);
+    }
+
+    /**
+     * 一个窗口结算：估了 expect、实际挨了 actual、宿傩一方打掉五条悟 dealt（血）。挨得比预想的多：恐惧涨；少：降；
+     * 打到五条悟是奖励：再降（惧怕损失：同样多的血，奖励只有损失的一半；一次最多降 12）。
+     */
+    void settleFear(int expect, int actual, int dealt) {
         lastExpect = expect;
         lastActual = actual;
+        lastDealt = dealt;
         windows++;
         int e = actual - expect; // 15 血以内算估得准
         if (e > 15) fear += Math.min(2400, Math.round(t.fearUp * (e - 15)));
         else if (e < -15) fear -= Math.min(1200, Math.round(t.fearDown * (-e - 15)));
+        if (dealt > 0) fear -= Math.min(1200, Math.round(t.fearReward * dealt));
         if (actual == 0 && expect <= 50 && fear > Tuning.FEAR_START) { // 安全的一秒：慢慢回到初值
             fear = Math.max(Tuning.FEAR_START, fear - Math.round(t.fearCalm * 100));
         }
@@ -665,7 +676,7 @@ final class SukunaAi {
         Fighter g = w.gojo, s = w.sukuna;
         if (g.state == Fighter.KO) return 0;
         float d = Math.abs(g.x - s.x);
-        boolean stuck = w.domainTicks > 0 || s.captured || s.scripted || s.knockedAir; // 躲不开
+        boolean stuck = w.domainTicks > 0 || w.spaceExhaust > 0 || s.captured || s.scripted || s.knockedAir; // 躲不开
         float hit = stuck ? 1f : 0.45f, done = stuck ? 0.95f : 0.6f;
         boolean facing = (s.x - g.x) * g.facing >= 0;
         float e = 0;

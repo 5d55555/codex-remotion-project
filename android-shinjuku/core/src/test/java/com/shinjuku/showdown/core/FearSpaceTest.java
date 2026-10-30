@@ -179,6 +179,53 @@ public class FearSpaceTest {
         assertEquals(0, ai.fear());
     }
 
+    /** 奖励：打到五条悟恐惧降；惧怕损失——同样多的血，挨打涨的是打人降的两倍。 */
+    @Test
+    public void hurtingGojoIsARewardButLossesWeighMore() {
+        BattleConfig c = new BattleConfig();
+        c.sukunaDifficulty(2);
+        World w = new World(c);
+        SukunaAi ai = w.ai();
+        int f0 = ai.fear();
+        ai.settleFear(100, 100, 200);
+        int drop = f0 - ai.fear();
+        assertEquals(Math.round(c.ai.fearReward * 200), drop);
+        ai.settleFear(100, 100 + 15 + 200, 0);
+        int rise = ai.fear() - (f0 - drop);
+        assertEquals("挨打涨的是打人降的两倍", 2 * drop, rise);
+        for (int i = 0; i < 100; i++) ai.settleFear(0, 0, 1000);
+        assertEquals(0, ai.fear());
+    }
+
+    /** 力竭和被困在无量空处里一样：宿傩不能动，魔虚罗也站住不出手。 */
+    @Test
+    public void exhaustionFreezesMahoragaToo() {
+        World w = manual(1);
+        TickInput in = new TickInput();
+        ready(w, in);
+        w.sukunaIntent.summon = true;
+        run(w, in, Tuning.SUMMON_CHANT + Tuning.SUMMON_RECOVERY + Tuning.MAHORAGA_RISE + 4);
+        assertTrue(w.mahoraga.present);
+        w.sukunaIntent.space = true;
+        run(w, in, Tuning.SPACE_LOCK + 2);
+        w.gojo.x = 1250; // 锁定以后绕到宿傩背后：斩不到，力竭
+        run(w, in, Tuning.SPACE_WINDUP);
+        assertEquals(Fighter.S_EXHAUSTED, w.sukuna.state);
+        w.mahoraga.x = w.gojo.x - 80; // 魔虚罗就在五条悟身边
+        long hp = w.gojo.hpMilli;
+        int frozen = 0;
+        while (w.spaceExhaust > 1) {
+            run(w, in, 1);
+            frozen++;
+            assertFalse(w.mahoragaCanAct());
+            assertTrue(w.mahoraga.state != Fighter.M_PUNCH && w.mahoraga.state != Fighter.M_SWORD);
+        }
+        assertTrue(frozen > 200);
+        assertEquals(hp, w.gojo.hpMilli);
+        run(w, in, 40);
+        assertTrue("力竭过去了，魔虚罗接着打", w.mahoragaCanAct());
+    }
+
     /** 窗口首尾相接：一局里每个窗口“实际挨的”加起来就是宿傩挨的全部（每个窗口最多差 1 血的取整），不漏结算那一 tick 的伤害。 */
     @Test
     public void fearWindowsCoverEveryHit() {

@@ -96,7 +96,8 @@ public final class BattleConfig {
         public float transformHp, transformHpEmergency; // 变原身的血线（魔虚罗不在场 / 在场时的紧急血线）
         public int transformMaxWait;                // 魔虚罗在场时最多再等多久（从血量第一次跌破血线算）
         // 恐惧（v0.11）：多挨 100 血涨几点、少挨 100 血降几点、安全时每秒自然回落几点；空间斩的基础使用率
-        public float fearUp, fearDown, fearCalm, spaceChance;
+        // 奖励（v0.12）：打掉五条悟 100 血降几点（惧怕损失：同样多的血，挨打涨的是打人降的两倍）
+        public float fearUp, fearDown, fearCalm, spaceChance, fearReward;
 
         public AiTuning() {
             reset();
@@ -161,6 +162,7 @@ public final class BattleConfig {
             fearDown = 2.0f;
             fearCalm = 0.5f;
             spaceChance = 0;
+            fearReward = fearUp / 2;
         }
 
         /** 各难度的参数：0 三轮（就是 reset() 的默认值）、1 里梅、2 万、3 史上最强。越高越聪明（不加血、不加攻）。 */
@@ -224,6 +226,7 @@ public final class BattleConfig {
             fearDown = level == 1 ? 2.4f : level == 2 ? 2.8f : 3.2f;
             fearCalm = level == 1 ? 0.7f : level == 2 ? 0.9f : 1.1f;
             spaceChance = level == 1 ? 0.55f : level == 2 ? 0.65f : 0.75f;
+            fearReward = fearUp / 2;
         }
     }
 }

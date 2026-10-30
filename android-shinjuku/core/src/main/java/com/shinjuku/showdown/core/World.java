@@ -67,6 +67,7 @@ public final class World {
 
     // 统计（模拟、测试用）：每人实际掉的血（毫血，不算溢出），宿傩反转术式和变原身各回了多少
     public final long[] damageTaken = new long[Fighter.COUNT];
+    public long gojoHurtByFoes;       // 宿傩一方（宿傩、顎吐、魔虚罗）打掉五条悟的血（毫血；宿傩恐惧的奖励用）
     public long rctHealed, transformHealed;
     private boolean adaptPending, worldLocked, worldPending;
     private int adaptLastTick = -100_000, adaptTimer;
@@ -1582,7 +1583,7 @@ public final class World {
     public boolean mahoragaCanAct() {
         Fighter m = mahoraga;
         return m.present && m.state != Fighter.M_RISE && m.hitstun == 0 && !m.captured && domainTicks == 0 && !inBlueField(m)
-                && !m.knockedAir && !m.scripted && !tenShadowsPaused() && outcome == OUTCOME_NONE;
+                && !m.knockedAir && !m.scripted && !tenShadowsPaused() && outcome == OUTCOME_NONE && spaceExhaust == 0; // 宿傩力竭：和无量空处里一样站住
     }
 
     /** 魔虚罗自己的 AI（各难度一样，没有随机）：每 12 tick 想一次；够得着就出拳，再远一点挥剑，否则往五条悟那边走。 */
@@ -1775,7 +1776,7 @@ public final class World {
         }
     }
 
-    /** 力竭：3 秒不能主动行动（照常挨打、被控；挨打不重置），展延关掉。 */
+    /** 力竭：3 秒不能行动，和被困在无量空处里一样——宿傩僵住、展延关掉、魔虚罗也站住不动（照常挨打、被控；挨打不重置）。 */
     private void exhaustSukuna() {
         Fighter s = sukuna;
         spacePending = false;
@@ -1783,6 +1784,7 @@ public final class World {
         drive(s, 0);
         spaceExhaust = Tuning.SPACE_EXHAUST;
         if (ampTicks > 0) closeAmp();
+        interruptMahoraga();
         events.emit(Events.SPACE, s.x, s.centerY(), 4, spaceDir, tick);
     }
 
@@ -1890,7 +1892,9 @@ public final class World {
         long dmg = a.source == Fighter.SUKUNA && a.kind != Attack.AGITO ? Math.round(a.damageMilli * (double) config.sukunaDamageMult) : a.damageMilli;
         if (a.kind == Attack.SPACE_SLASH) dmg = t.hpMilli; // 空间斩：斩中就是剩下的全部血量
         if ((mask & Defense.ALLOW_DAMAGE) != 0 && dmg > 0) {
-            damageTaken[t.id] += Math.min(dmg, t.hpMilli);
+            long dealt = Math.min(dmg, t.hpMilli);
+            damageTaken[t.id] += dealt;
+            if (t == gojo && a.source != Fighter.GOJO) gojoHurtByFoes += dealt; // 五条悟自己的茈不算
             t.hpMilli = Math.max(0, t.hpMilli - dmg);
             if (a.kind != Attack.BLUE_FIELD) events.emit(Events.DAMAGE, t.x, t.y + t.height + 10, dmg / 1000f, a.kind, tick);
             if (t == sukuna && t.state == Fighter.S_SPACE) interruptSukuna(); // 空间斩起手时挨到任何伤害（苍的持续伤害、不再硬直的轻拳也算）就断
