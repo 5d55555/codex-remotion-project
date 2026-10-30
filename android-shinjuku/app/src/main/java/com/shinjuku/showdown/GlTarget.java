@@ -426,6 +426,11 @@ final class GlTarget implements PixelTarget {
 
     @Override
     public void present() {
+        present(0, 0, vw, vh);
+    }
+
+    @Override
+    public void present(int cx, int cy, int cw, int ch) {
         flush();
         gl.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
         gl.glViewport(0, 0, sw, sh);
@@ -435,7 +440,8 @@ final class GlTarget implements PixelTarget {
         useTexture(fboTex);
         float m = packColor(0xFFFFFFFF), a = packColor(0);
         float w = vw * scale, h = vh * scale;
-        quad(0, 0, 0, 1, w, 0, 1, 1, w, h, 1, 0, 0, h, 0, 0, m, a, 0, 0, 0, 0);
+        float u0 = cx / (float) vw, u1 = (cx + cw) / (float) vw, vt = 1 - cy / (float) vh, vb = 1 - (cy + ch) / (float) vh;
+        quad(0, 0, u0, vt, w, 0, u1, vt, w, h, u1, vb, 0, h, u0, vb, m, a, 0, 0, 0, 0);
     }
 
     @Override

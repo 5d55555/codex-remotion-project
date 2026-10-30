@@ -1342,4 +1342,54 @@ public class CombatTest {
         run(w, in, 60);
         assertEquals(w.sukuna.maxHpMilli, w.sukuna.hpMilli);
     }
+
+    /** 冷却中按的闪避超过缓冲时间就作废，不会过很久自己闪出去。 */
+    @Test
+    public void staleDodgePressExpires() {
+        World w = world();
+        TickInput in = new TickInput();
+        in.dodge = true;
+        run(w, in, Tuning.DODGE_TICKS + 2);
+        in.dodge = true; // 冷却中再按
+        run(w, in, 1);
+        run(w, in, Tuning.DODGE_COOLDOWN + 30);
+        int dodges = 0;
+        for (int i = 0; i < 60; i++) {
+            w.step(in);
+            if (w.gojo.state == Fighter.DODGE) dodges++;
+        }
+        assertEquals("过期的闪避不会自己出来", 0, dodges);
+    }
+
+    /** 赫念咒时，命中停顿里松开再按住，恢复后照样算松手（打断）。 */
+    @Test
+    public void releaseDuringHitstopStillBreaksRedChant() {
+        World w = world();
+        TickInput in = new TickInput();
+        in.red = in.redHeld = true;
+        run(w, in, Tuning.RED_HOLD + 6);
+        assertEquals(Fighter.RED_CHANT, w.gojo.state);
+        w.hitstop = 6;
+        in.redHeld = false;
+        run(w, in, 2);
+        in.redHeld = true;
+        run(w, in, 6);
+        assertEquals("停顿里松过手：打断", Fighter.FREE, w.gojo.state);
+        in.redHeld = false;
+    }
+
+    /** 连段衰减只数轻拳：重招（这里是瞬移连段）不占轻拳的三下名额。 */
+    @Test
+    public void comboDecayCountsOnlyLightHits() {
+        World w = world();
+        TickInput in = new TickInput();
+        w.gojo.x = 300;
+        w.sukuna.x = 700;
+        in.dodgeHeld = true;
+        in.blueDown = in.blueUp = true;
+        run(w, in, 1);
+        in.dodgeHeld = false;
+        for (int i = 0; i < 400 && w.gojo.state != Fighter.FREE; i++) run(w, in, 1);
+        assertEquals("苍拳五连不算轻拳", 0, w.sukuna.comboHits);
+    }
 }

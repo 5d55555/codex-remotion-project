@@ -11,15 +11,17 @@ import android.graphics.Typeface;
  */
 final class HudText {
     static final int GOJO = 0, SUKUNA = 1, DIFF_TITLE = 2, DIFF_TIER = 3;
-    static final int BTN_MELEE = 4, BTN_JUMP = 5, BTN_BLUE = 6, BTN_RED = 7, BTN_PURPLE = 8, BTN_DOMAIN = 9; // 和 Controls 的键顺序一致
-    static final int SUB_BLUE = 10, SUB_BLUE_MAX = 11, SUB_RED = 12, SUB_PURPLE = 13, SUB_HOLLOW = 14;
-    static final int SUB_RED_MAX = 15, SUB_PURPLE_200 = 16, SUB_FIST = 17, SUB_DOMAIN = 18;
-    static final int CHANT0 = 19;   // 四段咒词：九纲、偏光、乌与声明、表里之间
-    static final int DISMANTLE = 23; // 宿傩的“解”
-    static final int AMP = 24, RCT = 25, ADAPTED = 26; // 宿傩头上的小字：领域展延、反转术式、适应完成
-    static final int WORLD_CHANT0 = 27;              // 世界斩的三段咏唱：龙鳞、反发、番之流星
-    static final int SUB_WORLD = 30, SUB_WORLD_BOUND = 31;
-    static final int COUNT = 32;
+    static final int BTN_MELEE = 4, BTN_JUMP = 5, BTN_BLUE = 6, BTN_RED = 7, BTN_PURPLE = 8, BTN_DOMAIN = 9, BTN_DODGE = 10; // 和 Controls 的键顺序一致
+    static final int SUB_BLUE = 11, SUB_BLUE_MAX = 12, SUB_RED = 13, SUB_PURPLE = 14, SUB_HOLLOW = 15;
+    static final int SUB_RED_MAX = 16, SUB_PURPLE_200 = 17, SUB_FIST = 18, SUB_DOMAIN = 19;
+    static final int CHANT0 = 20;   // 茈的四段咒词：九纲、偏光、乌与声明、表里之间
+    static final int DISMANTLE = 24; // 宿傩的“解”
+    static final int AMP = 25, RCT = 26, ADAPTED = 27; // 宿傩头上的小字：领域展延、反转术式、适应完成
+    static final int WORLD_CHANT0 = 28;              // 世界斩的三段咏唱：龙鳞、反发、番之流星
+    static final int SUB_WORLD = 31, SUB_WORLD_BOUND = 32;
+    static final int BLUE_CHANT0 = 33;               // 苍的三段咒词：位相、黄昏、智慧之瞳
+    static final int RED_CHANT0 = 36;                // 赫的三段咒词：位相、波罗蜜、光之柱
+    static final int COUNT = 39;
 
     final Bitmap bitmap;
     final float dp;
@@ -28,15 +30,16 @@ final class HudText {
 
     HudText(float dp, Difficulty d) {
         this.dp = dp;
-        String[] text = {"五条悟", "两面宿傩", d.title, d.tier, "体术", "跳", "苍", "赫", "茈", "领域",
+        String[] text = {"五条悟", "两面宿傩", d.title, d.tier, "体术", "跳", "苍", "赫", "茈", "领域", "闪避",
                 "术式顺转", "术式顺转 · 出力最大", "术式反转", "虚式", "虚式 · 无指向",
                 "术式反转 · 最大输出", "虚式 · 200%", "术式顺转 · 苍拳", "领域展开",
                 "九纲", "偏光", "乌与声明", "表里之间", "解",
                 "领域展延", "反转术式", "适应完成",
                 "龙鳞", "反发", "番之流星",
-                "斩断世界的斩击", "斩断世界的斩击 · 束缚"};
-        float[] size = {13, 13, 16, 10, 15, 15, 22, 22, 22, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 17, 17, 17, 17, 16,
-                13, 13, 14, 17, 17, 17, 15, 15};
+                "斩断世界的斩击", "斩断世界的斩击 · 束缚",
+                "位相", "黄昏", "智慧之瞳", "位相", "波罗蜜", "光之柱"};
+        float[] size = {13, 13, 16, 10, 15, 15, 22, 22, 22, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 17, 17, 17, 17, 16,
+                13, 13, 14, 17, 17, 17, 15, 15, 17, 17, 17, 17, 17, 17};
         Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         fill.setTypeface(Typeface.DEFAULT_BOLD);
         fill.setColor(0xFFFFFFFF);

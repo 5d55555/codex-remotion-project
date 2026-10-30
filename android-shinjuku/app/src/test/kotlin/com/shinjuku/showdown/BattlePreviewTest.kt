@@ -175,13 +175,15 @@ class BattlePreviewTest {
     }
 
     @Test
-    fun blueFistCharging() {
+    fun blueFistAirWindup() {
         paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
-            world.gojo.x = 520f
+            world.gojo.x = 540f
             world.sukuna.x = 640f
             steps(10)
-            input.melee = true; input.meleeHeld = true
-            steps(18 + 10)
+            input.jump = true; input.jumpHeld = true
+            steps(20)
+            input.melee = true
+            steps(10)
         })
     }
 
@@ -191,10 +193,139 @@ class BattlePreviewTest {
             world.gojo.x = 560f
             world.sukuna.x = 640f
             steps(10)
-            input.melee = true; input.meleeHeld = true
-            stepsUntil(Events.HIT, 60)
-            input.meleeHeld = false
+            input.jump = true; input.jumpHeld = true
+            steps(16)
+            input.melee = true
+            stepsUntil(Events.HIT, 80)
+            input.jumpHeld = false
+            steps(3)
+        })
+    }
+
+    @Test
+    fun blueChant() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 400f
+            world.sukuna.x = 800f
+            steps(10)
+            input.blueDown = true; input.blueHeld = true
+            steps(24 + 36 + 20)
+        })
+    }
+
+    @Test
+    fun redChant() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 300f
+            world.sukuna.x = 900f
+            steps(10)
+            input.red = true; input.redHeld = true
+            steps(24 + 72 + 20)
+        })
+    }
+
+    @Test
+    fun dodge() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 500f
+            world.sukuna.x = 800f
+            steps(10)
+            input.dodge = true; input.moveX = -1f
+            steps(8)
+        })
+    }
+
+    @Test
+    fun teleportBlueCombo() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 300f
+            world.sukuna.x = 700f
+            steps(10)
+            input.dodgeHeld = true; input.blueDown = true; input.blueUp = true
+            steps(1)
+            input.dodgeHeld = false
+            steps(24 + 36 + 14 * 2 + 3)
+        })
+    }
+
+    @Test
+    fun teleportRedCharge() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 300f
+            world.sukuna.x = 1100f
+            steps(10)
+            input.dodgeHeld = true; input.red = true
+            steps(1)
+            input.dodgeHeld = false
+            steps(24 + 18)
+        })
+    }
+
+    @Test
+    fun teleportRedFlight() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 300f
+            world.sukuna.x = 1100f
+            steps(10)
+            input.dodgeHeld = true; input.red = true
+            steps(1)
+            input.dodgeHeld = false
+            steps(24 + 24 + 22)
+        })
+    }
+
+    @Test
+    fun sukunaAmplification() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) {
+            world.gojo.x = 400f
+            world.sukuna.x = 800f
+            stepsUntil(Events.AMP, 4000)
+            steps(40)
+        })
+    }
+
+    @Test
+    fun worldSlashChant() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) {
+            world.gojo.x = 300f
+            world.sukuna.x = 800f
+            var n = 0
+            while (n < 20000 && !(world.sukuna.state == com.shinjuku.showdown.core.Fighter.S_WORLD && world.worldWindup == 144 && world.sukuna.stateTick >= 64)) {
+                steps(1); n++
+                if (world.gojo.hpMilli < world.gojo.maxHpMilli / 2) world.gojo.hpMilli = world.gojo.maxHpMilli
+            }
+        })
+    }
+
+    @Test
+    fun worldSlashFired() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) {
+            world.gojo.x = 300f
+            world.sukuna.x = 800f
+            var seen = world.events.written
+            var fired = false
+            var n = 0
+            while (n < 20000 && !fired) {
+                steps(1); n++
+                if (world.gojo.hpMilli < world.gojo.maxHpMilli / 2) world.gojo.hpMilli = world.gojo.maxHpMilli
+                while (seen < world.events.written) {
+                    val i = (seen and Events.MASK.toLong()).toInt()
+                    if (world.events.type[i] == Events.SLASH && world.events.kind[i] == com.shinjuku.showdown.core.Attack.WORLD_SLASH) fired = true
+                    seen++
+                }
+            }
             steps(4)
+        })
+    }
+
+    @Test
+    fun sukunaReverseTechnique() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) {
+            world.gojo.x = 100f
+            world.sukuna.x = 1100f
+            world.sukuna.hpMilli = world.sukuna.maxHpMilli / 3
+            stepsUntil(Events.RCT, 6000)
+            steps(60)
         })
     }
 

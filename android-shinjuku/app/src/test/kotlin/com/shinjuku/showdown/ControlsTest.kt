@@ -61,18 +61,19 @@ class ControlsTest {
     }
 
     @Test
-    fun holdsAreReportedForMeleeRedPurple() {
-        c.push(Controls.MELEE, true, 10)
+    fun holdsAreReportedForJumpDodgeRedPurple() {
+        c.push(Controls.JUMP, true, 10)
+        c.push(Controls.DODGE, true, 10)
         c.push(Controls.RED, true, 10)
         c.push(Controls.PURPLE, true, 10)
         val a = tick()
-        assertTrue(a.melee && a.meleeHeld && a.red && a.redHeld && a.purple && a.purpleHeld)
+        assertTrue(a.jump && a.jumpHeld && a.dodge && a.dodgeHeld && a.red && a.redHeld && a.purple && a.purpleHeld)
         val b = tick()
-        assertTrue("按住不放：下一个 tick 还是按着，但没有新的按下", b.meleeHeld && b.redHeld && b.purpleHeld && !b.melee && !b.red && !b.purple)
+        assertTrue("按住不放：下一个 tick 还是按着，但没有新的按下", b.jumpHeld && b.dodgeHeld && b.redHeld && b.purpleHeld && !b.jump && !b.dodge && !b.red && !b.purple)
         c.push(Controls.RED, false, 20)
         val d = tick()
         assertFalse(d.redHeld)
-        assertTrue(d.meleeHeld && d.purpleHeld)
+        assertTrue(d.jumpHeld && d.dodgeHeld && d.purpleHeld)
     }
 
     @Test
@@ -86,6 +87,6 @@ class ControlsTest {
         c.push(Controls.PURPLE, true, 31)
         c.discardPending()
         val t = tick()
-        assertFalse(t.melee || t.purple || t.meleeHeld || t.purpleHeld)
+        assertFalse(t.melee || t.purple || t.purpleHeld)
     }
 }

@@ -8,7 +8,8 @@ import com.shinjuku.showdown.core.TickInput;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 
 /**
- * 触屏操作：左下浮动摇杆，右下 体术 / 跳 / 苍 / 赫 / 茈 / 领域 六个键，顶部 返回 和 音乐 两个小按钮。
+ * 触屏操作：左下浮动摇杆，右下 体术 / 跳 / 苍 / 赫 / 茈 / 领域 / 闪避 七个键，顶部 返回 和 音乐 两个小按钮。
+ * 组合：按住跳时点体术是苍拳；按住闪避时点苍、点赫是瞬移。
  * 主线程处理触摸；战斗线程每个 tick 取一次（sample）。
  * 按键：主线程把“第几个键、按下还是松开、什么时候”写进预分配的事件环（单写单读，不加锁、不分配），
  * 战斗线程按时间顺序取。同一个键在一个 tick 里最多取一次按下加一次松开（点按不丢），再多的顺延到下一个 tick，
@@ -16,7 +17,7 @@ import java.util.concurrent.atomic.AtomicIntegerArray;
  * 摇杆是连续量，只传最新值：两个分量打包在一个 volatile long 里，读到的总是同一次写入。
  */
 final class Controls {
-    static final int MELEE = 0, JUMP = 1, BLUE = 2, RED = 3, PURPLE = 4, DOMAIN = 5, BUTTONS = 6;
+    static final int MELEE = 0, JUMP = 1, BLUE = 2, RED = 3, PURPLE = 4, DOMAIN = 5, DODGE = 6, BUTTONS = 7;
 
     /** 布局（视图像素）。尺寸或安全区变化时在主线程重建一个新的，渲染线程只读。 */
     static final class Layout {
@@ -47,6 +48,7 @@ final class Controls {
             arc(PURPLE, ax, ay, 125 * dp, 121, 31 * dp);
             arc(RED, ax, ay, 125 * dp, 90, 31 * dp);
             arc(DOMAIN, ax, ay, 196 * dp, 114, 27 * dp);
+            arc(DODGE, ax, ay, 196 * dp, 152, 27 * dp);
             smallR = 19 * dp;
             backX = sl + 14 * dp + smallR;
             backY = st + 12 * dp + smallR;
@@ -103,7 +105,7 @@ final class Controls {
     private static final float DEADZONE = 0.12f;
     private final Actions actions;
     private int stickPointer = -1;
-    private final int[] buttonPointer = {-1, -1, -1, -1, -1, -1};
+    private final int[] buttonPointer = {-1, -1, -1, -1, -1, -1, -1};
     private boolean blocked; // 放过场时：战斗不收触摸
     private int hudPointer = -1, hudTarget = -1;
     private long hudDownAt;
@@ -151,12 +153,14 @@ final class Controls {
         in.red = (downs & (1 << RED)) != 0;
         in.purple = (downs & (1 << PURPLE)) != 0;
         in.domain = (downs & (1 << DOMAIN)) != 0;
+        in.dodge = (downs & (1 << DODGE)) != 0;
         in.blueDown = (downs & (1 << BLUE)) != 0;
         in.blueUp = (ups & (1 << BLUE)) != 0;
         in.blueHeld = (heldBits & (1 << BLUE)) != 0;
-        in.meleeHeld = (heldBits & (1 << MELEE)) != 0;
         in.redHeld = (heldBits & (1 << RED)) != 0;
         in.purpleHeld = (heldBits & (1 << PURPLE)) != 0;
+        in.jumpHeld = (heldBits & (1 << JUMP)) != 0;
+        in.dodgeHeld = (heldBits & (1 << DODGE)) != 0;
     }
 
     /** 战斗线程：过场结束、接着打之前，把积压的按键事件全丢掉，按住状态以主线程为准（放过场时主线程已全部松开）。 */

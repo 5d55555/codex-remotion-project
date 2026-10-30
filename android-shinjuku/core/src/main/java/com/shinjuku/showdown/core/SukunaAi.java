@@ -138,6 +138,7 @@ final class SukunaAi {
                 else if (d >= lo && d <= hi) moveIntent = 0;
                 holdTimer = range(t.holdMin, t.holdMax) / 2;
             }
+            if (amp && d > Tuning.S_MELEE_REACH) moveIntent = toward; // 展延中够不着就一直往前贴（不留滞回的死区）
             // 出手：展延中够得着就打（不等出手计时）；没开展延就用解试探（攒适应）
             if (amp && d <= Tuning.S_MELEE_REACH + 6 && w.sMeleeCd == 0 && rng.nextUnitDouble() < t.attackChance) wantMelee = true;
             attackTimer -= t.decideInterval;

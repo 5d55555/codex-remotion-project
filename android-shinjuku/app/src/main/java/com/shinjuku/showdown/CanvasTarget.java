@@ -138,8 +138,13 @@ final class CanvasTarget implements PixelTarget {
 
     @Override
     public void present() {
+        present(0, 0, vw, vh);
+    }
+
+    @Override
+    public void present(int x, int y, int w, int h) {
         additive(false);
-        src.set(0, 0, vw, vh);
+        src.set(x, y, x + w, y + h);
         dst.set(0, 0, vw * scale, vh * scale);
         dest.drawBitmap(lo, src, dst, up);
     }

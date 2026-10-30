@@ -55,6 +55,7 @@ public final class World {
     public int meleeCombo;            // 第几下体术（画面轮换拳、踢、上勾）
     private boolean pendingCharged, redMax, purple200;
     private boolean redReleased, purpleReleased, fistAir;
+    private boolean redLetGo, purpleLetGo; // 停顿期间也记着：赫、茈松开过（念咒恢复后照样算打断）
     private int dodgeDir = 1, tpKind, tpHits, tpEndAt;
     private float tpBaseY, tpFromX, tpToX;
     private float aimX = 1, aimY;     // 苍的瞄准方向（单位向量）；0 表示自动瞄准
@@ -131,6 +132,8 @@ public final class World {
         if (in.purple) bufPurple = Tuning.INPUT_BUFFER;
         if (in.domain) bufDomain = Tuning.INPUT_BUFFER;
         if (in.dodge) bufDodge = Tuning.INPUT_BUFFER;
+        if (!in.redHeld) redLetGo = true;
+        if (!in.purpleHeld) purpleLetGo = true;
         if (in.blueDown) bluePush(true);
         if (in.blueUp) bluePush(false);
     }
@@ -265,7 +268,7 @@ public final class World {
                 break;
             case Fighter.RED_HOLD: // 赫起手：松开就放普通赫；一直按住到 RED_HOLD 就蓄成最大输出
                 drive(g, 0);
-                if (!in.redHeld) redReleased = true;
+                if (!in.redHeld || redLetGo) redReleased = true;
                 if (!redReleased && st >= Tuning.RED_HOLD) {
                     events.emit(Events.CAST, g.x, g.centerY(), 1, Attack.RED, tick);
                     startChant(Fighter.RED_CHANT, Attack.RED); // 一直按着：念咒（位相、波罗蜜、光之柱）
@@ -275,7 +278,7 @@ public final class World {
                 break;
             case Fighter.RED_CHANT: // 念咒：不能动；松手或被攻击碰到就打断
                 drive(g, 0);
-                if (!in.redHeld) {
+                if (!in.redHeld || redLetGo) {
                     breakChant();
                     break;
                 }
@@ -295,7 +298,7 @@ public final class World {
                 break;
             case Fighter.PURPLE_WINDUP: // 茈起手：松开就是普通茈；一直按住到 PURPLE_HOLD 就开始念咒
                 drive(g, 0);
-                if (!in.purpleHeld) purpleReleased = true;
+                if (!in.purpleHeld || purpleLetGo) purpleReleased = true;
                 if (!purpleReleased && st >= Tuning.PURPLE_HOLD) {
                     startChant(Fighter.PURPLE_CHANT, Attack.PURPLE);
                 } else if (purpleReleased && st >= Tuning.PURPLE_WINDUP) {
@@ -304,7 +307,7 @@ public final class World {
                 break;
             case Fighter.PURPLE_CHANT: { // 念咒：不能移动；松手或被攻击都会打断
                 drive(g, 0);
-                if (!in.purpleHeld) {
+                if (!in.purpleHeld || purpleLetGo) {
                     breakChant();
                     break;
                 }
@@ -541,11 +544,13 @@ public final class World {
             bufRed = 0;
             enter(g, Fighter.RED_HOLD);
             redReleased = !in.redHeld;
+            redLetGo = false;
             events.emit(Events.CAST, g.x, g.centerY(), 0, Attack.RED, tick);
         } else if (bufPurple > 0 && purpleCd == 0 && purpleFailLock == 0) {
             bufPurple = 0;
             enter(g, Fighter.PURPLE_WINDUP);
             purpleReleased = !in.purpleHeld;
+            purpleLetGo = false;
             events.emit(Events.CAST, g.x, g.centerY(), 0, Attack.PURPLE, tick);
         } else if (blueNextIsDown() && blueCd == 0 && blueFailLock == 0 && in.dodgeHeld && canTeleport()) {
             bluePop();
@@ -1085,10 +1090,13 @@ public final class World {
             }
         }
         if ((mask & Defense.ALLOW_STUN) != 0 && a.hitstun > 0) {
-            // 连段衰减：同一串连击里，轻拳（体术）打到第 COMBO_STUN_HITS 下以后只扣血、不再造成硬直（打不成无限连）
-            t.comboHits = t.comboTimer > 0 ? t.comboHits + 1 : 1;
-            t.comboTimer = Tuning.COMBO_RESET;
+            // 连段衰减：同一串连击里，轻拳（双方的体术）打到第 COMBO_STUN_HITS 下以后只扣血，不再造成硬直、也不打断动作
+            // （有意的设计，双方一样：被贴身连打时第 4 下起能顶着出招，打不成无限连）。只数轻拳，重招不占名额
             boolean light = a.kind == Attack.MELEE || a.kind == Attack.S_MELEE;
+            if (light) {
+                t.comboHits = t.comboTimer > 0 ? t.comboHits + 1 : 1;
+                t.comboTimer = Tuning.COMBO_RESET;
+            }
             if (!light || t.comboHits <= Tuning.COMBO_STUN_HITS) {
                 t.hitstun = Math.max(t.hitstun, a.hitstun);
                 if (t == sukuna) interruptSukuna(); // 宿傩出招、咏唱、回复被打断
@@ -1432,6 +1440,7 @@ public final class World {
         if (bufJump > 0) bufJump--;
         if (bufPurple > 0) bufPurple--;
         if (bufDomain > 0) bufDomain--;
+        if (bufDodge > 0) bufDodge--;
         for (int i = 0; i < bqSize; i++) bqTtl[(bqHead + i) % BQ]--;
         while (bqSize > 0 && bqTtl[bqHead] <= 0) bluePop(); // 越早的越先到期，到期的总在队头
         for (int i = 0; i < 2; i++) {
@@ -1481,6 +1490,16 @@ public final class World {
 
     public boolean purple200() {
         return purple200;
+    }
+
+    /** 这次苍拳是在空中（往下俯冲）还是地上（往下劈）。 */
+    public boolean fistAir() {
+        return fistAir;
+    }
+
+    /** 瞬移的是哪个：Attack.BLUE_FIST（苍）或 Attack.RED（赫）。 */
+    public int tpKind() {
+        return tpKind;
     }
 
     static float clamp(float v, float lo, float hi) {

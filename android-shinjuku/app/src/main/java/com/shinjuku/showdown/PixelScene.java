@@ -183,6 +183,14 @@ final class PixelScene {
         if (k.state != Fighter.KO) sukunaFront(t, w, kx, ky, time, dt, sx, sy);
         if (w.domainTicks > 0 && k.state != Fighter.KO) overload(t, kx, ky, time);
         poseGojo(w, time);
+        if (g.state == Fighter.DODGE) { // 闪避：身后两道半透明的残影
+            float dir = Math.signum(g.vx);
+            for (int i = 2; i >= 1; i--) {
+                ghost = withAlpha(0xFF9FD8FF, 0.22f * (3 - i));
+                figure(t, true, gx - dir * i * 9, gy);
+            }
+            ghost = 0;
+        }
         figure(t, true, gx, gy);
         handFx(t, w, handX, handY, backHandX, backHandY, time, dt);
 
@@ -205,13 +213,30 @@ final class PixelScene {
             t.rect(0, 0, VW, vh, withAlpha(flashColor, (flashColor >>> 24) / 255f * (1 - ft / 0.25f)));
             t.additive(false);
         }
-        drawBannerPixels(t, time);
-        drawHudPixels(t, w, dt);
-        drawControlsPixels(t, w);
-        t.present();
-        drawHudText(t, w, time);
+        // 镜头：瞬移的固定动作拉近（像素层裁一块放大），上下加黑边，界面先收起来
+        boolean close = g.state == Fighter.TP_BLUE || g.state == Fighter.TP_RED && g.stateTick <= Tuning.TP_RED_CHARGE + 4;
+        float zt = close ? 1.6f : 1f;
+        zoom += (zt - zoom) * Math.min(1, dt * 7);
+        if (Math.abs(zoom - zt) < 0.01f) zoom = zt;
+        if (zoom > 1.01f) {
+            int cw = Math.round(VW / zoom), ch = Math.round(vh / zoom);
+            float fx = (gx + kx) * 0.5f, fy = (gy + ky) * 0.5f - 30;
+            int cx = Math.max(0, Math.min(VW - cw, Math.round(fx - cw * 0.5f))), cy = Math.max(0, Math.min(vh - ch, Math.round(fy - ch * 0.55f)));
+            int bar = Math.round(ch * 0.1f * Math.min(1, (zoom - 1) / 0.5f));
+            t.rect(cx, cy, cw, bar, 0xFF000000);
+            t.rect(cx, cy + ch - bar, cw, bar, 0xFF000000);
+            t.present(cx, cy, cw, ch);
+        } else {
+            drawBannerPixels(t, time);
+            drawHudPixels(t, w, dt);
+            drawControlsPixels(t, w);
+            t.present();
+            drawHudText(t, w, time);
+        }
         t.end();
     }
+
+    private float zoom = 1;
 
     private float X(float wx) {
         return wx * PPU;
@@ -245,7 +270,13 @@ final class PixelScene {
                     banner(Atlas.BIG_BLACK_FLASH, -1, BF_RED, time);
                     break;
                 case Events.RED_FIRE:
-                    if (kind == 1) { // 最大输出：出手就是一圈冲击
+                    if (kind == 2) { // 瞬移后的大赫：贴脸一发
+                        fx(FX_DISC, x, y, 0.16f, 26, 0, RED_CORE, 0);
+                        fx(FX_RING, x, y, 0.4f, 10, 70, RED_LIGHT, RED);
+                        fx(FX_SPEED, x, y, 0.3f, 14, 60, RED_LIGHT, 0);
+                        flash(0xAAFF5A4A, time);
+                        shake(8, time);
+                    } else if (kind == 1) { // 最大输出：出手就是一圈冲击
                         fx(FX_DISC, x, y, 0.12f, 12, 0, RED_CORE, 0);
                         fx(FX_RING, x, y, 0.3f, 6, 40, RED_LIGHT, RED);
                         fx(FX_SPEED, x, y, 0.25f, 10, 40, RED_LIGHT, 0);
@@ -256,7 +287,13 @@ final class PixelScene {
                     }
                     break;
                 case Events.RED_BURST:
-                    if (kind == 1) {
+                    if (kind == 2) {
+                        fx(FX_RING, x, y, 0.5f, 10, 110, RED_LIGHT, RED);
+                        fx(FX_DISC, x, y, 0.2f, 30, 0, RED_CORE, 0);
+                        sparks(x, y, 60, RED_LIGHT, RED, 320);
+                        flash(0xCCFF3A2A, time);
+                        shake(10, time);
+                    } else if (kind == 1) {
                         float R = Tuning.RED_MAX_RANGE * PPU;
                         fx(FX_RING, x, y, 0.45f, 8, R * 1.5f, RED_LIGHT, RED);
                         fx(FX_RING, x, y, 0.6f, 4, R * 2.4f, RED, RED_DARK);
@@ -302,6 +339,7 @@ final class PixelScene {
                     break;
                 case Events.CAST: {
                     int v = Math.round(ev.value[i]);
+                    if (v == 4) break; // 瞬移：不出横幅（镜头拉近就够了）
                     if (kind == Attack.BLUE_FIST) banner(Atlas.BIG_FIST, HudText.SUB_FIST, BLUE_LIGHT, time);
                     else if (kind == Attack.WORLD_SLASH) banner(Atlas.BIG_DISMANTLE, v == 3 ? HudText.SUB_WORLD_BOUND : HudText.SUB_WORLD, WORLD_RED, time);
                     else if (kind == Attack.RED) banner(Atlas.BIG_RED, v == 1 ? HudText.SUB_RED_MAX : HudText.SUB_RED, v == 1 ? 0xFFFF3A2A : 0xFFFF5A4A, time);
@@ -312,9 +350,11 @@ final class PixelScene {
                 }
                 case Events.CHANT: {
                     int phase = Math.round(ev.value[i]);
-                    if (phase >= 0) { // 每念一段，身上的紫光往外推一圈
-                        fx(FX_RING, x, y, 0.5f, 10, 40 + 14 * phase, PURPLE_LIGHT, PURPLE);
-                        sparks(x, y, 10 + 6 * phase, PURPLE_LIGHT, PURPLE_HOT, 90 + 30 * phase);
+                    int c1 = kind == Attack.BLUE_FIELD ? BLUE_LIGHT : kind == Attack.RED ? RED_LIGHT : PURPLE_LIGHT;
+                    int c2 = kind == Attack.BLUE_FIELD ? BLUE : kind == Attack.RED ? RED : PURPLE_HOT;
+                    if (phase >= 0) { // 每念一段，身上的光往外推一圈
+                        fx(FX_RING, x, y, 0.5f, 10, 40 + 14 * phase, c1, c2);
+                        sparks(x, y, 10 + 6 * phase, c1, c2, 90 + 30 * phase);
                         shake(1 + phase, time);
                     } else {          // 被打断：散掉
                         sparks(x, y, 18, PURPLE_HOT, 0xFF8A8FA0, 90);
@@ -355,6 +395,19 @@ final class PixelScene {
                         dismantleT0 = time;
                     }
                     break;
+                case Events.DODGE:
+                    fx(FX_RING, x, y, 0.2f, 4, 18, BLUE_LIGHT, 0);
+                    dust(x, Y(0), 0.4f);
+                    break;
+                case Events.TELEPORT: { // 原地一圈收拢，背后一闪
+                    int c = kind == Attack.RED ? RED_LIGHT : BLUE_LIGHT;
+                    float nx = X(ev.value[i]);
+                    fx(FX_RING_IN, x, y, 0.2f, 1, 26, c, 0);
+                    fx(FX_DISC, nx, y, 0.12f, 14, 0, 0xFFFFFFFF, 0);
+                    fx(FX_RING, nx, y, 0.3f, 6, 34, c, kind == Attack.RED ? RED : BLUE);
+                    flash(0x66FFFFFF, time);
+                    break;
+                }
                 case Events.AMP:
                     if (ev.value[i] > 0) {
                         ampT0 = time;
@@ -836,12 +889,6 @@ final class PixelScene {
         hy = Math.round(hy);
         int st = g.stateTick;
         switch (g.state) {
-            case Fighter.MELEE:
-                if (st > Tuning.MELEE_STARTUP) { // 还按着：苍开始往拳头上聚
-                    float k = Math.min(1, (st - Tuning.MELEE_STARTUP) / (float) (Tuning.FIST_HOLD - Tuning.MELEE_STARTUP));
-                    fistBlue(t, hx, hy, 1.5f + 2.5f * k, k, time, dt);
-                }
-                break;
             case Fighter.MELEE_ACTIVE: { // 出拳的一瞬：拳头前一点白光、身后两道速度线
                 t.additive(true);
                 t.shape(hx, hy, 3, 0, 0, 7, withAlpha(0xFFFFFFFF, 0.8f));
@@ -854,11 +901,15 @@ final class PixelScene {
             case Fighter.FIST_WINDUP:
                 fistBlue(t, hx, hy, 4 + 3 * Math.min(1, st / (float) Tuning.FIST_WINDUP), 1, time, dt);
                 break;
-            case Fighter.FIST_ACTIVE: {
+            case Fighter.FIST_ACTIVE: { // 往下砸：拳头上的苍拖出一道往上的残光
                 fistBlue(t, hx, hy, 7, 1, time, dt);
                 float f = g.facing;
+                boolean dive = w.fistAir();
                 t.additive(true);
-                for (int i = 1; i <= 4; i++) t.shape(hx - f * i * 6, hy, 6 - i, 0, 0, 7, withAlpha(BLUE_MID, 0.5f - i * 0.1f));
+                for (int i = 1; i <= 5; i++) {
+                    float tx = dive ? hx - f * i * 2 : hx - f * i * 3, ty = dive ? hy - i * 7 : hy - i * 5;
+                    t.shape(tx, ty, 6 - i, 0, 0, 7, withAlpha(BLUE_MID, 0.55f - i * 0.1f));
+                }
                 t.additive(false);
                 break;
             }
@@ -866,10 +917,11 @@ final class PixelScene {
                 if (st < 12) fistBlue(t, hx, hy, 7 * (1 - st / 12f), 1 - st / 12f, time, 0);
                 break;
             case Fighter.BLUE_HOLD:
-            case Fighter.BLUE_WINDUP: {
-                boolean charged = g.state == Fighter.BLUE_WINDUP && w.pendingCharged();
+            case Fighter.BLUE_WINDUP:
+            case Fighter.BLUE_CHANT: {
+                boolean charged = g.state == Fighter.BLUE_CHANT; // 念咒：一段比一段大
                 float k = g.state == Fighter.BLUE_HOLD ? 0.4f + 0.6f * Math.min(1, st / (float) Tuning.BLUE_HOLD_THRESHOLD) : 1;
-                float r = (charged ? 4 + 4 * Math.min(1, st / (float) Tuning.BLUE_WINDUP_CHARGED) : 3) * k;
+                float r = (charged ? 4 + 4 * Math.min(1, st / (float) (Tuning.CHANT3_PHRASE * Tuning.CHANT3_PHRASES)) : 3) * k;
                 t.additive(true);
                 t.shape(hx, hy, r * 2.5f, 0, 0, 7, withAlpha(BLUE, 0.4f));
                 t.additive(false);
@@ -884,12 +936,50 @@ final class PixelScene {
             }
             case Fighter.RED_HOLD: {
                 float r = 1 + 4 * Math.min(1, st / (float) Tuning.RED_WINDUP);
-                if (st > Tuning.RED_WINDUP) r += 3 * Math.min(1, (st - Tuning.RED_WINDUP) / (float) (Tuning.RED_HOLD - Tuning.RED_WINDUP)); // 还按着：往最大输出蓄
                 redHand(t, hx, hy, r, false, time, dt);
                 break;
             }
-            case Fighter.RED_WINDUP: // 最大输出的前摇：红球越来越大，往外推出一圈圈的斥力
-                redHand(t, hx, hy, 8 + 7 * Math.min(1, st / (float) Tuning.RED_MAX_WINDUP), true, time, dt);
+            case Fighter.RED_CHANT: // 念咒：红球越来越大，往外推出一圈圈的斥力
+                redHand(t, hx, hy, 6 + 9 * Math.min(1, st / (float) (Tuning.CHANT3_PHRASE * Tuning.CHANT3_PHRASES)), true, time, dt);
+                break;
+            case Fighter.DODGE: // 闪避：身后一串蓝色的残影线
+                t.additive(true);
+                for (int i = 0; i < 4; i++) {
+                    float yy = gojoSY - 10 - i * 9;
+                    t.line(gojoSX - g.facing * 4, yy, gojoSX - Math.signum(g.vx) * (16 + 6 * i), yy, 1, withAlpha(BLUE_LIGHT, 0.5f - i * 0.08f));
+                }
+                t.additive(false);
+                break;
+            case Fighter.TP_WINDUP: { // 瞬移的前摇：术式往身上收拢
+                boolean red = w.tpKind() == Attack.RED;
+                float k = Math.min(1, st / (float) Tuning.TP_WINDUP);
+                float cx = Math.round(gojoSX), cy = Math.round(gojoSY) - 26;
+                t.additive(true);
+                t.shape(cx, cy, 30 * (1 - k) + 6, 30 * (1 - k) + 4, 0, 7, withAlpha(red ? RED_LIGHT : BLUE_LIGHT, 0.4f + 0.5f * k));
+                t.shape(cx, cy, 14, 0, 0, 7, withAlpha(red ? RED : BLUE, 0.25f * k));
+                t.additive(false);
+                if (dt > 0) {
+                    float a = rnd() * 6.2832f, d = 26 + 8 * rnd();
+                    emit(cx + (float) Math.cos(a) * d, cy + (float) Math.sin(a) * d, -(float) Math.cos(a) * d * 5, -(float) Math.sin(a) * d * 5,
+                            0.18f, red ? RED_LIGHT : BLUE_LIGHT, 1, 0, 0, 2);
+                }
+                break;
+            }
+            case Fighter.TP_BLUE: { // 把宿傩吸上去：他头上一团苍；连打时拳头上带着苍
+                if (w.sukuna.scripted && st < Tuning.TP_BLUE_FIRST_HIT + 4) {
+                    float bx = Math.round(sukunaSX), by = Math.round(sukunaSY) - 60;
+                    float k = Math.min(1, st / (float) Tuning.TP_BLUE_LIFT);
+                    t.additive(true);
+                    t.shape(bx, by, 18 * k + 4, 0, 0, 7, withAlpha(BLUE, 0.35f));
+                    t.additive(false);
+                    t.shape(bx, by, 6 * k + 2, 0, 0, 7, BLUE_LIGHT);
+                    t.shape(bx, by, 3 * k + 1, 0, 0, 7, BLUE_CORE);
+                }
+                if (st >= Tuning.TP_BLUE_FIRST_HIT - 8) fistBlue(t, hx, hy, 5, 1, time, dt);
+                break;
+            }
+            case Fighter.TP_RED: // 背后蓄一发很大的赫
+                if (st <= Tuning.TP_RED_CHARGE) redHand(t, hx, hy, 6 + 16 * Math.min(1, st / (float) Tuning.TP_RED_CHARGE), true, time, dt);
                 break;
             case Fighter.PURPLE_WINDUP: {
                 float k = Math.min(1, st / (float) Tuning.PURPLE_WINDUP);
@@ -1113,6 +1203,17 @@ final class PixelScene {
                         float xa = x0 + w.worldDir * d;
                         t.rect(Math.round(Math.min(xa, xa + w.worldDir * 5)), Math.round(y), 5, 1, withAlpha(on ? 0xFFFFFFFF : WORLD_RED, 0.8f));
                     }
+                }
+            }
+        } else if (s.scripted && w.gojo.state == Fighter.TP_RED && w.gojo.stateTick > Tuning.TP_RED_CHARGE) {
+            // 被大赫轰飞：身上裹着红光，身后拖着火星
+            t.additive(true);
+            t.shape(Math.round(kx), Math.round(ky) - 26, 24, 0, 0, 7, withAlpha(RED, 0.35f));
+            t.additive(false);
+            if (dt > 0) {
+                for (int i = 0; i < 4; i++) {
+                    emit(kx + (rnd() - 0.5f) * 20, ky - 26 + (rnd() - 0.5f) * 30, (rnd() - 0.5f) * 40, (rnd() - 0.5f) * 40, 0.3f,
+                            rnd() < 0.5f ? RED_LIGHT : RED, rnd() < 0.3f ? 2 : 1, 0, 2, 1);
                 }
             }
         } else if (s.state == Fighter.S_RCT) {
@@ -1370,56 +1471,114 @@ final class PixelScene {
             p.armBack = -8;
         }
         switch (g.state) {
-            case Fighter.MELEE: { // 起手；还按着就是在蓄苍拳：拳头往后收
-                int combo = (w.meleeCombo - 1) % 3;
-                meleeWindup(p, combo, Math.min(1, st / (float) Tuning.MELEE_STARTUP));
-                if (st > Tuning.MELEE_STARTUP) {
-                    float k = Math.min(1, (st - Tuning.MELEE_STARTUP) / (float) (Tuning.FIST_HOLD - Tuning.MELEE_STARTUP));
-                    fistWindup(p, k);
-                }
+            case Fighter.MELEE: // 起手
+                meleeWindup(p, (w.meleeCombo - 1) % 3, Math.min(1, st / (float) Tuning.MELEE_STARTUP));
                 break;
-            }
             case Fighter.MELEE_ACTIVE:
                 meleeStrike(p, (w.meleeCombo - 1) % 3, 1);
                 break;
             case Fighter.MELEE_RECOVER:
                 meleeStrike(p, (w.meleeCombo - 1) % 3, 1 - st / (float) Tuning.MELEE_RECOVERY);
                 break;
-            case Fighter.FIST_WINDUP:
-                fistWindup(p, 1);
+            case Fighter.FIST_WINDUP: // 苍拳：拳头举过头顶
+                fistWindup(p, Math.min(1, st / (float) Tuning.FIST_WINDUP));
+                if (w.fistAir()) {
+                    p.legFront = 40;
+                    p.legBack = 10;
+                }
                 p.bob = 0;
                 break;
-            case Fighter.FIST_ACTIVE:
-                p.armFront = 95;
-                p.armBack = -45;
-                p.lean = 22;
-                p.legFront = 32;
-                p.legBack = -30;
+            case Fighter.FIST_ACTIVE: // 往下砸：空中俯冲（拳头朝前下方），地上往下劈
+                if (w.fistAir()) {
+                    p.armFront = 55;
+                    p.armBack = -60;
+                    p.lean = 24;
+                    p.legFront = 35;
+                    p.legBack = 25;
+                } else {
+                    float k = Math.min(1, st / 3f);
+                    p.armFront = 170 - 120 * k;
+                    p.armBack = -40;
+                    p.lean = 6 + 18 * k;
+                    p.legFront = 28;
+                    p.legBack = -26;
+                }
+                p.bob = 0;
                 break;
             case Fighter.FIST_RECOVER: {
                 float f = 1 - st / (float) Tuning.FIST_RECOVERY;
-                p.armFront = 10 + 85 * f;
-                p.armBack = -45 * f;
-                p.lean = 22 * f;
-                p.legFront = 32 * f;
-                p.legBack = -30 * f;
+                p.armFront = 10 + 40 * f;
+                p.armBack = -40 * f;
+                p.lean = 24 * f;
+                p.legFront = 30 * f;
+                p.legBack = -28 * f;
+                p.bob = -Math.round(3 * f); // 砸完蹲下去一点
                 break;
             }
+            case Fighter.DODGE: { // 闪避：压低身子冲出去
+                boolean back = Math.signum(g.vx) != g.facing;
+                p.lean = back ? -18 : 24;
+                p.armFront = back ? 40 : -30;
+                p.armBack = back ? -60 : 60;
+                p.legFront = 30;
+                p.legBack = -30;
+                p.bob = -2;
+                break;
+            }
+            case Fighter.TP_WINDUP: // 结印
+                p.armFront = 150;
+                p.armBack = -10;
+                p.bob = 0;
+                break;
+            case Fighter.TP_BLUE: { // 吸上来的时候伸手，之后左右手轮流出拳
+                if (st < Tuning.TP_BLUE_FIRST_HIT - 6) {
+                    p.armFront = 120;
+                    p.armBack = -20;
+                    p.lean = -4;
+                } else {
+                    int k = (st - Tuning.TP_BLUE_FIRST_HIT + 6) % Tuning.TP_BLUE_HIT_GAP;
+                    boolean out = k < 6;
+                    p.armFront = out ? 95 : 10;
+                    p.armBack = out ? -40 : 60;
+                    p.lean = out ? 18 : 4;
+                }
+                p.legFront = 30;
+                p.legBack = -10;
+                p.bob = 0;
+                break;
+            }
+            case Fighter.TP_RED: // 蓄力伸手，放出去之后被反冲往后仰
+                if (st <= Tuning.TP_RED_CHARGE) {
+                    p.armFront = 90;
+                    p.armBack = -50;
+                    p.lean = -6;
+                } else {
+                    float f = Math.max(0, 1 - (st - Tuning.TP_RED_CHARGE) / (float) Tuning.TP_RED_AFTER);
+                    p.armFront = 10 + 85 * f;
+                    p.armBack = -50 * f;
+                    p.lean = -14 * f;
+                }
+                p.legFront = 30;
+                p.legBack = -28;
+                p.bob = 0;
+                break;
             case Fighter.BLUE_HOLD:
                 p.armFront = 85;
                 p.armBack = -20;
                 p.lean = 4;
                 break;
             case Fighter.BLUE_WINDUP:
-                if (w.pendingCharged()) {
-                    p.armFront = 150;
-                    p.armBack = 40;
-                    p.lean = -4;
-                } else {
-                    p.armFront = 85;
-                    p.armBack = -20;
-                    p.lean = 4;
-                }
+                p.armFront = 85;
+                p.armBack = -20;
+                p.lean = 4;
+                break;
+            case Fighter.BLUE_CHANT: // 念咒：手举向前上方托着苍
+                p.armFront = 140;
+                p.armBack = 30;
+                p.lean = -4;
+                p.legFront = 18;
+                p.legBack = -18;
+                p.bob = 0;
                 break;
             case Fighter.BLUE_RECOVER:
                 p.armFront = 100;
@@ -1433,7 +1592,7 @@ final class PixelScene {
                 p.legFront = 14;
                 p.legBack = -14;
                 break;
-            case Fighter.RED_WINDUP: // 最大输出：站稳，手臂伸直
+            case Fighter.RED_CHANT: // 念咒：站稳，手臂伸直
                 p.armFront = 88;
                 p.armBack = -55;
                 p.lean = -10;
@@ -1542,13 +1701,13 @@ final class PixelScene {
         }
     }
 
-    /** 苍拳蓄力：拳头收到身后，身体压低。 */
+    /** 苍拳的前摇：拳头举过头顶，身体往后仰。 */
     private static void fistWindup(Pose p, float k) {
-        p.armFront = -40 - 25 * k;
-        p.armBack = 30 * k;
-        p.lean = -8 - 4 * k;
-        p.legFront = 20 + 6 * k;
-        p.legBack = -18 - 6 * k;
+        p.armFront = 20 + 155 * k;
+        p.armBack = -30 * k;
+        p.lean = -10 * k;
+        p.legFront = 20;
+        p.legBack = -18;
     }
 
     private void poseSukuna(World w, float time) {
@@ -1577,6 +1736,23 @@ final class PixelScene {
             return;
         }
         boolean air = s.y > 1;
+        if (s.downTicks > 0 && !air && !s.scripted) { // 被击倒：躺在地上
+            p.spin = -90;
+            p.bob = -18;
+            p.armFront = 60;
+            p.armBack = -50;
+            p.legFront = 12;
+            p.legBack = -8;
+            return;
+        }
+        if (s.scripted && w.gojo.state == Fighter.TP_BLUE) { // 被苍吸在空中、挨着连打
+            p.lean = -18;
+            p.armFront = 110 + (float) Math.sin(time * 13) * 15;
+            p.armBack = 100;
+            p.legFront = 25;
+            p.legBack = -25;
+            return;
+        }
         if (air && s.hitstun > 0 && (s.lastHitKind == Attack.RED || s.lastHitKind == Attack.PURPLE || s.lastHitKind == Attack.HOLLOW
                 || s.lastHitKind == Attack.BLUE_FIST || s.lastHitKind == Attack.BLACK_FLASH)) {
             p.spin = -Math.round(36 * Math.min(1, since / 40f)) * 10; // 被打飞：翻一个跟头（每 10 度一档）
@@ -1709,6 +1885,7 @@ final class PixelScene {
     /* ---------------- 像素角色：按骨骼摆部件 ---------------- */
 
     private float figX, figY, figFace, figCos = 1, figSin;
+    private int ghost; // 不为 0 时画残影：所有部件用这个颜色乘（半透明）
 
     /** 画一个人：脚底在 (fx, fy)。头和身体不转（只按前倾平移整数像素，保持像素干净），手脚绕关节转。 */
     private void figure(PixelTarget t, boolean gojo, float fx, float fy) {
@@ -1721,15 +1898,15 @@ final class PixelScene {
         figCos = (float) Math.cos(sp);
         figSin = (float) Math.sin(sp);
         int add = p.hurt > 0 ? gray(Math.round(p.hurt * 4) * 48) : 0;
-        int back = 0xFFB4B4BC;
+        int back = ghost != 0 ? ghost : 0xFFB4B4BC, front = ghost != 0 ? ghost : 0xFFFFFFFF;
         float lean = p.lean;
         int dTorso = Math.round(lean * 0.12f), dHead = Math.round(lean * 0.2f), dShoulder = Math.round(lean * 0.16f);
         part(t, arm, -6 + dShoulder, SHOULDER_Y, -p.armBack, back, add);
         part(t, leg, -2, -13, -p.legBack, back, add);
-        part(t, leg, 2, -13, -p.legFront, 0xFFFFFFFF, add);
-        part(t, torso, dTorso, -12, 0, 0xFFFFFFFF, add);
-        part(t, head, dHead, -26 + Math.round(Math.abs(lean) * 0.04f), 0, 0xFFFFFFFF, add);
-        part(t, arm, 6 + dShoulder, SHOULDER_Y, -p.armFront, 0xFFFFFFFF, add);
+        part(t, leg, 2, -13, -p.legFront, front, add);
+        part(t, torso, dTorso, -12, 0, front, add);
+        part(t, head, dHead, -26 + Math.round(Math.abs(lean) * 0.04f), 0, front, add);
+        part(t, arm, 6 + dShoulder, SHOULDER_Y, -p.armFront, front, add);
         // 两只手的位置（给手上的术式用）
         float[] q = hand(6 + dShoulder, -p.armFront);
         handX = q[0];
@@ -1895,23 +2072,28 @@ final class PixelScene {
             else if (i == Controls.RED) cdMax = w.redCdMax;
             else if (i == Controls.PURPLE) cdMax = w.purpleCdMax;
             else if (i == Controls.DOMAIN) cdMax = Tuning.DOMAIN_COOLDOWN;
+            else if (i == Controls.DODGE) cdMax = Tuning.DODGE_COOLDOWN;
             if (cd > 0) {
                 t.shape(x, y, r - 1, 0, (float) (-Math.PI / 2), (float) (Math.PI * 2 * cd / cdMax), 0x99000000);
                 drawNumber(t, (cd + Tuning.HZ - 1) / Tuning.HZ, x, y - 4, 1, 0xFFEFF2FF, true);
             }
-            // 外圈进度：长按蓄力（苍、苍拳、赫最大输出、茈念咒）、领域剩余时间
+            // 外圈进度：长按念咒（苍、赫、茈）、苍拳的前摇、瞬移的冷却、领域剩余时间
             float prog = -1;
             boolean full = false;
-            int st = g.stateTick;
+            int st = g.stateTick, chant3 = Tuning.CHANT3_PHRASE * Tuning.CHANT3_PHRASES;
             if (i == Controls.BLUE) {
-                if (g.state == Fighter.BLUE_HOLD) prog = Math.min(1, st / (float) Tuning.BLUE_HOLD_THRESHOLD);
-                else if (g.state == Fighter.BLUE_WINDUP && w.pendingCharged()) full = true;
+                if (g.state == Fighter.BLUE_HOLD) prog = Math.min(1, st / (float) Tuning.BLUE_HOLD_THRESHOLD) * 0.25f;
+                else if (g.state == Fighter.BLUE_CHANT) prog = 0.25f + 0.75f * Math.min(1, st / (float) chant3);
             } else if (i == Controls.MELEE) {
-                if (g.state == Fighter.MELEE && pressed && st > Tuning.MELEE_STARTUP) prog = st / (float) Tuning.FIST_HOLD;
-                else if (g.state == Fighter.FIST_WINDUP) full = true;
+                if (g.state == Fighter.FIST_WINDUP) prog = st / (float) Tuning.FIST_WINDUP;
             } else if (i == Controls.RED) {
-                if (g.state == Fighter.RED_HOLD && pressed && st > Tuning.RED_WINDUP) prog = st / (float) Tuning.RED_HOLD;
-                else if (g.state == Fighter.RED_WINDUP) full = true;
+                if (g.state == Fighter.RED_HOLD && pressed && st > Tuning.RED_WINDUP) prog = st / (float) Tuning.RED_HOLD * 0.25f;
+                else if (g.state == Fighter.RED_CHANT) prog = 0.25f + 0.75f * Math.min(1, st / (float) chant3);
+            } else if (i == Controls.DODGE) {
+                if (g.state == Fighter.TP_WINDUP) prog = st / (float) Tuning.TP_WINDUP;
+                else if (w.tpCd > 0) { // 瞬移的冷却：外圈一道细线慢慢走满
+                    t.shape(x, y, r + 2, r + 1, (float) (-Math.PI / 2), (float) (Math.PI * 2 * (1 - w.tpCd / (float) Tuning.TP_COOLDOWN)), 0x80EFF2FF);
+                }
             } else if (i == Controls.PURPLE) {
                 if (g.state == Fighter.PURPLE_WINDUP && pressed) prog = st / (float) Tuning.PURPLE_HOLD * 0.25f;
                 else if (g.state == Fighter.PURPLE_CHANT) prog = Math.min(1, st / (float) (Tuning.CHANT_PHRASES * Tuning.CHANT_PHRASE));
@@ -1930,7 +2112,8 @@ final class PixelScene {
     }
 
     private static int buttonColor(int i) {
-        return i == Controls.BLUE ? BLUE_MID : i == Controls.RED ? RED_LIGHT : i == Controls.PURPLE ? PURPLE_HOT : i == Controls.DOMAIN ? VOID_LIGHT : 0xFFEFF2FF;
+        return i == Controls.BLUE ? BLUE_MID : i == Controls.RED ? RED_LIGHT : i == Controls.PURPLE ? PURPLE_HOT : i == Controls.DOMAIN ? VOID_LIGHT
+                : i == Controls.DODGE ? 0xFFB8F0E0 : 0xFFEFF2FF;
     }
 
     private static int cooldown(World w, int button) {
@@ -1943,6 +2126,8 @@ final class PixelScene {
                 return w.purpleCd;
             case Controls.DOMAIN:
                 return w.domainTicks > 0 ? 0 : w.domainCd;
+            case Controls.DODGE:
+                return w.dodgeCd;
             default:
                 return 0;
         }
@@ -1964,16 +2149,22 @@ final class PixelScene {
             int color = i == Controls.BLUE ? 0xFFD8F5FF : i == Controls.RED ? 0xFFFFC2B0 : i == Controls.PURPLE ? 0xFFF2C7FF : i == Controls.DOMAIN ? VOID_LIGHT : 0xFFEFF2FF;
             t.hud(ht.x[id], ht.y[id], ht.w[id], ht.h[id], l.bx[i] - ht.w[id] * 0.5f, l.by[i] - ht.h[id] * 0.5f, color);
         }
-        // 200% 茈的咒词：念到哪段，五条悟头上就亮哪段，念过的留在上面
+        // 咒词：念到哪段，五条悟头上就亮哪段，念过的留在上面（茈四段；苍、赫三段）
         Fighter g = w.gojo;
-        if (g.state == Fighter.PURPLE_CHANT && w.chantPhase >= 0) {
-            int ph = Math.min(3, w.chantPhase);
-            float local = (g.stateTick - ph * Tuning.CHANT_PHRASE) / (float) Tuning.CHANT_PHRASE;
+        boolean chanting = g.state == Fighter.PURPLE_CHANT || g.state == Fighter.BLUE_CHANT || g.state == Fighter.RED_CHANT;
+        if (chanting && w.chantPhase >= 0) {
+            boolean purple = g.state == Fighter.PURPLE_CHANT;
+            int first = purple ? HudText.CHANT0 : g.state == Fighter.BLUE_CHANT ? HudText.BLUE_CHANT0 : HudText.RED_CHANT0;
+            int phrase = purple ? Tuning.CHANT_PHRASE : Tuning.CHANT3_PHRASE, last = purple ? 3 : 2;
+            int bright = purple ? 0xFFF7E6FF : g.state == Fighter.BLUE_CHANT ? 0xFFE6F8FF : 0xFFFFE6DC;
+            int dim = purple ? 0x80D9C2F2 : g.state == Fighter.BLUE_CHANT ? 0x80B8D8F2 : 0x80F2C2B8;
+            int ph = Math.min(last, w.chantPhase);
+            float local = (g.stateTick - ph * phrase) / (float) phrase;
             float cx = Math.max(60 * dp, Math.min(laidW - 60 * dp, gojoSX * s));
-            float y = Math.max(l.hudTop + 44 * dp, (gojoSY - 62) * s - ht.h[HudText.CHANT0]);
-            float step = ht.h[HudText.CHANT0] * 0.8f;
-            for (int k = 0; k < ph; k++) hudCenter(t, HudText.CHANT0 + k, cx, y - (ph - k) * step, 0x80D9C2F2);
-            hudCenter(t, HudText.CHANT0 + ph, cx, y - 4 * dp * Math.max(0, 1 - local * 6), withAlpha(0xFFF7E6FF, Math.min(1, local * 6)));
+            float y = Math.max(l.hudTop + 44 * dp, (gojoSY - 62) * s - ht.h[first]);
+            float step = ht.h[first] * 0.8f;
+            for (int k = 0; k < ph; k++) hudCenter(t, first + k, cx, y - (ph - k) * step, dim);
+            hudCenter(t, first + ph, cx, y - 4 * dp * Math.max(0, 1 - local * 6), withAlpha(bright, Math.min(1, local * 6)));
         }
         // 宿傩头上：世界斩的咏唱（念到哪段亮哪段）；领域展延、反转术式、适应完成的小字
         Fighter k = w.sukuna;

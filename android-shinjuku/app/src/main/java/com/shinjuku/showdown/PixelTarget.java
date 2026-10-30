@@ -31,6 +31,9 @@ interface PixelTarget {
     /** 像素层画完：最近邻放大铺满屏幕。之后的 hud() 画在屏幕分辨率上。 */
     void present();
 
+    /** 同上，但只取像素层里 (x, y, w, h) 这一块放大铺满屏幕（镜头拉近；宽高比和整层一样）。 */
+    void present(int x, int y, int w, int h);
+
     /** 屏幕分辨率层：从 HudText 图集贴一块，左上角在 (x, y) 屏幕像素，乘色 mul。 */
     void hud(int sx, int sy, int w, int h, float x, float y, int mul);
 
