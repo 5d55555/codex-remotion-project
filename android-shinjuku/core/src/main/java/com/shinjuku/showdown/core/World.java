@@ -71,6 +71,14 @@ public final class World {
     private boolean adaptPending, worldLocked, worldPending;
     private int adaptLastTick = -100_000, adaptTimer;
 
+    // 空间斩（里梅以上，一局一次）：起手时的斩带（画面也读）、斩不中后的力竭倒计时
+    public boolean spaceUsed;
+    public int spaceExhaust;          // 力竭还剩多久（>0 时宿傩不能主动行动）
+    public int spaceDir = 1;
+    public float spaceX, spaceY = Tuning.SPACE_HEIGHT; // 斩带的起点和高度（锁定以后不再动）
+    boolean spaceFiring;              // 正在结算空间斩的那一下（Defense 只在这时让它破无限）
+    private boolean spacePending;
+
     // 胜负（测试模式以外）：分出来以后双方都不再行动，画面过一会儿弹出结算
     public static final int OUTCOME_NONE = 0, OUTCOME_WIN = 1, OUTCOME_LOSE = 2;
     public int outcome = OUTCOME_NONE;
@@ -169,6 +177,7 @@ public final class World {
         updateHollow();
         applyBlue();
         resolveWorldSlash();
+        resolveSpaceSlash();
         integrate(gojo);
         integrate(sukuna);
         if (mahoraga.present) integrate(mahoraga);
@@ -1223,7 +1232,16 @@ public final class World {
     public boolean sukunaCanAct() {
         Fighter s = sukuna;
         return s.state != Fighter.KO && s.hitstun == 0 && !s.captured && domainTicks == 0 && !inBlueField(s) && !s.knockedAir
-                && !s.scripted && s.downTicks == 0;
+                && !s.scripted && s.downTicks == 0 && spaceExhaust == 0;
+    }
+
+    SukunaAi ai() { // 模拟统计用
+        return ai;
+    }
+
+    /** 宿傩的恐惧（0–10000；没有 AI 时一直是初值）。 */
+    public int sukunaFear() {
+        return ai.fear();
     }
 
     /** f 在苍的吸引范围里（被吸着，不能主动行动）。 */
@@ -1253,7 +1271,7 @@ public final class World {
                     return;
                 }
                 if (!config.sukunaAi && i.moveX == 0 && !i.melee && !i.dismantle && !i.jump && !i.amp && !i.ampOff && !i.world && !i.rct
-                        && !i.agito && !i.summon && !i.transform) return; // 活靶子：什么都不做
+                        && !i.agito && !i.summon && !i.transform && !i.space) return; // 活靶子：什么都不做
                 drive(s, i.moveX * Tuning.SUKUNA_SPEED);
                 if (i.jump && s.onGround) {
                     s.vy = Tuning.JUMP_SPEED;
@@ -1265,6 +1283,8 @@ public final class World {
                     closeAmp();
                 } else if (i.transform && config.trueForm && !sukunaTrueForm && s.hpMilli > 0) {
                     startTransform();
+                } else if (i.space && technique && config.spaceSlash && !spaceUsed && sAttackGap == 0 && s.onGround && spaceAllowed()) {
+                    startSpace();
                 } else if (sAttackGap == 0 && i.melee && sMeleeCd == 0) {
                     enter(s, Fighter.S_MELEE);
                     drive(s, 0);
@@ -1341,6 +1361,16 @@ public final class World {
                 drive(s, 0);
                 if (st >= Tuning.S_WORLD_RECOVERY) enter(s, Fighter.FREE);
                 break;
+            case Fighter.S_SPACE:
+                drive(s, 0);
+                if (st <= Tuning.SPACE_LOCK) { // 前一半跟着五条悟转，锁定以后斩带不再动
+                    s.facing = gojo.x >= s.x ? 1 : -1;
+                    spaceDir = s.facing;
+                    spaceX = s.x + spaceDir * 20;
+                    if (st == Tuning.SPACE_LOCK) events.emit(Events.SPACE, spaceX, spaceY, 1, spaceDir, tick);
+                }
+                if (st >= Tuning.SPACE_WINDUP) spacePending = true; // 这一 tick 结束前没被打断才斩出去（resolveSpaceSlash）
+                break;
             case Fighter.S_RCT: {
                 if (sukunaCanAct()) drive(s, 0); // 被控时照样回血，但不去动击飞、吸引的速度
                 int healFrom = Tuning.S_RCT_STARTUP, healTo = healFrom + Tuning.S_RCT_DURATION;
@@ -1391,6 +1421,10 @@ public final class World {
             case Fighter.S_RCT:
             case Fighter.S_TRANSFORM:
                 return; // 反转术式（定）、变原身不可打断
+            case Fighter.S_SPACE: // 空间斩的起手被打断：没斩到，一样力竭
+                events.emit(Events.SPACE, s.x, s.centerY(), -1, spaceDir, tick);
+                exhaustSukuna();
+                return;
             case Fighter.S_SUMMON:
                 if (s.stateTick < Tuning.SUMMON_CHANT) { // 咏唱被打断：不算用掉，但要僵一会儿、过一阵才能再召
                     sStagger = Tuning.SUMMON_BREAK_LOCK;
@@ -1696,6 +1730,62 @@ public final class World {
         }
     }
 
+    /** 空间斩能不能起手（硬条件，定）：打了 20 秒以上、血量 25% 以下（还活着）、不在无量空处里。恐惧由 AI 自己看。 */
+    private boolean spaceAllowed() {
+        Fighter s = sukuna;
+        return fightTicks >= Tuning.SPACE_MIN_TICKS && s.hpMilli > 0 && s.hpMilli * 4 <= s.maxHpMilli && domainTicks == 0;
+    }
+
+    private void startSpace() {
+        Fighter s = sukuna;
+        enter(s, Fighter.S_SPACE);
+        drive(s, 0);
+        spaceUsed = true; // 起手就算用掉（被打断也不退）
+        sAttackGap = Tuning.S_ATTACK_GAP;
+        s.facing = gojo.x >= s.x ? 1 : -1;
+        spaceDir = s.facing;
+        spaceX = s.x + spaceDir * 20;
+        spaceY = Tuning.SPACE_HEIGHT;
+        events.emit(Events.SPACE, s.x, s.centerY(), 0, spaceDir, tick);
+    }
+
+    /** 空间斩斩出去：锁定的水平斩带，碰到五条悟（闪避、瞬移的无敌照样躲得开）就把他剩下的血全部斩掉；没斩死就力竭。 */
+    private void resolveSpaceSlash() {
+        if (!spacePending) return;
+        spacePending = false;
+        Fighter s = sukuna, g = gojo;
+        if (s.state != Fighter.S_SPACE || s.hpMilli == 0) return; // 这一 tick 里被打断或倒下了
+        float endX = clamp(spaceX + spaceDir * Tuning.SPACE_RANGE, 0, Tuning.WIDTH);
+        events.emit(Events.SLASH, spaceX, spaceY, endX, Attack.SPACE_SLASH, tick);
+        float dx = (g.x - spaceX) * spaceDir;
+        boolean touch = g.state != Fighter.KO && dx >= -Tuning.BODY_HALF_W && dx <= Tuning.SPACE_RANGE + Tuning.BODY_HALF_W
+                && g.y <= spaceY + Tuning.SPACE_HALF_THICKNESS && g.y + Tuning.BODY_H >= spaceY - Tuning.SPACE_HALF_THICKNESS;
+        if (touch) {
+            spaceFiring = true;
+            attack.set(Fighter.SUKUNA, Fighter.GOJO, Attack.SPACE_SLASH, ++attackSeq, 1, spaceDir * Tuning.S_WORLD_IMPULSE_X,
+                    Tuning.S_WORLD_IMPULSE_Y, Tuning.S_WORLD_HITSTUN, 0);
+            apply(attack);
+            spaceFiring = false;
+        }
+        if (g.hpMilli == 0) {
+            enter(s, Fighter.S_WORLD_RECOVER);
+            events.emit(Events.SPACE, g.x, g.centerY(), 3, spaceDir, tick);
+        } else {
+            exhaustSukuna();
+        }
+    }
+
+    /** 力竭：3 秒不能主动行动（照常挨打、被控；挨打不重置），展延关掉。 */
+    private void exhaustSukuna() {
+        Fighter s = sukuna;
+        spacePending = false;
+        enter(s, Fighter.S_EXHAUSTED);
+        drive(s, 0);
+        spaceExhaust = Tuning.SPACE_EXHAUST;
+        if (ampTicks > 0) closeAmp();
+        events.emit(Events.SPACE, s.x, s.centerY(), 4, spaceDir, tick);
+    }
+
     private int sMeleeSeq = -1;
 
     private void resolveSukunaMelee() {
@@ -1798,10 +1888,12 @@ public final class World {
         if (t == mahoraga && a.kind == Attack.MELEE) mask &= ~(Defense.ALLOW_IMPULSE | Defense.ALLOW_STUN);
         // 难度倍率只乘宿傩自己的招（式神的伤害固定）
         long dmg = a.source == Fighter.SUKUNA && a.kind != Attack.AGITO ? Math.round(a.damageMilli * (double) config.sukunaDamageMult) : a.damageMilli;
+        if (a.kind == Attack.SPACE_SLASH) dmg = t.hpMilli; // 空间斩：斩中就是剩下的全部血量
         if ((mask & Defense.ALLOW_DAMAGE) != 0 && dmg > 0) {
             damageTaken[t.id] += Math.min(dmg, t.hpMilli);
             t.hpMilli = Math.max(0, t.hpMilli - dmg);
             if (a.kind != Attack.BLUE_FIELD) events.emit(Events.DAMAGE, t.x, t.y + t.height + 10, dmg / 1000f, a.kind, tick);
+            if (t == sukuna && t.state == Fighter.S_SPACE) interruptSukuna(); // 空间斩起手时挨到任何伤害（苍的持续伤害、不再硬直的轻拳也算）就断
         }
         if ((mask & Defense.ALLOW_IMPULSE) != 0 && (a.impulseX != 0 || a.impulseY != 0)) {
             t.vx = clamp(t.vx + a.impulseX, -Tuning.MAX_VX, Tuning.MAX_VX);
@@ -2163,6 +2255,10 @@ public final class World {
     /* ---------------- 计时器、领域、倒地与复活 ---------------- */
 
     private void timers() {
+        if (spaceExhaust > 0 && --spaceExhaust == 0) { // 力竭过去了（被控住的话接着等控制结束）
+            if (sukuna.state == Fighter.S_EXHAUSTED) enter(sukuna, Fighter.FREE);
+            events.emit(Events.SPACE, sukuna.x, sukuna.centerY(), 5, spaceDir, tick);
+        }
         if (meleeCd > 0) meleeCd--;
         if (blueCd > 0) blueCd--;
         if (redCd > 0) redCd--;
@@ -2260,6 +2356,10 @@ public final class World {
         f.stateTick = 0;
         f.captured = false;
         f.koTimer = Tuning.KO_TICKS;
+        if (f == sukuna) {
+            spaceExhaust = 0;
+            spacePending = false;
+        }
         events.emit(Events.KO, f.x, f.centerY(), 0, f.id, tick);
         if (decide(f)) endFight();
     }
@@ -2287,7 +2387,8 @@ public final class World {
         hollow.active = false;
         agito.active = false;
         if (ampTicks > 0) closeAmp();
-        adaptPending = worldPending = false;
+        adaptPending = worldPending = spacePending = false;
+        spaceExhaust = 0;
         chantPhase = -1;
         for (int i = 0; i < Fighter.COUNT; i++) {
             Fighter f = fighter(i);

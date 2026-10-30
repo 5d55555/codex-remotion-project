@@ -30,7 +30,8 @@ final class PixelScene {
     private static final int VOID_LIGHT = 0xFFCFF4FF, VOID_RING = 0xFF7A5CFF;
     // 宿傩：领域展延的灰白轮廓、魔虚罗法阵的金色、世界斩的红、反转术式的白
     private static final int AMP_LIGHT = 0xFFE9EAF2, AMP_DARK = 0xFF7D8294, WHEEL = 0xFFE0B25A, WHEEL_LIT = 0xFFFFF0B8,
-            CUT_RED = 0xFFB0101E, WORLD_RED = 0xFFFF3A4A, RCT_LIGHT = 0xFFE6FFF0;
+            CUT_RED = 0xFFB0101E, WORLD_RED = 0xFFFF3A4A, RCT_LIGHT = 0xFFE6FFF0,
+            SPACE_DARK = 0xFF14061E, SPACE_VIOLET = 0xFF9A5CFF, SPACE_LIGHT = 0xFFE9DDFF; // 空间斩：紫黑的裂缝
     // 十种影法术的影子、魔虚罗的白、顎吐的电、原身的暗红
     private static final int SHADOW = 0xFF120A1E, SHADOW_EDGE = 0xFF4A2E6E, MAHO_LIGHT = 0xFFF3EFE6, MAHO_DARK = 0xFF8C8577,
             BOLT = 0xFF6FE0FF, BOLT_CORE = 0xFFE8FBFF, TRUE_DARK = 0xFF3A0610, TRUE_RED = 0xFFC0182C;
@@ -89,6 +90,8 @@ final class PixelScene {
     // 宿傩：头上小字（领域展延、反转术式、适应完成）出现的时刻、法阵转到的角度、世界斩斩出的那一道
     private float ampT0 = -99, rctT0 = -99, adaptedT0 = -99, wheelAngle, wheelT0 = -99;
     private float worldT0 = -99, worldX0, worldY0, worldX1;
+    private boolean worldSpace;          // 这一道斩带是空间斩（紫黑）还是世界斩（红白）
+    private float spaceT0 = -99, exhaustT0 = -99;
     // 十种影法术、原身：顎吐出手、魔虚罗适应无限、变原身的时刻；魔虚罗这一帧的位置
     private float agitoT0 = -99, mahoAdaptT0 = -99, trueT0 = -99, mahoSX, mahoSY;
     // 茈·最大输出的固定动作：画用的苍和茈（不在场上，只拿来画）、宿傩的「穿血」（最近四道）、拍肩的时刻
@@ -154,6 +157,7 @@ final class PixelScene {
         float dt = Math.max(0, Math.min(0.1f, time - lastTime));
         lastTime = time;
         consumeEvents(w, time);
+        updateQuotes(w, time);
         updateParticles(dt);
 
         t.begin(VW, vh, screenW, screenH, s);
@@ -263,25 +267,155 @@ final class PixelScene {
             int bar = Math.round(ch * 0.1f * Math.min(1, (zoom - 1) / 0.5f));
             t.rect(cx, cy, cw, bar, 0xFF000000);
             t.rect(cx, cy + ch - bar, cw, bar, 0xFF000000);
+            float qk = s * VW / cw;
+            quoteLayout(cx, cy + bar, qk);
             t.present(cx, cy, cw, ch);
+            quoteText(t, cx, cy, qk);
         } else if (cine) { // 茈·最大输出：上下黑边，界面收起来，只留咒词和横幅
             int bar = Math.round(vh * 0.09f);
             t.rect(0, 0, VW, bar, 0xFF000000);
             t.rect(0, vh - bar, VW, bar, 0xFF000000);
             drawBannerPixels(t, time);
+            quoteLayout(0, bar, s);
             t.present();
             drawCineText(t, w, time);
+            quoteText(t, 0, 0, s);
         } else {
             drawBannerPixels(t, time);
             drawHudPixels(t, w, dt);
             drawControlsPixels(t, w);
+            quoteLayout(0, (l.hudTop + 44 * l.dp) / s, s);
             t.present();
             drawHudText(t, w, time);
+            quoteText(t, 0, 0, s);
         }
         t.end();
     }
 
     private float zoom = 1;
+
+    /* ---------------- 台词气泡 ---------------- */
+
+    private static final int GOJO_Q = 0, SUKUNA_Q = 1;
+    // HudText 台词表里的下标：随机冒的是头几句，后面几句只在对应的时候说
+    private static final int G_CHALLENGER = 0, G_SERIOUS = 5, G_HEART = 9, G_WIN = 10, G_RANDOM = 9;
+    private static final int S_ERA = 0, S_ADAPT = 7, S_REMEMBER = 8, S_RANDOM = 7;
+    private static final float QUOTE_TIME = 2.8f;
+    private final int[] quote = {-1, -1};            // 正在说的（HudText 的 id），-1 没在说
+    private final float[] quoteT0 = new float[2];
+    private final float[] quoteNext = {1.0f, 4.2f};  // 下一句随机台词的时刻：开场先各说一句招牌台词（挑战者 → 凡夫）
+    private final int[] quoteLast = {-1, -1};
+    private final boolean[] quoteOpened = new boolean[2];
+    // 这一帧气泡的位置（像素层坐标）和透明度，quoteLayout 算、quoteText 用
+    private final float[] qx = new float[2], qy = new float[2], qw = new float[2], qh = new float[2], qa = new float[2];
+    private final boolean[] headText = new boolean[2]; // 这一帧头上有没有咒词之类的字（updateQuotes 里算）
+
+    /** 说一句（招式触发的会顶掉正在说的那句）。 */
+    private void say(int who, int idx, float time) {
+        quote[who] = (who == GOJO_Q ? HudText.QUOTE_G0 : HudText.QUOTE_S0) + idx;
+        quoteT0[who] = time;
+        quoteOpened[who] = true;
+        quoteNext[who] = Math.max(quoteNext[who], time + QUOTE_TIME + 9 + 7 * rnd());
+    }
+
+    /** 随机台词：各自隔 12–19 秒冒一句（不重复上一句），对方在说、自己在念咒或在固定动作里就等一会儿。 */
+    private void updateQuotes(World w, float time) {
+        for (int who = 0; who < 2; who++) {
+            headText[who] = !canTalk(w, who) && w.cine == World.CINE_NONE && !w.cutscene
+                    || who == SUKUNA_Q && w.spaceExhaust > 0;
+            if (quote[who] >= 0 && time - quoteT0[who] > QUOTE_TIME) quote[who] = -1;
+        }
+        if (w.outcome != World.OUTCOME_NONE) return;
+        for (int who = 0; who < 2; who++) {
+            if (quote[who] >= 0 || time < quoteNext[who]) continue;
+            if (quote[1 - who] >= 0 || !canTalk(w, who)) {
+                quoteNext[who] = time + 1.5f;
+                continue;
+            }
+            int n = who == GOJO_Q ? G_RANDOM : S_RANDOM, idx;
+            if (!quoteOpened[who]) {
+                idx = who == GOJO_Q ? G_CHALLENGER : S_ERA;
+            } else {
+                idx = Math.min(n - 1, (int) (rnd() * n));
+                if (idx == quoteLast[who]) idx = (idx + 1) % n;
+            }
+            quoteLast[who] = idx;
+            say(who, idx, time);
+        }
+    }
+
+    private static boolean canTalk(World w, int who) {
+        if (w.cutscene || w.cine != World.CINE_NONE) return false;
+        Fighter f = who == GOJO_Q ? w.gojo : w.sukuna;
+        if (f.state == Fighter.KO || f.scripted) return false;
+        switch (f.state) {
+            case Fighter.PURPLE_CHANT:
+            case Fighter.BLUE_CHANT:
+            case Fighter.RED_CHANT:
+            case Fighter.PURPLE_MAX_CHANT:
+            case Fighter.TP_WINDUP:
+            case Fighter.TP_BLUE:
+            case Fighter.TP_RED:
+            case Fighter.TP_PURPLE:
+            case Fighter.S_WORLD:
+            case Fighter.S_SUMMON:
+            case Fighter.S_SPACE:
+            case Fighter.S_EXHAUSTED:
+                return false; // 头上在显示咒词（空间斩、力竭的字）
+            default:
+                return true;
+        }
+    }
+
+    /**
+     * 气泡的位置（像素层坐标）：说话人头顶，挤在一起时后说的那个抬上去。cropX 是这一帧画面左边（拉近镜头时是裁出来那块），
+     * minY 是气泡最高能到哪（界面下面），k 是一个像素层像素在屏幕上多宽。
+     */
+    private void quoteLayout(float cropX, float minY, float k) {
+        HudText ht = hud;
+        for (int who = 0; who < 2; who++) {
+            qa[who] = 0;
+            int id = quote[who];
+            if (id < 0 || ht == null) continue;
+            float age = lastTime - quoteT0[who];
+            float a = Math.min(1, age / 0.12f) * Math.min(1, (QUOTE_TIME - age) / 0.3f);
+            if (a <= 0) continue;
+            float w = ht.w[id] / k + 4, h = ht.h[id] / k;
+            float vx = who == GOJO_Q ? gojoSX : sukunaSX, vy = who == GOJO_Q ? gojoSY - 66 : sukunaSY - 84;
+            if (headText[who]) vy -= ht.h[HudText.SPACE_SLASH] / k + 2; // 头上有字（咒词、空间斩、力竭）：气泡再抬高一些
+            float viewW = laidW / k;
+            qx[who] = Math.max(cropX + 2, Math.min(cropX + viewW - w - 2, vx - w * 0.5f));
+            qy[who] = Math.max(minY, vy - h);
+            qw[who] = w;
+            qh[who] = h;
+            qa[who] = a;
+        }
+        if (qa[0] > 0 && qa[1] > 0 && qx[0] < qx[1] + qw[1] && qx[1] < qx[0] + qw[0] && qy[0] < qy[1] + qh[1] && qy[1] < qy[0] + qh[0]) {
+            int up = quoteT0[0] > quoteT0[1] ? 0 : 1, other = 1 - up;
+            qy[up] = Math.max(minY, qy[other] - qh[up] - 3);
+        }
+    }
+
+    /** 屏幕层（界面和按键的字之上）：气泡的底、角色色的边、朝说话人的小尖，再写字。 */
+    private void quoteText(PixelTarget t, float cropX, float cropY, float k) {
+        HudText ht = hud;
+        float dp = laid.dp, b = Math.max(1, Math.round(1.5f * dp));
+        for (int who = 0; who < 2; who++) {
+            float a = qa[who];
+            int id = quote[who];
+            if (a <= 0 || id < 0 || ht == null) continue;
+            int edge = withAlpha(who == GOJO_Q ? 0xFF6FC3FF : 0xFFE0303F, a * 0.95f);
+            float x = (qx[who] - cropX) * k, y = (qy[who] - cropY) * k, w = qw[who] * k, h = qh[who] * k;
+            float sx = ((who == GOJO_Q ? gojoSX : sukunaSX) - cropX) * k;
+            float tx = Math.max(x + 6 * dp, Math.min(x + w - 6 * dp, sx));
+            t.hudRect(x - b, y - b, w + 2 * b, h + 2 * b, edge);
+            t.hudRect(x, y, w, h, withAlpha(0xFF0E0B16, a * 0.9f));
+            t.hudRect(tx - 3 * dp, y + h + b, 6 * dp, 2 * dp, edge); // 小尖
+            t.hudRect(tx - 1.5f * dp, y + h + b + 2 * dp, 3 * dp, 2 * dp, edge);
+            int color = who == GOJO_Q ? 0xFFE8F6FF : 0xFFFFE4E0;
+            hudCenter(t, id, x + w * 0.5f, y + (h - ht.h[id]) * 0.5f, withAlpha(color, a));
+        }
+    }
 
     private float X(float wx) {
         return wx * PPU;
@@ -390,6 +524,7 @@ final class PixelScene {
                         flash(0xAAF2C7FF, time);
                         shake(4, time);
                         banner(Atlas.BIG_PURPLE, HudText.SUB_PURPLE_MAX, 0xFFF7DDFF, time);
+                        say(GOJO_Q, G_SERIOUS, time);
                         break;
                     }
                     if (kind == Attack.BLUE_FIST) banner(Atlas.BIG_FIST, HudText.SUB_FIST, BLUE_LIGHT, time);
@@ -425,6 +560,7 @@ final class PixelScene {
                     shake(4, time);
                     fx(FX_RING, x, y, 0.8f, 6, 160, VOID_LIGHT, VOID_RING);
                     banner(Atlas.BIG_VOID, HudText.SUB_DOMAIN, VOID_LIGHT, time);
+                    say(GOJO_Q, G_HEART, time);
                     break;
                 case Events.DOMAIN_CLOSE:
                     voidCx = x;
@@ -432,16 +568,18 @@ final class PixelScene {
                     fx(FX_RING_IN, x, y, 0.5f, 1, 120, VOID_LIGHT, 0);
                     break;
                 case Events.SLASH:
-                    if (kind == Attack.WORLD_SLASH) { // 世界斩：整条斩带一下子劈开
+                    if (kind == Attack.WORLD_SLASH || kind == Attack.SPACE_SLASH) { // 世界斩、空间斩：整条斩带一下子劈开
+                        boolean space = kind == Attack.SPACE_SLASH;
+                        worldSpace = space;
                         worldT0 = time;
                         worldX0 = x;
                         worldY0 = y;
                         worldX1 = X(ev.value[i]);
-                        flash(0xCCFFFFFF, time);
-                        shake(9, time);
-                        for (int k = 0; k < 12; k++) {
+                        flash(space ? 0xDD1A0830 : 0xCCFFFFFF, time);
+                        shake(space ? 12 : 9, time);
+                        for (int k = 0; k < (space ? 20 : 12); k++) {
                             float px = x + (worldX1 - x) * rnd();
-                            sparks(px, y, 3, 0xFFFFFFFF, WORLD_RED, 120);
+                            sparks(px, y, 3, space ? SPACE_LIGHT : 0xFFFFFFFF, space ? SPACE_VIOLET : WORLD_RED, 120);
                         }
                     } else {
                         slashT0 = time;
@@ -451,6 +589,29 @@ final class PixelScene {
                         dismantleT0 = time;
                     }
                     break;
+                case Events.SPACE: {
+                    int v = Math.round(ev.value[i]);
+                    if (v == 0) {          // 起手：空间一暗，横幅
+                        spaceT0 = time;
+                        flash(0x99140620, time);
+                        fx(FX_RING_IN, x, y, 0.5f, 2, 40, SPACE_VIOLET, 0);
+                        banner(Atlas.BIG_SPACE, HudText.SUB_SPACE_SLASH, SPACE_LIGHT, time);
+                        say(SUKUNA_Q, S_ERA, time);
+                    } else if (v == 1) {   // 锁定
+                        shake(2, time);
+                    } else if (v == 3) {   // 斩死五条悟
+                        flash(0xEEFFFFFF, time);
+                        shake(14, time);
+                        fx(FX_RING, x, y, 0.6f, 4, 70, SPACE_LIGHT, SPACE_VIOLET);
+                        sparks(x, y, 40, SPACE_LIGHT, SPACE_VIOLET, 220);
+                    } else if (v < 0) {    // 起手被打断：裂缝散掉
+                        sparks(x, y, 18, SPACE_VIOLET, 0xFF8A8FA0, 90);
+                        fx(FX_RING, x, y, 0.3f, 14, 4, 0xFF8A8FA0, SPACE_DARK);
+                    } else if (v == 4) {   // 力竭
+                        exhaustT0 = time;
+                    }
+                    break;
+                }
                 case Events.DODGE:
                     fx(FX_RING, x, y, 0.2f, 4, 18, BLUE_LIGHT, 0);
                     dust(x, Y(0), 0.4f);
@@ -497,6 +658,7 @@ final class PixelScene {
                         sparks(x, y - 30, 30, MAHO_LIGHT, SHADOW_EDGE, 160);
                         dust(x, y, 1);
                         banner(Atlas.BIG_MAHORAGA, HudText.SUB_SUMMON, MAHO_LIGHT, time);
+                        say(SUKUNA_Q, S_ADAPT, time);
                     } else {              // 被打断
                         sparks(x, y, 16, SHADOW_EDGE, AMP_DARK, 90);
                         fx(FX_RING, x, y, 0.3f, 14, 4, AMP_DARK, SHADOW_EDGE);
@@ -531,9 +693,13 @@ final class PixelScene {
                         fx(FX_RING, x, y, 0.4f, 8, 40, TRUE_RED, TRUE_DARK);
                     }
                     break;
-                case Events.CINE:
-                    cineEvent(w, Math.round(ev.value[i]), kind, ev.x[i], ev.y[i], x, y, time);
+                case Events.CINE: {
+                    int v = Math.round(ev.value[i]);
+                    cineEvent(w, v, kind, ev.x[i], ev.y[i], x, y, time);
+                    if (v == Events.CINE_TAP) say(GOJO_Q, G_CHALLENGER, time); // 拍肩
+                    else if (v == Events.CINE_BLAST) say(GOJO_Q, G_WIN, time);
                     break;
+                }
                 case Events.MAHORAGA_GONE:
                     if (ev.value[i] == 0) { // 被打倒：碎成白色的光
                         fx(FX_RING, x, y, 0.6f, 6, 70, MAHO_LIGHT, MAHO_DARK);
@@ -583,6 +749,8 @@ final class PixelScene {
                 case Events.KO:
                     if (kind == Fighter.GOJO) koT0Gojo = time;
                     else koT0Sukuna = time;
+                    if (kind == Fighter.GOJO && w.outcome == World.OUTCOME_LOSE) say(SUKUNA_Q, S_REMEMBER, time);
+                    quote[kind == Fighter.GOJO ? GOJO_Q : SUKUNA_Q] = -1; // 倒下的人不说话
                     fx(FX_KO, x, y - 34, 1.4f, 0, 0, 0xFFFFE6A8, 0);
                     shake(3, time);
                     break;
@@ -1332,7 +1500,24 @@ final class PixelScene {
                 }
             }
         }
-        if (s.state == Fighter.S_WORLD) {
+        if (s.state == Fighter.S_SPACE) {
+            // 空间斩的预警：手前一团紫黑，斩带上空间一段段裂开；跟着五条悟转的时候是虚线，锁定以后是实线、一闪一闪
+            int st = s.stateTick;
+            boolean locked = st > Tuning.SPACE_LOCK;
+            float y = Y(w.spaceY) + sy, x0 = X(w.spaceX) + sx, len = Tuning.SPACE_RANGE * PPU;
+            float k = Math.min(1, st / (float) Tuning.SPACE_WINDUP);
+            t.additive(true);
+            t.shape(Math.round(handX), Math.round(handY), 3 + 4 * k, 0, 0, 7, withAlpha(SPACE_VIOLET, 0.7f));
+            t.additive(false);
+            t.shape(Math.round(handX), Math.round(handY), 2 + 2 * k, 0, 0, 7, withAlpha(SPACE_DARK, 0.9f));
+            boolean on = !locked || ((int) (time * 16) & 1) == 0;
+            for (float d = 0; d < len; d += locked ? 4 : 10) {
+                float xa = x0 + w.spaceDir * d;
+                t.rect(Math.round(Math.min(xa, xa + w.spaceDir * (locked ? 4 : 5))), Math.round(y), locked ? 4 : 5, 1,
+                        withAlpha(on ? SPACE_LIGHT : SPACE_VIOLET, locked ? 0.85f : 0.45f + 0.3f * k));
+            }
+            if (locked) crackLine(t, x0, y - 1, w.spaceDir, len * Math.min(1, (st - Tuning.SPACE_LOCK) / 30f), (int) (spaceT0 * 30), withAlpha(SPACE_VIOLET, 0.7f));
+        } else if (s.state == Fighter.S_WORLD) {
             int st = s.stateTick;
             float y = Y(w.worldY) + sy, x0 = Math.round(kx) + w.worldDir * 8;
             float len = Tuning.S_WORLD_RANGE * PPU;
@@ -1403,12 +1588,14 @@ final class PixelScene {
         float y = Math.round(worldY0) + sy, xa = Math.round(worldX0) + sx, xb = Math.round(worldX1) + sx;
         float x0 = Math.min(xa, xb), w = Math.abs(xb - xa);
         float th = Math.max(1, Math.round(5 * (1 - f)));
+        int glow = worldSpace ? SPACE_VIOLET : WORLD_RED, core = worldSpace ? SPACE_LIGHT : 0xFFFFFFFF;
+        if (worldSpace) th += 2; // 空间斩：更粗，裂开的空间留得更久（黑色那条）
         t.additive(true);
-        t.rect(x0, y - th - 2, w, th * 2 + 5, withAlpha(WORLD_RED, 0.35f * (1 - f)));
-        t.rect(x0, y - th, w, th * 2 + 1, withAlpha(0xFFFFFFFF, 0.9f * (1 - f)));
+        t.rect(x0, y - th - 2, w, th * 2 + 5, withAlpha(glow, 0.35f * (1 - f)));
+        t.rect(x0, y - th, w, th * 2 + 1, withAlpha(core, 0.9f * (1 - f)));
         t.additive(false);
-        t.rect(x0, y, w, 1, withAlpha(0xFF05040A, 1 - f * f));
-        crackLine(t, xa, y - 2, xb >= xa ? 1 : -1, w, (int) (worldT0 * 30), withAlpha(CUT_RED, 0.8f * (1 - f)));
+        t.rect(x0, y - (worldSpace ? 1 : 0), w, worldSpace ? 3 : 1, withAlpha(worldSpace ? SPACE_DARK : 0xFF05040A, 1 - f * f));
+        crackLine(t, xa, y - 2, xb >= xa ? 1 : -1, w, (int) (worldT0 * 30), withAlpha(worldSpace ? SPACE_VIOLET : CUT_RED, 0.8f * (1 - f)));
     }
 
     /** 解：看不见的斩击，只留一道一闪而过的细白线。 */
@@ -1997,6 +2184,16 @@ final class PixelScene {
             p.bob = ((int) (time * 24) % 9) == 0 ? 1 : 0;
             return;
         }
+        if (w.spaceExhaust > 0) { // 力竭：单膝跪地，一只手撑着膝盖，大口喘气（一起一伏）
+            float breath = (float) Math.sin(time * 5);
+            p.armFront = 45 + 6 * breath;
+            p.armBack = -20;
+            p.lean = 30 + 4 * breath;
+            p.legFront = 80;
+            p.legBack = -60;
+            p.bob = -9 + Math.round(breath);
+            return;
+        }
         int st = s.stateTick;
         switch (s.state) {
             case Fighter.S_MELEE: {
@@ -2049,6 +2246,15 @@ final class PixelScene {
                 p.lean = 8 * k;
                 p.legFront = 18 * k;
                 p.legBack = -18 * k;
+                return;
+            }
+            case Fighter.S_SPACE: { // 空间斩：前一半蓄力（前手收在胸前），锁定以后前手横着指出去
+                boolean pointing = st > Tuning.SPACE_LOCK;
+                p.armFront = pointing ? 90 : 150;
+                p.armBack = pointing ? -40 : 110;
+                p.lean = pointing ? 8 : -4;
+                p.legFront = 20;
+                p.legBack = -20;
                 return;
             }
             case Fighter.S_RCT: // 反转术式：站直，两手微微张开
@@ -2888,6 +3094,12 @@ final class PixelScene {
         if (k.state == Fighter.S_SUMMON && k.stateTick <= Tuning.SUMMON_CHANT) { // 「布瑠部由良由良」：一个字一个字亮起来的感觉用透明度代替
             float local = k.stateTick / (float) Tuning.SUMMON_CHANT;
             hudCenter(t, HudText.SUMMON_CHANT, kcx, ktop - ht.h[HudText.SUMMON_CHANT], withAlpha(0xFFE8E0FF, 0.45f + 0.55f * Math.min(1, local * 3)));
+        } else if (k.state == Fighter.S_SPACE) { // 「空间斩」：越来越亮
+            float local = k.stateTick / (float) Tuning.SPACE_WINDUP;
+            hudCenter(t, HudText.SPACE_SLASH, kcx, ktop - ht.h[HudText.SPACE_SLASH], withAlpha(0xFFE9DDFF, 0.5f + 0.5f * local));
+        } else if (w.spaceExhaust > 0 && k.state != Fighter.KO) { // 「力竭」
+            float a = 0.5f + 0.5f * (float) Math.sin((time - exhaustT0) * 6); // 颜色在灰紫和白之间喘，字一直清楚
+            hudCenter(t, HudText.EXHAUSTED, kcx, ktop - ht.h[HudText.EXHAUSTED], lerpColor(0xFFB8A8D8, 0xFFFFFFFF, a));
         } else if (k.state == Fighter.S_WORLD && w.worldWindup == Tuning.S_WORLD_WINDUP) {
             int tt = k.stateTick - Tuning.S_WORLD_SIGN;
             if (tt >= 0) {
@@ -2961,6 +3173,14 @@ final class PixelScene {
 
     private static float lerp(float a, float b, float t) {
         return a + (b - a) * t;
+    }
+
+    /** 两个不透明颜色之间按 k（0–1）插值。 */
+    private static int lerpColor(int c0, int c1, float k) {
+        int r = Math.round(((c0 >> 16) & 0xFF) + (((c1 >> 16) & 0xFF) - ((c0 >> 16) & 0xFF)) * k);
+        int g = Math.round(((c0 >> 8) & 0xFF) + (((c1 >> 8) & 0xFF) - ((c0 >> 8) & 0xFF)) * k);
+        int b = Math.round((c0 & 0xFF) + ((c1 & 0xFF) - (c0 & 0xFF)) * k);
+        return 0xFF000000 | r << 16 | g << 8 | b;
     }
 
     static int withAlpha(int argb, float a) {

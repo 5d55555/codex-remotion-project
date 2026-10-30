@@ -22,6 +22,8 @@ final class GojoBot {
     private int mahoSeenAt = -1, mahoReactAt, mHitReactAt;
     private boolean mDodge, mSwingSeen;
     private boolean domainUsed;
+    private int spaceSeenAt = -1, spaceReactAt;
+    private boolean spaceKnown;
 
     GojoBot(int level, long seed) {
         this.level = level;
@@ -39,6 +41,36 @@ final class GojoBot {
         int toward = dx >= 0 ? 1 : -1;
         boolean free = g.state == Fighter.FREE && g.hitstun == 0;
         boolean sukunaStuck = !w.sukunaCanAct() || s.state == Fighter.KO;
+
+        // 空间斩（标准、熟练；放在按住的招前面，蓄力时也看得到）：看到起手，过了反应时间（标准八成、熟练九成五认得出来）：贴着就打断；
+        // 不然掐着时间跳过斩带（起跳后 0.1–0.7 秒脚在斩带上面），来不及跳就在斩出前一刻闪避
+        if (level != BASIC && s.state == Fighter.S_SPACE) {
+            if (spaceSeenAt < 0) {
+                spaceSeenAt = w.tick;
+                spaceReactAt = w.tick + range(reactMin, reactMax);
+                spaceKnown = rng.nextUnitDouble() < (level == SKILLED ? 0.95 : 0.8);
+            }
+            if (spaceKnown && w.tick >= spaceReactAt) {
+                maxHold = purpleHold = redHold = 0; // 按住的蓄力、念咒都放掉（可取消的就取消），先应对这一斩
+                int remaining = Tuning.SPACE_WINDUP - s.stateTick;
+                if (d <= Tuning.MELEE_REACH && free && w.meleeCd == 0) {
+                    in.melee = true;
+                    return;
+                }
+                if (free && g.onGround && remaining <= 40 && remaining >= 14) {
+                    in.jump = true;
+                    return;
+                }
+                if (free && g.onGround && w.dodgeCd == 0 && remaining <= 6 && remaining >= 2) {
+                    in.dodge = true;
+                    return;
+                }
+                in.moveX = 0;
+                return;
+            }
+        } else {
+            spaceSeenAt = -1;
+        }
 
         // 按住着的招：茈·最大输出（苍和赫一起按着）、茈（念咒）、赫（最大输出）
         if (maxHold > 0) {

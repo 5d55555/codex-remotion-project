@@ -681,6 +681,46 @@ class BattlePreviewTest {
         })
     }
 
+    /** 空间斩：打满 20 秒、宿傩剩 20% 血；script 里起手以后再推进。 */
+    private fun space(script: Scene.() -> Unit) = Scene(paparazzi.context, Difficulty.URAUME, { it.sukunaAi = false }) {
+        world.gojo.x = 420f
+        world.sukuna.x = 860f
+        steps(10)
+        world.fightTicks = com.shinjuku.showdown.core.Tuning.SPACE_MIN_TICKS
+        world.sukuna.hpMilli = world.sukuna.maxHpMilli / 5
+        world.sukunaIntent.space = true
+        steps(1)
+        script()
+    }
+
+    /** 空间斩的预警：锁定以后，紫黑的斩带一闪一闪，头上「空间斩」，宿傩说“凡夫”。 */
+    @Test
+    fun spaceSlashWindup() {
+        paparazzi.snapshot(space { steps(90) })
+    }
+
+    /** 空间斩斩中：五条悟（无限也挡不住）直接被斩掉。 */
+    @Test
+    fun spaceSlashKill() {
+        paparazzi.snapshot(space { steps(com.shinjuku.showdown.core.Tuning.SPACE_WINDUP + 4) })
+    }
+
+    /** 跳过斩带：宿傩力竭（弯腰喘气，头上「力竭」）。 */
+    @Test
+    fun spaceSlashExhausted() {
+        paparazzi.snapshot(space {
+            steps(com.shinjuku.showdown.core.Tuning.SPACE_WINDUP - 30)
+            input.jump = true
+            steps(120)
+        })
+    }
+
+    /** 开场台词：五条悟先说“你才是挑战者”，说完宿傩接“凡夫”（头顶的气泡）。 */
+    @Test
+    fun openingQuotes() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.URAUME, { it.sukunaAi = false }) { steps(600) })
+    }
+
     /** 结算：战斗画面上盖一层“胜利”/“失败”（倒下的动作放完 1.25 秒后弹出）。 */
     private fun result(won: Boolean, d: Difficulty): android.widget.FrameLayout {
         val ctx = paparazzi.context

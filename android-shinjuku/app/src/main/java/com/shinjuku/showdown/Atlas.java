@@ -24,8 +24,8 @@ final class Atlas {
     // 宿傩的原身（四臂：arm2 是多出来的一对）、魔虚罗（前手是退魔之剑）、嵌合兽「顎吐」
     static final int TRUE_HEAD = 29, TRUE_TORSO = 30, TRUE_ARM = 31, TRUE_ARM2 = 32;
     static final int MAHO_HEAD = 33, MAHO_TORSO = 34, MAHO_ARM = 35, MAHO_SWORD = 36, MAHO_LEG = 37, AGITO = 38;
-    static final int BIG_MAHORAGA = 39, BIG_TRUE_FORM = 40; // 「魔虚罗」「原身」
-    static final int COUNT = 41;
+    static final int BIG_MAHORAGA = 39, BIG_TRUE_FORM = 40, BIG_SPACE = 41; // 「魔虚罗」「原身」「空间斩」
+    static final int COUNT = 42;
 
     static final String[] BIG_TEXT = {"「苍」", "「赫」", "「茈」", "黑闪", "击倒", "「苍拳」", "「无量空处」", "「解」"};
     static final int[] BIG_SIZE = {28, 28, 28, 30, 15, 28, 28, 28};
@@ -75,6 +75,7 @@ final class Atlas {
         for (int i = 0; i < BIG_TEXT.length; i++) parts[BIG_BLUE + i] = outlined(outlined(pixelText(BIG_TEXT[i], BIG_SIZE[i])));
         parts[BIG_MAHORAGA] = outlined(outlined(pixelText("「魔虚罗」", 28)));
         parts[BIG_TRUE_FORM] = outlined(outlined(pixelText("「原身」", 28)));
+        parts[BIG_SPACE] = outlined(outlined(pixelText("「空间斩」", 28)));
 
         // 简单的分行装箱
         int atlasW = 256, cx = PAD, cy = PAD, rowH = 0;

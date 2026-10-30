@@ -37,5 +37,8 @@ interface PixelTarget {
     /** 屏幕分辨率层：从 HudText 图集贴一块，左上角在 (x, y) 屏幕像素，乘色 mul。 */
     void hud(int sx, int sy, int w, int h, float x, float y, int mul);
 
+    /** 屏幕分辨率层：纯色矩形（屏幕像素；台词气泡的底和边）。 */
+    void hudRect(float x, float y, float w, float h, int argb);
+
     void end();
 }

@@ -160,6 +160,13 @@ final class CanvasTarget implements PixelTarget {
     }
 
     @Override
+    public void hudRect(float x, float y, float w, float h, int argb) {
+        shp.setStyle(Paint.Style.FILL);
+        shp.setColor(argb);
+        dest.drawRect(x, y, x + w, y + h, shp);
+    }
+
+    @Override
     public void end() {
     }
 }

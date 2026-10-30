@@ -22,7 +22,9 @@ public final class Events {
             AGITO = 29,            // 顎吐：value 0 从 (x, y) 飞出、1 在 (x, y) 俯冲电击、2 消失
             TRANSFORM = 30,        // 宿傩变原身：value 1 开始（回满血）、0 变完
             MAHORAGA_GONE = 31,    // 魔虚罗退场：value 0 被打倒、1 宿傩倒下或变原身（十种影法术没了）
-            CINE = 32;             // 固定动作里的节点：value 见下面的 CINE_*，(x, y) 是发生的位置
+            CINE = 32,             // 固定动作里的节点：value 见下面的 CINE_*，(x, y) 是发生的位置
+            SPACE = 33;            // 宿傩的空间斩：value 0 起手、1 锁定、3 斩死五条悟、-1 起手被打断、4 力竭开始、5 力竭结束；kind 是方向（±1）
+    // 空间斩斩出去的那一下另发一个 SLASH（kind 是 Attack.SPACE_SLASH）
     public static final int CINE_RED = 1, CINE_SLASH = 2, CINE_MAHO_SWING = 3, CINE_CHANT = 4, CINE_CONTACT = 5, CINE_BLAST = 6,
             CINE_END = 7, CINE_TAP = 10, CINE_TURN = 11;
     // CINE_SLASH：宿傩朝赫斩出去，kind 是斩到哪里停下的 x（被苍挡下）；CINE_CHANT：kind 是第几段追加咏唱

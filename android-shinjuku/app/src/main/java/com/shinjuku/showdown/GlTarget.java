@@ -455,6 +455,11 @@ final class GlTarget implements PixelTarget {
     }
 
     @Override
+    public void hudRect(float x, float y, float w, float h, int argb) {
+        rect(x, y, w, h, argb); // present() 之后坐标就是屏幕像素
+    }
+
+    @Override
     public void end() {
         flush();
     }

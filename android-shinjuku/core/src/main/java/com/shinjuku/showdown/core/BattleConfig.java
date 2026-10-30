@@ -24,6 +24,7 @@ public final class BattleConfig {
     public boolean agito = false;     // 十种影法术：嵌合兽「顎吐」
     public boolean mahoraga = false;  // 十种影法术：魔虚罗（里梅以上，定；一局只能召唤一次，定）
     public boolean trueForm = false;  // 原身（里梅以上，定；回满血，之后不能用十种影法术，定）
+    public boolean spaceSlash = false; // 空间斩（里梅以上：要御厨子，三轮的十影宿傩没有）
 
     /** 难度的数值档：第 n 档（三轮 0）宿傩伤害、血量都 ×1.1 的 n 次方（定）。 */
     public void tier(int n) {
@@ -48,6 +49,7 @@ public final class BattleConfig {
         agito = true;
         mahoraga = full;
         trueForm = full;
+        spaceSlash = full;
     }
     /** 宿傩有没有 AI。测试模式没有（活靶子）。 */
     public boolean sukunaAi = false;
@@ -93,6 +95,8 @@ public final class BattleConfig {
         public int summonMargin;                    // 估计五条悟来不及打断的时间要比咏唱多出这么多
         public float transformHp, transformHpEmergency; // 变原身的血线（魔虚罗不在场 / 在场时的紧急血线）
         public int transformMaxWait;                // 魔虚罗在场时最多再等多久（从血量第一次跌破血线算）
+        // 恐惧（v0.11）：多挨 100 血涨几点、少挨 100 血降几点、安全时每秒自然回落几点；空间斩的基础使用率
+        public float fearUp, fearDown, fearCalm, spaceChance;
 
         public AiTuning() {
             reset();
@@ -153,6 +157,10 @@ public final class BattleConfig {
             transformHp = 0.35f;
             transformHpEmergency = 0.2f;
             transformMaxWait = 360;
+            fearUp = 4.0f;
+            fearDown = 2.0f;
+            fearCalm = 0.5f;
+            spaceChance = 0;
         }
 
         /** 各难度的参数：0 三轮（就是 reset() 的默认值）、1 里梅、2 万、3 史上最强。越高越聪明（不加血、不加攻）。 */
@@ -211,6 +219,11 @@ public final class BattleConfig {
             transformHp = level == 1 ? 0.35f : level == 2 ? 0.3f : 0.25f;
             transformHpEmergency = level == 1 ? 0.2f : level == 2 ? 0.18f : 0.15f;
             transformMaxWait = level == 1 ? 360 : level == 2 ? 480 : 600;
+            // 越难越会收心：多挨打涨得少、没挨打降得快
+            fearUp = level == 1 ? 3.6f : level == 2 ? 3.2f : 2.8f;
+            fearDown = level == 1 ? 2.4f : level == 2 ? 2.8f : 3.2f;
+            fearCalm = level == 1 ? 0.7f : level == 2 ? 0.9f : 1.1f;
+            spaceChance = level == 1 ? 0.55f : level == 2 ? 0.65f : 0.75f;
         }
     }
 }

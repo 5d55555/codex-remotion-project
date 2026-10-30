@@ -207,6 +207,18 @@ public final class Tuning {
     public static final int S_WORLD_RECOVERY = 72, S_WORLD_COOLDOWN = 1440; // 占位：冷却 12 秒（从起手算）
     public static final int S_WORLD_BREAK_LOCK = 36; // 咏唱被打断：这么久不能行动（和受击硬直同时计）
     public static final int S_WORLD_HITSTUN = 36;
+
+    // 空间斩（v0.11，里梅以上）。用户定的：恐惧偏低、打了 20 秒以上、血量 25% 以下才放，斩中直接秒杀，斩不中力竭。
+    // 其余是 Astra 的方案（占位）：起手 1 秒，前 0.5 秒跟着五条悟转，之后锁定；水平斩带离地 50、半厚 10、长 960，跳得过去、闪避躲得开；
+    // 起手时挨到任何伤害就断；一局一次（起手就算用掉）；斩不中（含被打断、被闪避或瞬移躲开）力竭 3 秒。破无限。
+    public static final int SPACE_WINDUP = 120, SPACE_LOCK = 60, SPACE_EXHAUST = 360, SPACE_MIN_TICKS = 20 * HZ;
+    public static final float SPACE_RANGE = 960f, SPACE_HEIGHT = 50f, SPACE_HALF_THICKNESS = 10f;
+
+    // 宿傩的恐惧（v0.11，Astra 的方案，占位）：0–100 存成万分制。每 1 秒一个窗口：开头按局势估这一秒大概会挨多少，
+    // 结尾和实际挨到的比，多挨了就涨、少挨了就降（各难度的系数在 BattleConfig.AiTuning）。
+    public static final int FEAR_MAX = 10000, FEAR_START = 2000, FEAR_WINDOW = 120;
+    public static final int FEAR_PANIC = 6000, FEAR_CALM_DOWN = 4500; // 60 以上连连后退，降到 45 以下才停
+    public static final int SPACE_FEAR_GATE = 3000;                   // 恐惧低于 30 才敢放空间斩
     public static final float S_WORLD_RANGE = 960f, S_WORLD_HEIGHT = 50f, S_WORLD_HALF_THICKNESS = 10f;
     public static final float S_WORLD_IMPULSE_X = 420f, S_WORLD_IMPULSE_Y = 120f;
 

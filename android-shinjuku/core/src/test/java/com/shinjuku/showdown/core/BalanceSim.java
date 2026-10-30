@@ -18,6 +18,9 @@ public final class BalanceSim {
         int unlockTick = -1, worldStarted, worldFired, worldHit, domainUsed, rctUsed, tp, tpBroken, chants, chantBroken, amps;
         int agitoCast, agitoTouch, summonTry, summonBroken, summonTick = -1, mahoGoneTick = -1, mahoAdaptTick = -1, transformTick = -1;
         int tpPurple, maxPurple, maxBroken;
+        long fearSum;                       // 按有效 tick 累加的恐惧（万分制）
+        int fearTicks, fearHigh, fearPeak;  // 有效 tick 数、恐惧 60 以上的 tick 数、最高值
+        int spaceStart, spaceKill, spaceBroken, spaceReady, spaceThinks; // 空间斩：起手、斩死、起手被打断；三个硬条件同时满足过（0/1）；认真考虑过几次
         boolean mahoKilled, mahoOneShot;
         float transformHp;
     }
@@ -32,9 +35,20 @@ public final class BalanceSim {
         Result r = new Result();
         long seen = 0, lastSukunaHp = w.sukuna.hpMilli;
         // 时钟统一用 fightTicks：逻辑真正推进了一 tick 才加一（命中停顿、过场都不算）
+        int lastFight = -1;
         while (w.fightTicks < LIMIT) {
             bot.fill(w, in);
             w.step(in);
+            if (w.fightTicks != lastFight) {
+                lastFight = w.fightTicks;
+                int fear = w.sukunaFear();
+                r.fearSum += fear;
+                r.fearTicks++;
+                if (fear >= Tuning.FEAR_PANIC) r.fearHigh++;
+                r.fearPeak = Math.max(r.fearPeak, fear);
+                if (w.fightTicks >= Tuning.SPACE_MIN_TICKS && w.sukuna.hpMilli > 0 && w.sukuna.hpMilli * 4 <= w.sukuna.maxHpMilli
+                        && fear < Tuning.SPACE_FEAR_GATE) r.spaceReady = 1;
+            }
             if (w.cutscene) {
                 w.endCutscene(w.castId); // 模拟里过场直接放完
                 r.domainUsed++;
@@ -87,6 +101,10 @@ public final class BalanceSim {
                     else if (e.value[i] < 0) r.chantBroken++;
                 } else if (e.type[i] == Events.AMP && e.value[i] > 0) {
                     r.amps++;
+                } else if (e.type[i] == Events.SPACE) {
+                    if (e.value[i] == 0) r.spaceStart++;
+                    else if (e.value[i] == 3) r.spaceKill++;
+                    else if (e.value[i] < 0) r.spaceBroken++;
                 }
             }
             lastSukunaHp = w.sukuna.hpMilli;
@@ -102,6 +120,7 @@ public final class BalanceSim {
             }
         }
         r.ticks = w.fightTicks;
+        r.spaceThinks = w.ai().spaceThinks;
         if (r.summonTick >= 0 && r.mahoGoneTick < 0) r.mahoGoneTick = w.fightTicks; // 打完还在场
         r.gojoDealt = w.damageTaken[Fighter.SUKUNA];
         r.mahoTaken = w.damageTaken[Fighter.MAHORAGA];
@@ -180,6 +199,9 @@ public final class BalanceSim {
         int fired = 0, hit = 0, started = 0, rct = 0, tp = 0, tpBroken = 0, chants = 0, chantBroken = 0, amps = 0;
         long gojoDealt = 0, mahoDealt = 0, transformHeal = 0, rctHeal = 0, mahoTaken = 0;
         int tpPurple = 0, maxPurple = 0, maxBroken = 0;
+        long fearSum = 0, fearTicks = 0, fearHigh = 0;
+        int[] fearPeak = new int[n];
+        int spaceStart = 0, spaceKill = 0, spaceBroken = 0, spaceReady = 0, spaceThinks = 0;
         int agitoCast = 0, agitoTouch = 0, summonTry = 0, summonBroken = 0, summoned = 0, mahoKilled = 0, oneShot = 0, adapted = 0, transformed = 0;
         int[] mahoLife = new int[n];
         float transformHpSum = 0;
@@ -209,6 +231,15 @@ public final class BalanceSim {
             tpPurple += r.tpPurple;
             maxPurple += r.maxPurple;
             maxBroken += r.maxBroken;
+            fearSum += r.fearSum;
+            fearTicks += r.fearTicks;
+            fearHigh += r.fearHigh;
+            fearPeak[i] = r.fearPeak;
+            spaceStart += r.spaceStart;
+            spaceKill += r.spaceKill;
+            spaceBroken += r.spaceBroken;
+            spaceReady += r.spaceReady;
+            spaceThinks += r.spaceThinks;
             rctHeal += r.heal;
             transformHeal += r.transformHeal;
             mahoTaken += r.mahoTaken;
@@ -244,6 +275,10 @@ public final class BalanceSim {
         System.out.printf("  每局：瞬移成功 %.2f（其中瞬移·茈 %.2f）、前摇被打断 %.2f；念咒 %.2f、被打断 %.2f；茈·最大输出 %.2f（被打断 %.2f）；展延 %.2f 次%n",
                 tp / (double) n, tpPurple / (double) n, tpBroken / (double) n, chants / (double) n, chantBroken / (double) n,
                 maxPurple / (double) n, maxBroken / (double) n, amps / (double) n);
+        Arrays.sort(fearPeak);
+        System.out.printf("  恐惧：平均 %.1f，60 以上占 %.1f%% 的时间，每局最高值的中位数 %.0f；空间斩：%d 局满足过硬条件，考虑 %d 次，起手 %d 次（被打断 %d）、斩死 %d 次%n",
+                fearTicks == 0 ? 0 : fearSum / 100.0 / fearTicks, fearTicks == 0 ? 0 : 100.0 * fearHigh / fearTicks, fearPeak[n / 2] / 100.0,
+                spaceReady, spaceThinks, spaceStart, spaceBroken, spaceKill);
     }
 
     private static String sec(int[] a, int n) {
