@@ -573,4 +573,111 @@ class BattlePreviewTest {
             steps(70)
         })
     }
+
+    /** 同时按住苍和赫，一直念；到了固定动作的第 cineTick 个 tick 停下（-1 表示停在咏唱第 chantTicks 个 tick）。 */
+    private fun Scene.purpleMax(cineTick: Int, chantTicks: Int = 0) {
+        input.blueDown = true; input.blueHeld = true; input.red = true; input.redHeld = true
+        steps(2)
+        input.blueHeld = true; input.redHeld = true
+        if (cineTick < 0) {
+            steps(chantTicks)
+            return
+        }
+        var n = 0
+        while (n < 3000 && !(world.cine != 0 && world.cineTick >= cineTick)) { steps(1); n++ }
+        input.blueHeld = false; input.redHeld = false
+    }
+
+    /** 茈·最大输出：同时按住苍和赫念十段咒词（这里念到赫的那三段）。 */
+    @Test
+    fun purpleMaxChant() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 300f; world.sukuna.x = 900f
+            steps(10)
+            purpleMax(-1, 150)
+        })
+    }
+
+    /** 固定动作：苍在天上张开，宿傩被吸上去，五条悟浮在空中，赫射向天空。 */
+    @Test
+    fun purpleMaxRedRises() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 200f; world.sukuna.x = 800f
+            steps(10)
+            purpleMax(330)
+        })
+    }
+
+    /** 魔虚罗在场的版本：宿傩射「穿血」、魔虚罗跳起来挥剑，想阻止苍和赫接触。 */
+    @Test
+    fun purpleMaxInterference() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.URAUME, { it.sukunaAi = false }) {
+            world.gojo.x = 200f; world.sukuna.x = 820f
+            steps(10)
+            world.sukunaIntent.summon = true
+            stepsUntil(Events.SUMMON, 10)
+            stepsUntil(Events.SUMMON, 200)
+            steps(30)
+            openDomain() // 先用领域把他们定住，咒词才念得完
+            purpleMax(505)
+        })
+    }
+
+    /** 追加咏唱（位相、黄昏、智慧之瞳）：苍变大，把宿傩吸回去。 */
+    @Test
+    fun purpleMaxExtraChant() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 200f; world.sukuna.x = 800f
+            steps(10)
+            purpleMax(810)
+        })
+    }
+
+    /** 苍和赫在空中相撞。 */
+    @Test
+    fun purpleMaxContact() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 200f; world.sukuna.x = 800f
+            steps(10)
+            purpleMax(1010)
+        })
+    }
+
+    /** 爆成大范围的茈（3500）。 */
+    @Test
+    fun purpleMaxBlast() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 200f; world.sukuna.x = 800f
+            steps(10)
+            purpleMax(1090)
+        })
+    }
+
+    /** 瞬移·茈：拍拍宿傩的肩膀。 */
+    @Test
+    fun teleportPurpleTap() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 360f; world.sukuna.x = 720f
+            steps(10)
+            input.dodgeHeld = true; input.purple = true
+            steps(1)
+            input.dodgeHeld = false
+            var n = 0
+            while (n < 400 && !(world.gojo.state == com.shinjuku.showdown.core.Fighter.TP_PURPLE && world.gojo.stateTick >= com.shinjuku.showdown.core.Tuning.TP_PURPLE_TAP + 2)) { steps(1); n++ }
+        })
+    }
+
+    /** 瞬移·茈：宿傩回头，贴脸一发茈。 */
+    @Test
+    fun teleportPurpleFire() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 360f; world.sukuna.x = 720f
+            steps(10)
+            input.dodgeHeld = true; input.purple = true
+            steps(1)
+            input.dodgeHeld = false
+            var n = 0
+            while (n < 400 && !(world.gojo.state == com.shinjuku.showdown.core.Fighter.TP_PURPLE && world.gojo.stateTick >= com.shinjuku.showdown.core.Tuning.TP_PURPLE_FIRE + 4)) { steps(1); n++ }
+        })
+    }
 }

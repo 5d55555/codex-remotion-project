@@ -146,7 +146,7 @@ public final class World {
         }
         controlGojo(in);
         gojo.invuln = gojo.state == Fighter.DODGE || gojo.state == Fighter.TP_BLUE || gojo.state == Fighter.TP_RED || gojo.state == Fighter.TP_PURPLE;
-        if (cutscene) return; // 这一 tick 按了领域展开：停在这里等过场
+        if (cutscene || cine != CINE_NONE) return; // 这一 tick 按了领域展开（停在这里等过场）或开始了固定动作（全场从这一 tick 起就暂停）
         if (config.sukunaAi) ai.think(this, sukunaIntent);
         controlSukuna(sukunaIntent);
         if (!config.sukunaAi) sukunaIntent.clear();
@@ -205,6 +205,12 @@ public final class World {
 
     private boolean blueNextIsUp() {
         return bqSize > 0 && !bqDown[bqHead];
+    }
+
+    /** 苍的队列里有没有还没处理的松开（茈·最大输出只认一直按着的苍：松开过一下就不算）。 */
+    private boolean blueUpQueued() {
+        for (int i = 0; i < bqSize; i++) if (!bqDown[(bqHead + i) % BQ]) return true;
+        return false;
     }
 
     private void clearInputs() {
@@ -281,7 +287,7 @@ public final class World {
                 move(g, in.moveX, 1f);
                 updateAim(in);
                 if (dodgeIntoTeleport(Attack.BLUE_FIST)) break; // 按着苍点闪避：瞬移
-                if (in.redHeld && maxPurpleReady()) {           // 苍和赫同时按住：茈·最大输出
+                if (in.redHeld && in.blueHeld && !blueUpQueued() && maxPurpleReady()) { // 苍和赫同时按住：茈·最大输出
                     startMaxChant();
                     break;
                 }
@@ -300,7 +306,7 @@ public final class World {
                 drive(g, 0);
                 updateAim(in);
                 if (dodgeIntoTeleport(Attack.BLUE_FIST)) break;
-                if (in.redHeld && bufRed > 0 && maxPurpleReady()) { // 念着苍又按住赫：改念茈·最大输出
+                if (in.redHeld && bufRed > 0 && in.blueHeld && !blueUpQueued() && maxPurpleReady()) { // 念着苍又按住赫：改念茈·最大输出
                     startMaxChant();
                     break;
                 }
@@ -339,7 +345,7 @@ public final class World {
             case Fighter.RED_HOLD: // 赫起手：松开就放普通赫；一直按住到 RED_HOLD 就蓄成最大输出
                 drive(g, 0);
                 if (dodgeIntoTeleport(Attack.RED)) break; // 按着赫（或刚点完赫）点闪避：瞬移
-                if (in.redHeld && !redLetGo && in.blueHeld && maxPurpleReady()) { // 赫和苍同时按住：茈·最大输出
+                if (in.redHeld && !redLetGo && in.blueHeld && !blueUpQueued() && maxPurpleReady()) { // 赫和苍同时按住：茈·最大输出
                     startMaxChant();
                     break;
                 }
@@ -354,7 +360,7 @@ public final class World {
             case Fighter.RED_CHANT: // 念咒：不能动；松手或被攻击碰到就打断
                 drive(g, 0);
                 if (dodgeIntoTeleport(Attack.RED)) break;
-                if (in.redHeld && !redLetGo && in.blueHeld && blueNextIsDown() && maxPurpleReady()) { // 念着赫又按住苍
+                if (in.redHeld && !redLetGo && in.blueHeld && blueNextIsDown() && !blueUpQueued() && maxPurpleReady()) { // 念着赫又按住苍
                     startMaxChant();
                     break;
                 }
@@ -397,7 +403,7 @@ public final class World {
             }
             case Fighter.PURPLE_MAX_CHANT: { // 茈·最大输出：苍三段、赫三段、茈四段；松开苍或赫、被攻击碰到都会打断
                 drive(g, 0);
-                if (blueNextIsUp() || (bqSize == 0 && !in.blueHeld) || !in.redHeld || redLetGo) {
+                if (blueUpQueued() || !in.blueHeld || !in.redHeld || redLetGo) { // 松开过一下（哪怕又按回去）也算松开
                     breakChant();
                     break;
                 }
@@ -900,6 +906,9 @@ public final class World {
         enter(g, Fighter.FREE);
         clearInputs();
         events.emit(Events.CINE, cineSx, cineSy, Events.CINE_END, tick);
+        // 打空血的现在就结算（不然下一 tick 零血的五条悟还能先出招）
+        if (m.present && m.hpMilli == 0) removeMahoraga(0);
+        for (int i = 0; i < 2; i++) if (fighter(i).hpMilli == 0) knockOut(fighter(i));
     }
 
     /** 自由状态：走、跳、出招。缓冲着的按键在这里兑现。 */
@@ -2211,20 +2220,7 @@ public final class World {
         for (int i = 0; i < 2; i++) {
             Fighter f = fighter(i);
             if (f.state != Fighter.KO && f.hpMilli == 0) {
-                if (f == gojo) breakChant(); // 念咒（或按住茈的起手）中倒下：打断
-                endScript();
-                f.downTicks = 0;
-                if (f != gojo) {
-                    interruptSukuna();
-                    if (ampTicks > 0) closeAmp();
-                    agito.active = false;
-                    removeMahoraga(1); // 宿傩倒下：式神跟着消失（一局只能召一次，复活也不会回来）
-                }
-                f.state = Fighter.KO;
-                f.stateTick = 0;
-                f.captured = false;
-                f.koTimer = Tuning.KO_TICKS;
-                events.emit(Events.KO, f.x, f.centerY(), 0, f.id, tick);
+                knockOut(f);
             } else if (f.state == Fighter.KO && --f.koTimer <= 0) {
                 f.state = Fighter.FREE;
                 f.stateTick = 0;
@@ -2234,7 +2230,25 @@ public final class World {
         }
         // 宿傩自由的时候面向五条悟（出招时锁定方向）
         Fighter s = sukuna;
-        if (s.state == Fighter.FREE && s.hitstun == 0 && !s.scripted) s.facing = gojo.x >= s.x ? 1 : -1; // 固定动作里不动
+        // 瞬移·茈：拍肩前背对着、拍肩后才回头（朝向由脚本定）
+        if (s.state == Fighter.FREE && s.hitstun == 0 && !(s.scripted && gojo.state == Fighter.TP_PURPLE)) s.facing = gojo.x >= s.x ? 1 : -1;
+    }
+
+    private void knockOut(Fighter f) {
+        if (f == gojo) breakChant(); // 念咒（或按住茈的起手）中倒下：打断
+        endScript();
+        f.downTicks = 0;
+        if (f != gojo) {
+            interruptSukuna();
+            if (ampTicks > 0) closeAmp();
+            agito.active = false;
+            removeMahoraga(1); // 宿傩倒下：式神跟着消失（一局只能召一次，复活也不会回来）
+        }
+        f.state = Fighter.KO;
+        f.stateTick = 0;
+        f.captured = false;
+        f.koTimer = Tuning.KO_TICKS;
+        events.emit(Events.KO, f.x, f.centerY(), 0, f.id, tick);
     }
 
     /* ---------------- 给画面读的状态 ---------------- */

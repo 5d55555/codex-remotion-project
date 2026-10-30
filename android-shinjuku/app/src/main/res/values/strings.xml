@@ -14,5 +14,5 @@
     <string name="arrow_back" translatable="false">←</string>
     <string name="select_title">选择难度</string>
     <string name="select_sub">新宿决战 · 宿傩</string>
-    <string name="version">v0.8</string>
+    <string name="version">v0.9</string>
 </resources>

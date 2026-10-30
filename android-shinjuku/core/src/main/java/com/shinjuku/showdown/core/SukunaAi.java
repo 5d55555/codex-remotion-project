@@ -107,8 +107,9 @@ final class SukunaAi {
             }
         }
 
-        // 五条悟在念 200% 茈或茈·最大输出：反应过来就去打断（里梅以上由战术层统一处理苍、赫、茈的咏唱）
-        if (t.tacticLevel == 0 && (g.state == Fighter.PURPLE_CHANT || g.state == Fighter.PURPLE_MAX_CHANT)) {
+        // 五条悟在念 200% 茈、茈·最大输出或瞬移·茈的咒词：反应过来就去打断（里梅以上由战术层统一处理苍、赫、茈的咏唱）
+        if (t.tacticLevel == 0 && (g.state == Fighter.PURPLE_CHANT || g.state == Fighter.PURPLE_MAX_CHANT
+                || g.state == Fighter.TP_WINDUP && w.tpKind() == Attack.PURPLE)) {
             if (!chantSeen) {
                 chantSeen = true;
                 chantReact = rng.nextUnitDouble() < t.mistake ? -1 : range(t.reactMin, t.reactMax);

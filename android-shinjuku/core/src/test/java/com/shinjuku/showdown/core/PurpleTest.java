@@ -65,7 +65,7 @@ public class PurpleTest {
         assertEquals("宿傩没开展延", 0, w.ampTicks);
         assertEquals(sHp - Tuning.PURPLE_MAX_DAMAGE_MILLI, w.sukuna.hpMilli);
         assertEquals("离得远：五条悟不挨", gHp, w.gojo.hpMilli);
-        assertEquals("冷却 60 秒（开始那一 tick 走了一格，固定动作里不走）", Tuning.PURPLE_MAX_COOLDOWN - 1, w.purpleCd);
+        assertEquals("冷却 60 秒（从开始那一 tick 起就不走）", Tuning.PURPLE_MAX_COOLDOWN, w.purpleCd);
         assertTrue(w.blueCd > 0 && w.redCd > 0);
         run(w, in, 400);
         assertTrue("宿傩掉回地上", w.sukuna.onGround);
@@ -83,6 +83,23 @@ public class PurpleTest {
         chantMax(w, in);
         while (w.cine != World.CINE_NONE) run(w, in, 1);
         assertEquals(gHp - Tuning.PURPLE_MAX_SELF_DAMAGE_MILLI, w.gojo.hpMilli);
+    }
+
+    /** 自伤 700 把自己打空：固定动作一结束就倒下，不能先按领域。 */
+    @Test
+    public void maxPurpleSelfKoEndsAtOnce() {
+        World w = world(c -> { });
+        TickInput in = new TickInput();
+        w.gojo.x = 500;
+        w.sukuna.x = 700;
+        w.gojo.hpMilli = Tuning.PURPLE_MAX_SELF_DAMAGE_MILLI - 1000;
+        chantMax(w, in);
+        while (w.cine != World.CINE_NONE) run(w, in, 1);
+        assertEquals(Fighter.KO, w.gojo.state);
+        in.domain = true;
+        run(w, in, 1);
+        assertFalse("零血不能开领域", w.cutscene);
+        assertEquals(0, w.domainTicks);
     }
 
     /** 魔虚罗在场的版本：它也挨 3500，被打掉。 */
@@ -120,6 +137,19 @@ public class PurpleTest {
         assertTrue(w.gojo.state != Fighter.PURPLE_MAX_CHANT);
         assertTrue(w.blueFailLock > 0 && w.redFailLock > 0 && w.purpleFailLock > 0);
         assertEquals("不进冷却", 0, w.purpleCd);
+
+        // 两次采样之间松开又按回苍（同一 tick 里有按下和松开）：也算松开
+        World q = world(c -> { });
+        TickInput qi = new TickInput();
+        qi.blueDown = qi.blueHeld = true;
+        qi.red = qi.redHeld = true;
+        run(q, qi, 3);
+        qi.blueHeld = qi.redHeld = true;
+        run(q, qi, 50);
+        assertEquals(Fighter.PURPLE_MAX_CHANT, q.gojo.state);
+        qi.blueDown = qi.blueUp = true;
+        run(q, qi, 1);
+        assertTrue(q.gojo.state != Fighter.PURPLE_MAX_CHANT);
 
         World h = world(c -> { });
         TickInput hi = new TickInput();

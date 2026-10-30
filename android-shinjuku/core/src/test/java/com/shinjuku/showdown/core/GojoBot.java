@@ -33,7 +33,7 @@ final class GojoBot {
     void fill(World w, TickInput in) {
         in.clearEdges();
         in.moveX = in.moveY = 0;
-        in.blueHeld = false;
+        in.blueHeld = in.redHeld = in.purpleHeld = in.dodgeHeld = false; // 按住的键每 tick 重新决定（下面按住着的招会再按上）
         Fighter g = w.gojo, s = w.sukuna;
         float dx = s.x - g.x, d = Math.abs(dx);
         int toward = dx >= 0 ? 1 : -1;
@@ -131,8 +131,10 @@ final class GojoBot {
         } else {
             mahoSeenAt = -1;
         }
+        // 攒招（标准、熟练）：领域还没开时先不用苍、赫、茈和瞬移，三个都好了再开领域念茈·最大输出；拖到 30 秒就照常开
+        boolean saving = level != BASIC && !domainUsed && w.domainCd == 0 && w.fightTicks < SAVE_LIMIT;
         boolean mahoTarget = maho && w.tick >= mahoReactAt;
-        if (mahoTarget && w.purpleCd == 0 && purpleSafe(w)) {
+        if (!saving && mahoTarget && w.purpleCd == 0 && purpleSafe(w)) {
             int mdir = m.x >= g.x ? 1 : -1;
             boolean both = (s.x - g.x) * mdir > 0 && s.state != Fighter.KO; // 宿傩也在同一边：一发穿两个
             if (both || level != SKILLED || w.tick >= mahoReactAt + 60) {
@@ -143,7 +145,7 @@ final class GojoBot {
         }
 
         // 瞬移连段：标准、熟练好了就用（茈好了就按住闪避点茈；不然点苍；苍在冷却就点赫）
-        if (level != BASIC && w.tpCd == 0 && !sukunaStuck && s.state != Fighter.KO) {
+        if (!saving && level != BASIC && w.tpCd == 0 && !sukunaStuck && s.state != Fighter.KO) {
             if (w.purpleCd == 0 && w.purpleFailLock == 0 && purpleSafe(w) && !(w.domainTicks > 0 && maxReady(w))) {
                 in.dodgeHeld = true;
                 in.purple = true;
@@ -162,7 +164,7 @@ final class GojoBot {
         }
 
         // 熟练：开着展延的宿傩贴上来，先用苍或赫把他控住、推开
-        if (level == SKILLED && w.ampTicks > 0 && d < 200 && !sukunaStuck) {
+        if (!saving && level == SKILLED && w.ampTicks > 0 && d < 200 && !sukunaStuck) {
             if (w.blueCd == 0 && w.blueFailLock == 0) {
                 in.blueDown = in.blueUp = true;
                 return;
@@ -174,9 +176,17 @@ final class GojoBot {
         }
 
         // 领域：标准、熟练每局开一次
-        if (level != BASIC && !domainUsed && w.domainCd == 0 && w.domainTicks == 0 && d < 600) {
+        if (level != BASIC && !domainUsed && w.domainCd == 0 && w.domainTicks == 0 && d < 600 && (maxReady(w) || !saving)) {
             in.domain = true;
             domainUsed = true;
+            return;
+        }
+        if (saving) { // 攒着：只打体术
+            if (d <= Tuning.MELEE_REACH) {
+                if (w.meleeCd == 0) in.melee = true;
+                return;
+            }
+            in.moveX = toward;
             return;
         }
         // 茈·最大输出：领域里苍、赫、茈都好了就念（宿傩动不了，十段咒词念得完）
@@ -224,6 +234,8 @@ final class GojoBot {
         }
         in.moveX = toward;
     }
+
+    private static final int SAVE_LIMIT = 30 * Tuning.HZ;
 
     private static boolean maxReady(World w) {
         return w.blueCd == 0 && w.redCd == 0 && w.purpleCd == 0 && w.blueFailLock == 0 && w.redFailLock == 0 && w.purpleFailLock == 0;
