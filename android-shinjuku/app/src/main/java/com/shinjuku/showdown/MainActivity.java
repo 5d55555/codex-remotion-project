@@ -10,11 +10,11 @@ import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.Toast;
 
-/** 主页：标题 + 从上到下三个选项（开始游戏、空置、空置）。 */
+/** 主页：标题 + 从上到下三个选项（开始游戏、神战模式（暂未开放）、空置）。 */
 public class MainActivity extends Activity {
 
     private static final long TOAST_GAP_MS = 2500; // 连点时这段时间内不重复弹
-    private static final int[] ENTRANCE = {R.id.title, R.id.subtitle, R.id.btn_start, R.id.btn_vacant_1, R.id.btn_vacant_2};
+    private static final int[] ENTRANCE = {R.id.title, R.id.subtitle, R.id.btn_start, R.id.btn_god_war, R.id.btn_vacant};
 
     private ShinjukuView scene;
     private FrameStatsView stats;
@@ -43,17 +43,9 @@ public class MainActivity extends Activity {
             startActivity(new Intent(this, SelectActivity.class));
         });
 
-        // 空置：弹出“未开放”。2.5 秒内的重复点击直接忽略；要弹新的先撤掉旧的。
-        View.OnClickListener notOpen = v -> {
-            long now = SystemClock.uptimeMillis();
-            if (now - toastAt < TOAST_GAP_MS) return;
-            toastAt = now;
-            if (toast != null) toast.cancel();
-            toast = Toast.makeText(this, R.string.not_open, Toast.LENGTH_SHORT);
-            toast.show();
-        };
-        findViewById(R.id.btn_vacant_1).setOnClickListener(notOpen);
-        findViewById(R.id.btn_vacant_2).setOnClickListener(notOpen);
+        // 神战模式（暂未开放）、空置：弹出提示。2.5 秒内的重复点击直接忽略；要弹新的先撤掉旧的。
+        findViewById(R.id.btn_god_war).setOnClickListener(v -> notOpen(R.string.god_war_not_open));
+        findViewById(R.id.btn_vacant).setOnClickListener(v -> notOpen(R.string.not_open));
 
         // 长按版本号：打开/关闭帧率监视
         findViewById(R.id.version).setOnLongClickListener(v -> {
@@ -96,6 +88,15 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         if (isFinishing()) bgm.release();
         super.onDestroy();
+    }
+
+    private void notOpen(int message) {
+        long now = SystemClock.uptimeMillis();
+        if (now - toastAt < TOAST_GAP_MS) return;
+        toastAt = now;
+        if (toast != null) toast.cancel();
+        toast = Toast.makeText(this, message, Toast.LENGTH_SHORT);
+        toast.show();
     }
 
     /** 进场：标题先浮现，三个选项依次升上来；全部到位约 0.75 秒。 */

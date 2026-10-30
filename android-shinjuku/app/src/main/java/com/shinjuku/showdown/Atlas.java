@@ -21,7 +21,11 @@ final class Atlas {
     // 像素大字（白字黑边，画的时候按颜色乘）
     static final int BIG_BLUE = 21, BIG_RED = 22, BIG_PURPLE = 23, BIG_BLACK_FLASH = 24, BIG_KO = 25, BIG_FIST = 26, BIG_VOID = 27,
             BIG_DISMANTLE = 28;
-    static final int COUNT = 29;
+    // 宿傩的原身（四臂：arm2 是多出来的一对）、魔虚罗（前手是退魔之剑）、嵌合兽「顎吐」
+    static final int TRUE_HEAD = 29, TRUE_TORSO = 30, TRUE_ARM = 31, TRUE_ARM2 = 32;
+    static final int MAHO_HEAD = 33, MAHO_TORSO = 34, MAHO_ARM = 35, MAHO_SWORD = 36, MAHO_LEG = 37, AGITO = 38;
+    static final int BIG_MAHORAGA = 39, BIG_TRUE_FORM = 40; // 「魔虚罗」「原身」
+    static final int COUNT = 41;
 
     static final String[] BIG_TEXT = {"「苍」", "「赫」", "「茈」", "黑闪", "击倒", "「苍拳」", "「无量空处」", "「解」"};
     static final int[] BIG_SIZE = {28, 28, 28, 30, 15, 28, 28, 28};
@@ -52,6 +56,16 @@ final class Atlas {
             px[i] = piv[i][0];
             py[i] = piv[i][1];
         }
+        extra(parts, TRUE_HEAD, PixelArt.SUKUNA_TRUE_HEAD, PixelArt.PAL_SUKUNA_TRUE_KEYS, PixelArt.PAL_SUKUNA_TRUE, PixelArt.SUKUNA_TRUE_HEAD_PX, PixelArt.SUKUNA_TRUE_HEAD_PY);
+        extra(parts, TRUE_TORSO, PixelArt.SUKUNA_TRUE_TORSO, PixelArt.PAL_SUKUNA_TRUE_KEYS, PixelArt.PAL_SUKUNA_TRUE, PixelArt.SUKUNA_TRUE_TORSO_PX, PixelArt.SUKUNA_TRUE_TORSO_PY);
+        extra(parts, TRUE_ARM, PixelArt.SUKUNA_TRUE_ARM, PixelArt.PAL_SUKUNA_TRUE_KEYS, PixelArt.PAL_SUKUNA_TRUE, PixelArt.SUKUNA_TRUE_ARM_PX, PixelArt.SUKUNA_TRUE_ARM_PY);
+        extra(parts, TRUE_ARM2, PixelArt.SUKUNA_TRUE_ARM2, PixelArt.PAL_SUKUNA_TRUE_KEYS, PixelArt.PAL_SUKUNA_TRUE, PixelArt.SUKUNA_TRUE_ARM2_PX, PixelArt.SUKUNA_TRUE_ARM2_PY);
+        extra(parts, MAHO_HEAD, PixelArt.MAHORAGA_HEAD, PixelArt.PAL_MAHORAGA_KEYS, PixelArt.PAL_MAHORAGA, PixelArt.MAHORAGA_HEAD_PX, PixelArt.MAHORAGA_HEAD_PY);
+        extra(parts, MAHO_TORSO, PixelArt.MAHORAGA_TORSO, PixelArt.PAL_MAHORAGA_KEYS, PixelArt.PAL_MAHORAGA, PixelArt.MAHORAGA_TORSO_PX, PixelArt.MAHORAGA_TORSO_PY);
+        extra(parts, MAHO_ARM, PixelArt.MAHORAGA_ARM, PixelArt.PAL_MAHORAGA_KEYS, PixelArt.PAL_MAHORAGA, PixelArt.MAHORAGA_ARM_PX, PixelArt.MAHORAGA_ARM_PY);
+        extra(parts, MAHO_SWORD, PixelArt.MAHORAGA_SWORD, PixelArt.PAL_MAHORAGA_KEYS, PixelArt.PAL_MAHORAGA, PixelArt.MAHORAGA_SWORD_PX, PixelArt.MAHORAGA_SWORD_PY);
+        extra(parts, MAHO_LEG, PixelArt.MAHORAGA_LEG, PixelArt.PAL_MAHORAGA_KEYS, PixelArt.PAL_MAHORAGA, PixelArt.MAHORAGA_LEG_PX, PixelArt.MAHORAGA_LEG_PY);
+        extra(parts, AGITO, PixelArt.AGITO_BODY, PixelArt.PAL_AGITO_KEYS, PixelArt.PAL_AGITO, PixelArt.AGITO_BODY_PX, PixelArt.AGITO_BODY_PY);
         String[][] digits = {PixelArt.DIGIT_0, PixelArt.DIGIT_1, PixelArt.DIGIT_2, PixelArt.DIGIT_3, PixelArt.DIGIT_4,
                 PixelArt.DIGIT_5, PixelArt.DIGIT_6, PixelArt.DIGIT_7, PixelArt.DIGIT_8, PixelArt.DIGIT_9, PixelArt.DIGIT_SLASH};
         for (int i = 0; i < digits.length; i++) parts[DIGIT0 + i] = outlined(part(digits[i], PixelArt.PAL_FONT_KEYS, PixelArt.PAL_FONT));
@@ -59,6 +73,8 @@ final class Atlas {
         parts[ICON_NOTE] = outlined(part(PixelArt.ICON_NOTE, PixelArt.PAL_FONT_KEYS, PixelArt.PAL_FONT));
         // 大字描两圈边（2 像素），在亮的天空上也看得清
         for (int i = 0; i < BIG_TEXT.length; i++) parts[BIG_BLUE + i] = outlined(outlined(pixelText(BIG_TEXT[i], BIG_SIZE[i])));
+        parts[BIG_MAHORAGA] = outlined(outlined(pixelText("「魔虚罗」", 28)));
+        parts[BIG_TRUE_FORM] = outlined(outlined(pixelText("「原身」", 28)));
 
         // 简单的分行装箱
         int atlasW = 256, cx = PAD, cy = PAD, rowH = 0;
@@ -84,6 +100,12 @@ final class Atlas {
             c.drawBitmap(parts[i], x[i], y[i], null);
             parts[i].recycle();
         }
+    }
+
+    private void extra(Bitmap[] parts, int i, String[] rows, String keys, int[] pal, int pivotX, int pivotY) {
+        parts[i] = part(rows, keys, pal);
+        px[i] = pivotX;
+        py[i] = pivotY;
     }
 
     /** 字符画 → 位图。 */

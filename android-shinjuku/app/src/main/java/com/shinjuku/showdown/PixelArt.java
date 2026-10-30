@@ -11,6 +11,12 @@ final class PixelArt {
     static final int[] PAL_GOJO = {0xFF0B0B14, 0xFFFFFFFF, 0xFFE4E6F0, 0xFFB4BCD0, 0xFF8A93AD, 0xFFFBE6D6, 0xFFE7C3AE, 0xFFFFFFFF, 0xFFC9F4FF, 0xFF5AB8F2, 0xFF285A9B, 0xFFB5636A, 0xFF1B1E27, 0xFF383E4C, 0xFF0A0B10, 0xFF4E5568, 0xFF22252F, 0xFF353A47, 0xFF050507, 0xFF2A2D36};
     static final String PAL_SUKUNA_KEYS = "KWHhgSsELBbqmCcdznNoO";
     static final int[] PAL_SUKUNA = {0xFF050508, 0xFF4A5270, 0xFF252937, 0xFF171A24, 0xFF0D0F15, 0xFFF3DCCB, 0xFFDDB9A6, 0xFFFFFFFF, 0xFFFF9AA0, 0xFFE0303F, 0xFF7A1020, 0xFF1A0F14, 0xFF9C4A52, 0xFF1E2333, 0xFF3A4260, 0xFF0C0E16, 0xFF4C5578, 0xFF1A1E2B, 0xFF2E3548, 0xFF050507, 0xFF2A2D36};
+    static final String PAL_SUKUNA_TRUE_KEYS = "KWHhgSsELBbqmCcdznNoO";
+    static final int[] PAL_SUKUNA_TRUE = {0xFF050508, 0xFFFFC9C2, 0xFFF0948E, 0xFFC66A70, 0xFF8E4552, 0xFFF3DCCB, 0xFFDDB9A6, 0xFFFFFFFF, 0xFFFF9AA0, 0xFFE0303F, 0xFF7A1020, 0xFF140A0E, 0xFF9C4A52, 0xFFF2EEE6, 0xFFFFFFFF, 0xFFB9B3A8, 0xFF2A2D36, 0xFF1A1E2B, 0xFF2E3548, 0xFF050507, 0xFF2A2D36};
+    static final String PAL_MAHORAGA_KEYS = "KWSsgVvqnNyBbLh";
+    static final int[] PAL_MAHORAGA = {0xFF07070B, 0xFFFAF7F0, 0xFFD8D2C6, 0xFFA9A296, 0xFF6E685F, 0xFFF3EFE6, 0xFFB9B1A2, 0xFF3A2024, 0xFF26232C, 0xFF3B3644, 0xFFC29A4E, 0xFFE4ECF4, 0xFF93A0AE, 0xFFFFFFFF, 0xFF4A3E34};
+    static final String PAL_AGITO_KEYS = "KWwAaFfRrBbE";
+    static final int[] PAL_AGITO = {0xFF05040A, 0xFFF2EEF6, 0xFFB8B2C4, 0xFF1E1A2C, 0xFF37304E, 0xFF0F0C18, 0xFF2B2440, 0xFFC8B48A, 0xFF8E7A55, 0xFF6FE0FF, 0xFFFFFFFF, 0xFFFF3A4A};
     static final String PAL_FONT_KEYS = "W";
     static final int[] PAL_FONT = {0xFFFFFFFF};
 
@@ -193,6 +199,256 @@ final class PixelArt {
             "KoOoooK",
             "KoooooK",
             ".KKKKK.",
+    };
+
+    static final int SUKUNA_TRUE_HEAD_PX = 15, SUKUNA_TRUE_HEAD_PY = 27;
+    static final String SUKUNA_TRUE_HEAD_PAL = "sukuna_true";
+    static final String[] SUKUNA_TRUE_HEAD = {
+            ".....K......K.....K......K....",
+            ".....KWK....KWK..KWK....KWK...",
+            "K.....KWK..KWHK.KWHK...KWHK...",
+            "KWK...KWHK.KWHhKKWHhK.KWHhK..K",
+            ".KWKK.KWHhKKWHhKKWHhKKKWHhK.KW",
+            ".KWHHKKWHhHKWHHhWHHHhKWHHhKKWH",
+            "..KWHhKWHHHhHHHHhHHHHhHHHhWHHK",
+            ".KWHHHhHHHHHHHHHHHHHHHHHHHHhK.",
+            "KWHHHHHHHHWWHHHHHHWWHHHHHHHhhK",
+            ".KhHHHHHHHHHHHHHHHHHHHHHHHHhhK",
+            "KhhhHHHHHHHHHHHHHHHHHHHHHHHhhK",
+            "KghhhHHHHHHHHHHHHHHHHHHHHHhhhK",
+            ".KghhhHHHhhHHHHhhHHHHhhHHHhhK.",
+            ".KghhhHHhKhHHHhKKhHHhKKhHHhK..",
+            "..KghhHhKSKhHhKSSKhHKSSKhHhK..",
+            "..KghhhKqSSKhKSSSSKhKSSSSKhK..",
+            "..KgghhKqSSSKSSSSSSKSSSSSKhK..",
+            "...KgghKqqKKKKSSSSSKKKKKKSK...",
+            "...KgghKSqSEbbSSSSSSEbbbKSK...",
+            "....KghKSSqBBBSSSSSSBBBBSSK...",
+            "....KghKqSSBLBqqSSSSBLLBqqK...",
+            ".....KKKqqSEbbSSSSSSEbbbKSK...",
+            ".......KsqSBBBSSSSSSBBBBSSK...",
+            ".......KssSqqSSKKKKKSSqqSK....",
+            "........KssSSSSSSESSSSSSK.....",
+            ".........KKssSSSSSSSSKK.......",
+            "...........KKKKKKKKKK.........",
+    };
+
+    static final int SUKUNA_TRUE_TORSO_PX = 8, SUKUNA_TRUE_TORSO_PY = 16;
+    static final String SUKUNA_TRUE_TORSO_PAL = "sukuna_true";
+    static final String[] SUKUNA_TRUE_TORSO = {
+            "......KKKKK......",
+            "....KKCcSScKK....",
+            "...KCcCSSSSdCK...",
+            "..KCcCSqSSqSdCK..",
+            ".KCcCSqSSSSqSdCK.",
+            "KCcCSqSSSSSSqSdCK",
+            "KCcCSSSSSSSSSSdCK",
+            "KCcCSKKKKKKKKSdCK",
+            ".KCcKEmEmEmEmKdCK",
+            ".KCcSKKKKKKKKSdCK",
+            ".KCcCSqSSSSqSdCK.",
+            "..KzzzzzzzzzzzzK.",
+            "..KzzzzzzzzzzzzK.",
+            "..KnNnnnnnnnnndK.",
+            "..KnNnnnnnnnnndK.",
+            "..KnnnnnKnnnnndK.",
+            "...KKKKK.KKKKKK..",
+    };
+
+    static final int SUKUNA_TRUE_ARM_PX = 2, SUKUNA_TRUE_ARM_PY = 1;
+    static final String SUKUNA_TRUE_ARM_PAL = "sukuna_true";
+    static final String[] SUKUNA_TRUE_ARM = {
+            ".KKK.",
+            "KcCCK",
+            "KcCCK",
+            "KcCdK",
+            "KcCdK",
+            "KcCdK",
+            "KCCdK",
+            ".KSsK",
+            ".KqqK",
+            ".KSsK",
+            "KSSsK",
+            "KSSsK",
+            ".KKK.",
+    };
+
+    static final int SUKUNA_TRUE_ARM2_PX = 2, SUKUNA_TRUE_ARM2_PY = 1;
+    static final String SUKUNA_TRUE_ARM2_PAL = "sukuna_true";
+    static final String[] SUKUNA_TRUE_ARM2 = {
+            ".KKK.",
+            "KSSsK",
+            "KSSsK",
+            "KqqqK",
+            "KSSsK",
+            "KSSsK",
+            ".KSsK",
+            ".KqqK",
+            ".KSsK",
+            "KSSsK",
+            "KSSsK",
+            ".KKK.",
+    };
+
+    static final int MAHORAGA_HEAD_PX = 13, MAHORAGA_HEAD_PY = 25;
+    static final String MAHORAGA_HEAD_PAL = "mahoraga";
+    static final String[] MAHORAGA_HEAD = {
+            "KK......................",
+            "KVKK....................",
+            ".KVVKK..................",
+            "..KVvVKK......KK........",
+            "...KVvvVKK...KVVKK......",
+            "....KKVvvVKKKVvvVKK.....",
+            ".KK...KKVvVKSSSKKVVK....",
+            "KVVKK...KKVKSSWWSSKK....",
+            ".KVvVKK...KSSSWWSSSSK...",
+            "..KKvvVKKKSSSSSSSSSSSK..",
+            "....KKvVVVKKKKKKKKKKKKK.",
+            ".....KKvvVVVVVVVVVVVVVVK",
+            ".......KKvvvvvvvvvvvvvK.",
+            ".........KKKKKKKKKKKKSK.",
+            ".........KgsSSSSSSSSSSK.",
+            ".........KgsSSSSSSSSSSK.",
+            ".........KgsSSSSSSKKKSK.",
+            ".........KgssSSSSKqqqKK.",
+            "..........KgsSSSSSKKKSK.",
+            "..........KggsSSSSSSSK..",
+            "...........KKggssssKK...",
+            ".............KKKKKK.....",
+            ".............KsSSsK.....",
+            ".............KsSSsK.....",
+            ".............KsSSsK.....",
+            "............KKKKKKKK....",
+    };
+
+    static final int MAHORAGA_TORSO_PX = 11, MAHORAGA_TORSO_PY = 22;
+    static final String MAHORAGA_TORSO_PAL = "mahoraga";
+    static final String[] MAHORAGA_TORSO = {
+            ".......KKKKKKKK.......",
+            ".....KKsSSSSSSSsKK....",
+            "...KKsSSSWWSSWWSSsKK..",
+            "..KsSSSSWWSSSSWWSSSsK.",
+            ".KsSSSSSSSSSSSSSSSSSsK",
+            "KgsSSSSSSSsSSsSSSSSSsK",
+            "KgsSSSSSSsgSSgsSSSSSsK",
+            "KgssSSSSsgSSSSgsSSSssK",
+            ".KgssSSSSSSSSSSSSSSsK.",
+            ".KgsSSSSSSSssSSSSSSsK.",
+            ".KgssSSSsSSSSSSsSSssK.",
+            "..KgsSSSSSSssSSSSSsK..",
+            "..KgssSSsSSSSSSsSssK..",
+            "..KgssSSSSSssSSSSssK..",
+            "...KgsSSsSSSSSSsSsK...",
+            "...KyyyyyyyyyyyyyyK...",
+            "...KyhyyyyyyyyyyhyK...",
+            "...KnNnnnnnnnnnnnnK...",
+            "..KnNNnnnnnnnnnnnnnK..",
+            "..KnNnnnnnnKnnnnnnnK..",
+            "..KnnnnnnnK.KnnnnnnK..",
+            "...KKKKKKK...KKKKKK...",
+    };
+
+    static final int MAHORAGA_ARM_PX = 3, MAHORAGA_ARM_PY = 2;
+    static final String MAHORAGA_ARM_PAL = "mahoraga";
+    static final String[] MAHORAGA_ARM = {
+            ".KKKK..",
+            "KsSSSK.",
+            "KsSSWSK",
+            "KsSSWSK",
+            "KgsSSSK",
+            "KgsSSSK",
+            "KgsSSSK",
+            ".KgsSSK",
+            ".KgsSSK",
+            ".KgsSSK",
+            ".KgsSSK",
+            ".KgsSSK",
+            "KKgsSSK",
+            "KgsSSSK",
+            "KgsSSSK",
+            "KgsSSSK",
+            ".KKKKK.",
+    };
+
+    static final int MAHORAGA_SWORD_PX = 3, MAHORAGA_SWORD_PY = 2;
+    static final String MAHORAGA_SWORD_PAL = "mahoraga";
+    static final String[] MAHORAGA_SWORD = {
+            ".KKKK....",
+            "KsSSSK...",
+            "KsSSWSK..",
+            "KsSSWSK..",
+            "KgsSSSK..",
+            "KgsSSSK..",
+            "KgsSSSK..",
+            ".KgsSSK..",
+            ".KgsSSK..",
+            ".KgsSSK..",
+            ".KgsSSK..",
+            "KhhhhhhK.",
+            "KhKhhKhK.",
+            "KgsSSSK..",
+            "KgsSSSK..",
+            ".KbBLK...",
+            ".KbBLK...",
+            ".KbBLK...",
+            "..KbBLK..",
+            "..KbBLK..",
+            "..KbBLK..",
+            "...KbBLK.",
+            "...KbBLK.",
+            "...KbBLK.",
+            "....KbLK.",
+            "....KbLK.",
+            ".....KLK.",
+            ".....KK..",
+    };
+
+    static final int MAHORAGA_LEG_PX = 4, MAHORAGA_LEG_PY = 1;
+    static final String MAHORAGA_LEG_PAL = "mahoraga";
+    static final String[] MAHORAGA_LEG = {
+            "KnnnnnnK..",
+            "KnNNnnnK..",
+            "KnNnnnnK..",
+            "KnNnnnnK..",
+            "KnNnnnnK..",
+            ".KnNnnnK..",
+            ".KnnnnnK..",
+            ".KKKKKKK..",
+            ".KsSSSSK..",
+            ".KgsSSSK..",
+            ".KgsSSSK..",
+            ".KgsSSSK..",
+            ".KgsSSSK..",
+            ".KgsSSSK..",
+            ".KgsSSSK..",
+            ".KgssSSK..",
+            ".KgsSSSKK.",
+            ".KgsSSSSSK",
+            ".KgssSSSSK",
+            ".KKKKKKKKK",
+    };
+
+    static final int AGITO_BODY_PX = 18, AGITO_BODY_PY = 14;
+    static final String AGITO_BODY_PAL = "agito";
+    static final String[] AGITO_BODY = {
+            ".........KK..KK...............",
+            "........KRrK.KRK..............",
+            ".......KRrK..KRrK.............",
+            "..KK...KRK....KRK.............",
+            ".KfFK..KRK...KRK..............",
+            "KfFFFK..KRKKKRK...............",
+            "KffFFFK..KKWWWK...KKK.........",
+            ".KffFFFKKWWWWwwK.KaAAKK.......",
+            "..KffFFKWWEWwwKKaAAAAAAK......",
+            "...KKfFKWWWwwKaAAaAAAAAAK.....",
+            ".....KKKwwwwKaAAAaaAAAAAAK....",
+            "....KBbKKKKKaAAAAAAAAAAAAAK...",
+            "...KBb.KfFFKAAAAAAAAAAKKAAAK..",
+            "....K.KfFFFKKAAAAAAAAK..KAAK..",
+            ".....KfFFFFK.KKAKKAAK....KAK..",
+            "....KfFFFFK...KAKKAK......KK..",
+            "...KffFFFK....KbBKbBK.........",
+            "...KKKKKK......KK..KK.........",
     };
 
     static final int DIGIT_0_PX = 0, DIGIT_0_PY = 0;

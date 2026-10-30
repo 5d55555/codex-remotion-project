@@ -71,20 +71,22 @@
             android:text="@string/start_game"
             android:textStyle="bold" />
 
+        <!-- 神战模式：已经有入口，暂未开放（点了弹提示）；字暗一点表示还锁着 -->
         <Button
-            android:id="@+id/btn_vacant_1"
+            android:id="@+id/btn_god_war"
             style="@style/MenuButton"
             android:layout_marginTop="@dimen/menu_gap"
             android:background="@drawable/btn_secondary"
-            android:contentDescription="@string/vacant_1_desc"
-            android:text="@string/vacant" />
+            android:contentDescription="@string/god_war_desc"
+            android:text="@string/god_war"
+            android:textColor="@color/text_dim" />
 
         <Button
-            android:id="@+id/btn_vacant_2"
+            android:id="@+id/btn_vacant"
             style="@style/MenuButton"
             android:layout_marginTop="@dimen/menu_gap"
             android:background="@drawable/btn_secondary"
-            android:contentDescription="@string/vacant_2_desc"
+            android:contentDescription="@string/vacant_desc"
             android:text="@string/vacant" />
 
         <Space

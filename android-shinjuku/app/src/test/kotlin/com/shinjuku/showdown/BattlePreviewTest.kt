@@ -33,8 +33,8 @@ class BattlePreviewTest {
         override fun toggleStats() {}
     }
 
-    internal inner class Scene(ctx: Context, d: Difficulty, script: Scene.() -> Unit) : View(ctx) {
-        val world = World(BattleConfig().also { d.configure(it) })
+    internal inner class Scene(ctx: Context, d: Difficulty, tweak: (BattleConfig) -> Unit = {}, script: Scene.() -> Unit) : View(ctx) {
+        val world = World(BattleConfig().also { d.configure(it); tweak(it) })
         internal val controls = Controls(noActions)
         private val atlas = Atlas()
         private val bg = BitmapFactory.decodeResource(ctx.resources, R.drawable.bg_battle_px, BitmapFactory.Options().apply { inScaled = false })
@@ -296,8 +296,8 @@ class BattlePreviewTest {
     }
 
     @Test
-    fun worldSlashChant() {
-        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) {
+    fun worldSlashChant() { // 三轮的十影宿傩没有御厨子：用里梅（关掉魔虚罗和原身，画面只看斩击）
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.URAUME, { it.mahoraga = false; it.trueForm = false }) {
             world.gojo.x = 300f
             world.sukuna.x = 800f
             var n = 0
@@ -309,8 +309,8 @@ class BattlePreviewTest {
     }
 
     @Test
-    fun worldSlashFired() {
-        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) {
+    fun worldSlashFired() { // 三轮的十影宿傩没有御厨子：用里梅（关掉魔虚罗和原身，画面只看斩击）
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.URAUME, { it.mahoraga = false; it.trueForm = false }) {
             world.gojo.x = 300f
             world.sukuna.x = 800f
             var seen = world.events.written
@@ -423,8 +423,8 @@ class BattlePreviewTest {
     }
 
     @Test
-    fun dismantle() {
-        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) {
+    fun dismantle() { // 三轮的十影宿傩没有御厨子：用里梅（关掉魔虚罗和原身，画面只看斩击）
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.URAUME, { it.mahoraga = false; it.trueForm = false }) {
             world.gojo.x = 400f
             world.sukuna.x = 800f
             stepsUntil(Events.SLASH, 3000)
@@ -456,6 +456,121 @@ class BattlePreviewTest {
                 world.sukuna.vx = 0f
             }
             steps(6)
+        })
+    }
+
+    /** 里梅：宿傩念「布瑠部由良由良」，魔虚罗要显现的地方地上铺开一摊影子。 */
+    @Test
+    fun mahoragaSummonChant() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.URAUME, { it.sukunaAi = false }) {
+            world.gojo.x = 360f
+            world.sukuna.x = 860f
+            steps(10)
+            world.sukunaIntent.summon = true
+            steps(90)
+        })
+    }
+
+    /** 魔虚罗从影子里显现（横幅、法阵移到它头上）。 */
+    @Test
+    fun mahoragaAppears() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.URAUME, { it.sukunaAi = false }) {
+            world.gojo.x = 360f
+            world.sukuna.x = 860f
+            steps(10)
+            world.sukunaIntent.summon = true
+            stepsUntil(Events.SUMMON, 10) // 开始念
+            stepsUntil(Events.SUMMON, 200) // 显现
+            steps(24)
+        })
+    }
+
+    /** 适应了无限的魔虚罗举起退魔之剑（法阵发亮）。 */
+    @Test
+    fun mahoragaSword() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.YOROZU, { it.sukunaAi = false }) {
+            world.gojo.x = 300f
+            world.sukuna.x = 900f
+            world.adaptPoints = 4
+            world.sukunaIntent.summon = true
+            stepsUntil(Events.SUMMON, 10)
+            stepsUntil(Events.SUMMON, 200)
+            world.gojo.x = world.mahoraga.x - 190f
+            var n = 0
+            while (n < 600 && !(world.mahoraga.state == com.shinjuku.showdown.core.Fighter.M_SWORD && world.mahoraga.stateTick >= 50)) {
+                steps(1); n++
+                if (world.mahoraga.state == com.shinjuku.showdown.core.Fighter.M_PUNCH) world.gojo.x = world.mahoraga.x - 190f
+            }
+        })
+    }
+
+    /** 三轮的十影宿傩：结手影放出顎吐，从上方俯冲下去。 */
+    @Test
+    fun agitoDive() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA, { it.sukunaAi = false }) {
+            world.gojo.x = 420f
+            world.sukuna.x = 840f
+            steps(10)
+            world.sukunaIntent.agito = true
+            steps(com.shinjuku.showdown.core.Tuning.AGITO_SIGN + 20)
+        })
+    }
+
+    /** 顎吐扑到五条悟身上：电光被无限挡住。 */
+    @Test
+    fun agitoStrike() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA, { it.sukunaAi = false }) {
+            world.gojo.x = 420f
+            world.sukuna.x = 840f
+            steps(10)
+            world.sukunaIntent.agito = true
+            stepsUntil(Events.AGITO, 60) // 飞出
+            stepsUntil(Events.AGITO, 100) // 扑到
+            steps(3)
+        })
+    }
+
+    /** 变原身：回满血，暗红翻涌（魔虚罗沉回影子里）。 */
+    @Test
+    fun trueFormTransform() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.URAUME, { it.sukunaAi = false }) {
+            world.gojo.x = 360f
+            world.sukuna.x = 860f
+            steps(10)
+            world.sukunaIntent.summon = true
+            stepsUntil(Events.SUMMON, 10)
+            stepsUntil(Events.SUMMON, 200)
+            steps(40)
+            world.sukuna.hpMilli = world.sukuna.maxHpMilli / 4
+            world.sukunaIntent.transform = true
+            steps(30)
+        })
+    }
+
+    /** 原身：四条手臂、腹部一张嘴（头像也换成原身）。 */
+    @Test
+    fun trueFormIdle() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.STRONGEST, { it.sukunaAi = false }) {
+            world.gojo.x = 420f
+            world.sukuna.x = 760f
+            steps(10)
+            world.sukuna.hpMilli = world.sukuna.maxHpMilli / 4
+            world.sukunaIntent.transform = true
+            steps(com.shinjuku.showdown.core.Tuning.TRANSFORM_TICKS + 160)
+        })
+    }
+
+    /** 魔虚罗站着（头上的翼、法阵，右手的退魔之剑）。 */
+    @Test
+    fun mahoragaIdle() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.URAUME, { it.sukunaAi = false }) {
+            world.gojo.x = 200f
+            world.sukuna.x = 900f
+            world.sukunaIntent.summon = true
+            stepsUntil(Events.SUMMON, 10)
+            stepsUntil(Events.SUMMON, 200)
+            world.gojo.x = 100f
+            steps(70)
         })
     }
 }

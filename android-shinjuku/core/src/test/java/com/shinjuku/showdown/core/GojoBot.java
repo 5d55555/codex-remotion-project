@@ -6,6 +6,9 @@ package com.shinjuku.showdown.core;
  * - 标准：24–36 tick 反应；看到世界斩起手就跳（或贴着就打断）；苍赫配合；每局开一次领域，领域里念 200% 茈；
  *   远了才念最大输出的赫；开着展延的宿傩贴身出拳时一半概率闪开；瞬移连段好了就用。
  * - 熟练：和标准一样的打法，但 12–18 tick 反应；开着展延的宿傩出拳每次都闪开，贴上来先用苍或赫控住、推开。
+ * 魔虚罗（Astra 的方案）：基础不管它（体术照样打到够得着的最近一个）。标准看到它 24–36 tick 后把它当优先目标：茈好了就转过去放
+ * （850 正好打掉）；领域里也先用普通茈打它。熟练 12–18 tick 就反应，先等最多 60 tick，找宿傩和魔虚罗在同一边、一发茈穿两个的机会。
+ * 适应了无限的魔虚罗出招：标准一半概率闪开，熟练都闪。最大输出赫的“安全”也要看魔虚罗和顎吐。
  */
 final class GojoBot {
     static final int BASIC = 0, STANDARD = 1, SKILLED = 2;
@@ -15,6 +18,8 @@ final class GojoBot {
     private final CombatRng rng;
     private int worldSeenAt = -1, worldReactAt, purpleHold, redHold, punchSeenAt = -1, punchReactAt;
     private boolean punchDodge;
+    private int mahoSeenAt = -1, mahoReactAt, mHitReactAt;
+    private boolean mDodge, mSwingSeen;
     private boolean domainUsed;
 
     GojoBot(int level, long seed) {
@@ -90,6 +95,45 @@ final class GojoBot {
         } else {
             punchSeenAt = -1;
         }
+        // 魔虚罗（标准、熟练）：看到它过一会儿才反应；适应了无限的魔虚罗出招时闪开
+        Fighter m = w.mahoraga;
+        boolean maho = m.present && level != BASIC;
+        if (maho) {
+            if (mahoSeenAt < 0) {
+                mahoSeenAt = w.tick;
+                mahoReactAt = w.tick + (level == SKILLED ? range(12, 18) : range(24, 36));
+            }
+            boolean swinging = m.state == Fighter.M_PUNCH || m.state == Fighter.M_SWORD;
+            if (!swinging) mSwingSeen = false;
+            if (swinging && w.mahoragaAdapted) {
+                if (!mSwingSeen) { // 每一招只抽一次签
+                    mSwingSeen = true;
+                    mHitReactAt = w.tick + range(reactMin, reactMax) / 2;
+                    mDodge = level == SKILLED || rng.nextUnitDouble() < 0.5;
+                }
+                int su = m.state == Fighter.M_SWORD ? Tuning.M_SWORD_STARTUP : Tuning.M_PUNCH_STARTUP;
+                float reach = m.state == Fighter.M_SWORD ? Tuning.M_SWORD_REACH : Tuning.M_PUNCH_REACH;
+                if (mDodge && w.tick >= mHitReactAt && w.dodgeCd == 0 && m.stateTick <= su && Math.abs(m.x - g.x) <= reach + 40) {
+                    in.dodge = true;
+                    in.moveX = m.x > g.x ? -1 : 1;
+                    mDodge = false;
+                    return;
+                }
+            }
+        } else {
+            mahoSeenAt = -1;
+        }
+        boolean mahoTarget = maho && w.tick >= mahoReactAt;
+        if (mahoTarget && w.purpleCd == 0 && purpleSafe(w)) {
+            int mdir = m.x >= g.x ? 1 : -1;
+            boolean both = (s.x - g.x) * mdir > 0 && s.state != Fighter.KO; // 宿傩也在同一边：一发穿两个
+            if (both || level != SKILLED || w.tick >= mahoReactAt + 60) {
+                in.moveX = mdir; // 这一 tick 转过去再放
+                in.purple = true;
+                return;
+            }
+        }
+
         // 瞬移连段：标准、熟练好了就用（按住闪避点苍；苍在冷却就点赫）
         if (level != BASIC && w.tpCd == 0 && !sukunaStuck && s.state != Fighter.KO) {
             if (w.blueCd == 0) {
@@ -122,8 +166,8 @@ final class GojoBot {
             domainUsed = true;
             return;
         }
-        // 200% 茈：标准在领域里念；熟练只在宿傩被控时念
-        boolean chantOk = level != BASIC && w.domainTicks > 300;
+        // 200% 茈：标准在领域里念；熟练只在宿傩被控时念（魔虚罗在场时先用普通茈打它）
+        boolean chantOk = level != BASIC && w.domainTicks > 300 && !maho;
         if (chantOk && w.purpleCd == 0 && w.purpleFailLock == 0) {
             in.purple = in.purpleHeld = true;
             purpleHold = 1;
@@ -140,7 +184,8 @@ final class GojoBot {
                 in.red = true;
                 return;
             }
-            boolean safe = level != BASIC && d > 600 && w.ampTicks == 0;
+            boolean safe = level != BASIC && d > 600 && w.ampTicks == 0 && !w.agito.active
+                    && (!m.present || Math.abs(m.x - g.x) > 400);
             if (safe) { // 最大输出要念 0.9 秒：远了（或宿傩被控住）才念
                 in.red = in.redHeld = true;
                 redHold = Tuning.RED_HOLD + Tuning.CHANT3_PHRASE * Tuning.CHANT3_PHRASES + 8;
@@ -158,6 +203,13 @@ final class GojoBot {
             return;
         }
         in.moveX = toward;
+    }
+
+    /** 放茈的起手（30 tick）会不会被打断：开着展延的宿傩或者适应了无限的魔虚罗贴得太近就先别放。 */
+    private static boolean purpleSafe(World w) {
+        Fighter g = w.gojo, s = w.sukuna, m = w.mahoraga;
+        if (w.ampTicks > 0 && Math.abs(s.x - g.x) < 160) return false;
+        return !(m.present && w.mahoragaAdapted && Math.abs(m.x - g.x) < 240);
     }
 
     private int range(int lo, int hi) {

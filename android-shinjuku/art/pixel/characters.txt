@@ -215,6 +215,298 @@ KoooooK
 .KKKKK.
 end
 
+# ---------------- 宿傩的原身（里梅以上：变身后四臂、腹部一张嘴、咒纹；头发是粉的） ----------------
+# 骨骼和人一样；多出来的一对手臂挂在 (±6,-18)（arm2，光着的手臂带咒纹）。
+palette sukuna_true
+  K 050508  轮廓
+  W FFC9C2  头发高光
+  H F0948E  头发（粉）
+  h C66A70  头发暗部
+  g 8E4552  头发深暗部
+  S F3DCCB  皮肤
+  s DDB9A6  皮肤暗部
+  E FFFFFF  眼睛高光
+  L FF9AA0  眼睛亮部
+  B E0303F  眼睛（红）
+  b 7A1020  眼睛暗部
+  q 140A0E  咒纹（黑）
+  m 9C4A52  嘴
+  C F2EEE6  和服（白）
+  c FFFFFF  和服高光
+  d B9B3A8  和服暗部
+  z 2A2D36  腰带
+  n 1A1E2B  裤子
+  N 2E3548  裤子高光
+  o 050507  鞋
+  O 2A2D36  鞋高光
+end
+
+sprite sukuna_true.head palette sukuna_true pivot 15 27
+.....K......K.....K......K....
+.....KWK....KWK..KWK....KWK...
+K.....KWK..KWHK.KWHK...KWHK...
+KWK...KWHK.KWHhKKWHhK.KWHhK..K
+.KWKK.KWHhKKWHhKKWHhKKKWHhK.KW
+.KWHHKKWHhHKWHHhWHHHhKWHHhKKWH
+..KWHhKWHHHhHHHHhHHHHhHHHhWHHK
+.KWHHHhHHHHHHHHHHHHHHHHHHHHhK.
+KWHHHHHHHHWWHHHHHHWWHHHHHHHhhK
+.KhHHHHHHHHHHHHHHHHHHHHHHHHhhK
+KhhhHHHHHHHHHHHHHHHHHHHHHHHhhK
+KghhhHHHHHHHHHHHHHHHHHHHHHhhhK
+.KghhhHHHhhHHHHhhHHHHhhHHHhhK.
+.KghhhHHhKhHHHhKKhHHhKKhHHhK..
+..KghhHhKSKhHhKSSKhHKSSKhHhK..
+..KghhhKqSSKhKSSSSKhKSSSSKhK..
+..KgghhKqSSSKSSSSSSKSSSSSKhK..
+...KgghKqqKKKKSSSSSKKKKKKSK...
+...KgghKSqSEbbSSSSSSEbbbKSK...
+....KghKSSqBBBSSSSSSBBBBSSK...
+....KghKqSSBLBqqSSSSBLLBqqK...
+.....KKKqqSEbbSSSSSSEbbbKSK...
+.......KsqSBBBSSSSSSBBBBSSK...
+.......KssSqqSSKKKKKSSqqSK....
+........KssSSSSSSESSSSSSK.....
+.........KKssSSSSSSSSKK.......
+...........KKKKKKKKKK.........
+end
+
+sprite sukuna_true.torso palette sukuna_true pivot 8 16
+......KKKKK......
+....KKCcSScKK....
+...KCcCSSSSdCK...
+..KCcCSqSSqSdCK..
+.KCcCSqSSSSqSdCK.
+KCcCSqSSSSSSqSdCK
+KCcCSSSSSSSSSSdCK
+KCcCSKKKKKKKKSdCK
+.KCcKEmEmEmEmKdCK
+.KCcSKKKKKKKKSdCK
+.KCcCSqSSSSqSdCK.
+..KzzzzzzzzzzzzK.
+..KzzzzzzzzzzzzK.
+..KnNnnnnnnnnndK.
+..KnNnnnnnnnnndK.
+..KnnnnnKnnnnndK.
+...KKKKK.KKKKKK..
+end
+
+sprite sukuna_true.arm palette sukuna_true pivot 2 1
+.KKK.
+KcCCK
+KcCCK
+KcCdK
+KcCdK
+KcCdK
+KCCdK
+.KSsK
+.KqqK
+.KSsK
+KSSsK
+KSSsK
+.KKK.
+end
+
+sprite sukuna_true.arm2 palette sukuna_true pivot 2 1
+.KKK.
+KSSsK
+KSSsK
+KqqqK
+KSSsK
+KSSsK
+.KSsK
+.KqqK
+.KSsK
+KSSsK
+KSSsK
+.KKK.
+end
+
+# ---------------- 魔虚罗（里梅以上，宿傩召唤；比人高一半） ----------------
+# 骨骼按人的 1.5 倍：腿挂在 (±3,-20)，身体底边 (0,-18)，肩 (±10,-37)，脖子 (0,-39)。右手（前手）是退魔之剑。
+palette mahoraga
+  K 07070B  轮廓
+  W FAF7F0  皮肤高光
+  S D8D2C6  皮肤
+  s A9A296  皮肤暗部
+  g 6E685F  皮肤深暗部
+  V F3EFE6  头上的翼
+  v B9B1A2  翼的暗部
+  q 3A2024  嘴
+  n 26232C  下装
+  N 3B3644  下装高光
+  y C29A4E  腰带（金）
+  B E4ECF4  退魔之剑
+  b 93A0AE  剑的暗部
+  L FFFFFF  剑刃高光
+  h 4A3E34  剑柄
+end
+
+sprite mahoraga.head palette mahoraga pivot 13 25
+KK......................
+KVKK....................
+.KVVKK..................
+..KVvVKK......KK........
+...KVvvVKK...KVVKK......
+....KKVvvVKKKVvvVKK.....
+.KK...KKVvVKSSSKKVVK....
+KVVKK...KKVKSSWWSSKK....
+.KVvVKK...KSSSWWSSSSK...
+..KKvvVKKKSSSSSSSSSSSK..
+....KKvVVVKKKKKKKKKKKKK.
+.....KKvvVVVVVVVVVVVVVVK
+.......KKvvvvvvvvvvvvvK.
+.........KKKKKKKKKKKKSK.
+.........KgsSSSSSSSSSSK.
+.........KgsSSSSSSSSSSK.
+.........KgsSSSSSSKKKSK.
+.........KgssSSSSKqqqKK.
+..........KgsSSSSSKKKSK.
+..........KggsSSSSSSSK..
+...........KKggssssKK...
+.............KKKKKK.....
+.............KsSSsK.....
+.............KsSSsK.....
+.............KsSSsK.....
+............KKKKKKKK....
+end
+
+sprite mahoraga.torso palette mahoraga pivot 11 22
+.......KKKKKKKK.......
+.....KKsSSSSSSSsKK....
+...KKsSSSWWSSWWSSsKK..
+..KsSSSSWWSSSSWWSSSsK.
+.KsSSSSSSSSSSSSSSSSSsK
+KgsSSSSSSSsSSsSSSSSSsK
+KgsSSSSSSsgSSgsSSSSSsK
+KgssSSSSsgSSSSgsSSSssK
+.KgssSSSSSSSSSSSSSSsK.
+.KgsSSSSSSSssSSSSSSsK.
+.KgssSSSsSSSSSSsSSssK.
+..KgsSSSSSSssSSSSSsK..
+..KgssSSsSSSSSSsSssK..
+..KgssSSSSSssSSSSssK..
+...KgsSSsSSSSSSsSsK...
+...KyyyyyyyyyyyyyyK...
+...KyhyyyyyyyyyyhyK...
+...KnNnnnnnnnnnnnnK...
+..KnNNnnnnnnnnnnnnnK..
+..KnNnnnnnnKnnnnnnnK..
+..KnnnnnnnK.KnnnnnnK..
+...KKKKKKK...KKKKKK...
+end
+
+sprite mahoraga.arm palette mahoraga pivot 3 2
+.KKKK..
+KsSSSK.
+KsSSWSK
+KsSSWSK
+KgsSSSK
+KgsSSSK
+KgsSSSK
+.KgsSSK
+.KgsSSK
+.KgsSSK
+.KgsSSK
+.KgsSSK
+KKgsSSK
+KgsSSSK
+KgsSSSK
+KgsSSSK
+.KKKKK.
+end
+
+sprite mahoraga.sword palette mahoraga pivot 3 2
+.KKKK....
+KsSSSK...
+KsSSWSK..
+KsSSWSK..
+KgsSSSK..
+KgsSSSK..
+KgsSSSK..
+.KgsSSK..
+.KgsSSK..
+.KgsSSK..
+.KgsSSK..
+KhhhhhhK.
+KhKhhKhK.
+KgsSSSK..
+KgsSSSK..
+.KbBLK...
+.KbBLK...
+.KbBLK...
+..KbBLK..
+..KbBLK..
+..KbBLK..
+...KbBLK.
+...KbBLK.
+...KbBLK.
+....KbLK.
+....KbLK.
+.....KLK.
+.....KK..
+end
+
+sprite mahoraga.leg palette mahoraga pivot 4 1
+KnnnnnnK..
+KnNNnnnK..
+KnNnnnnK..
+KnNnnnnK..
+KnNnnnnK..
+.KnNnnnK..
+.KnnnnnK..
+.KKKKKKK..
+.KsSSSSK..
+.KgsSSSK..
+.KgsSSSK..
+.KgsSSSK..
+.KgsSSSK..
+.KgsSSSK..
+.KgsSSSK..
+.KgssSSK..
+.KgsSSSKK.
+.KgsSSSSSK
+.KgssSSSSK
+.KKKKKKKKK
+end
+
+# ---------------- 嵌合兽「顎吐」（十种影法术：鵺的翼、圆鹿的角、面具；俯冲电击） ----------------
+palette agito
+  K 05040A  轮廓
+  W F2EEF6  面具
+  w B8B2C4  面具暗部
+  A 1E1A2C  身体
+  a 37304E  身体高光
+  F 0F0C18  翼
+  f 2B2440  翼高光
+  R C8B48A  角
+  r 8E7A55  角暗部
+  B 6FE0FF  电
+  b FFFFFF  电光
+  E FF3A4A  眼
+end
+
+sprite agito.body palette agito pivot 18 14
+.........KK..KK...............
+........KRrK.KRK..............
+.......KRrK..KRrK.............
+..KK...KRK....KRK.............
+.KfFK..KRK...KRK..............
+KfFFFK..KRKKKRK...............
+KffFFFK..KKWWWK...KKK.........
+.KffFFFKKWWWWwwK.KaAAKK.......
+..KffFFKWWEWwwKKaAAAAAAK......
+...KKfFKWWWwwKaAAaAAAAAAK.....
+.....KKKwwwwKaAAAaaAAAAAAK....
+....KBbKKKKKaAAAAAAAAAAAAAK...
+...KBb.KfFFKAAAAAAAAAAKKAAAK..
+....K.KfFFFKKAAAAAAAAK..KAAK..
+.....KfFFFFK.KKAKKAAK....KAK..
+....KfFFFFK...KAKKAK......KK..
+...KffFFFK....KbBKbBK.........
+...KKKKKK......KK..KK.........
+end
+
 # ---------------- 像素数字（5×7，白色；描边在运行时自动加 1 像素） ----------------
 palette font
   W FFFFFF  字

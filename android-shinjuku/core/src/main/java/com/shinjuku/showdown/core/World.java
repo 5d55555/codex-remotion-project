@@ -2,9 +2,10 @@ package com.shinjuku.showdown.core;
 
 /**
  * 战斗世界：每秒 120 tick 固定步长推进。完全确定：同一个配置 + 同一串输入 = 同一个结果。
- * 一个 tick 的顺序：五条悟的操作与动作 → 宿傩（AI 意图 → 动作执行）→ 体术命中 → 苍的位置 → 赫（遇到苍变无指向茈；命中）
- * → 茈 → 无指向茈的扩张 → 苍的吸力与持续伤害 → 宿傩的世界斩（这一 tick 没被打断才斩出去）→ 积分（重力、外力）→ 地面与墙
- * → 计时器、领域、倒地与复活。
+ * 一个 tick 的顺序：五条悟的操作与动作 → 宿傩（AI 意图 → 动作执行）→ 魔虚罗（在场时）→ 体术命中（五条悟、宿傩、魔虚罗）
+ * → 顎吐 → 苍的位置 → 赫（遇到苍变无指向茈；命中）→ 茈 → 无指向茈的扩张 → 苍的吸力与持续伤害
+ * → 宿傩的世界斩（这一 tick 没被打断才斩出去）→ 积分（重力、外力）→ 地面与墙 → 计时器、领域、倒地与复活。
+ * 五条悟的招同时对宿傩和魔虚罗：体术打够得着的最近一个，赫打到弹道上第一个就爆，茈穿透都打，无指向茈范围内都打，苍都吸。
  * 领域展开先放过场：cutscene 为真时整个世界停住（时间也不走），直到画面调用 endCutscene()。
  * 热路径不分配对象。
  */
@@ -21,7 +22,7 @@ public final class World {
     public final CombatRng rng;
     public final BlackFlash blackFlash = new BlackFlash();
     private final SukunaAi ai;
-    final SukunaIntent sukunaIntent = new SukunaIntent(); // 没有 AI 时测试可以手动填
+    public final SukunaIntent sukunaIntent = new SukunaIntent(); // 没有 AI 时测试（和截图）可以手动填
 
     public int tick;
     public int hitstop;               // >0 时整个世界停住（打中的顿挫）
@@ -41,6 +42,22 @@ public final class World {
     public int worldDir;              // 斩的方向（指向时锁定）
     public int rctUses, rctCd;
     public int sStagger;              // 宿傩的招被打断后这么久不能行动（和受击硬直同时计）
+
+    // 十种影法术（顎吐、魔虚罗）与原身
+    public final Fighter mahoraga = new Fighter(Fighter.MAHORAGA);
+    public final Agito agito = new Agito();
+    public static final int WHEEL_NONE = 0, WHEEL_SUKUNA = 1, WHEEL_MAHORAGA = 2;
+    public int wheelOn;               // 法阵在谁头上：三轮没有；召出魔虚罗后在它头上；魔虚罗退场、变原身以后没有
+    public boolean mahoragaUsed;      // 召唤过魔虚罗了（一局一次，定）
+    public boolean mahoragaAdapted;   // 魔虚罗适应了无限：攻击能打穿（原作第 234 话）
+    public boolean sukunaTrueForm;    // 变成原身了（十种影法术没了）
+    public int summonCd, agitoCd;     // 召唤被打断后的重试冷却、顎吐的冷却
+    public int mPunchCd, mSwordCd, mGap; // 魔虚罗两招的冷却、两次出招的间隔
+    private int mDecide, mReact, mMove, mSeq = -1, mHitId = -1;
+    private boolean mWasLocked;
+    // 统计（模拟、测试用）：每人实际掉的血（毫血，不算溢出），宿傩反转术式和变原身各回了多少
+    public final long[] damageTaken = new long[Fighter.COUNT];
+    public long rctHealed, transformHealed;
     private boolean adaptPending, worldLocked, worldPending;
     private int adaptLastTick = -100_000, adaptTimer;
 
@@ -80,10 +97,15 @@ public final class World {
         gojo.x = gojo.px = Tuning.WIDTH * 0.28f;
         sukuna.x = sukuna.px = Tuning.WIDTH * 0.72f;
         sukuna.facing = -1;
+        mahoraga.present = false;
+        mahoraga.halfW = Tuning.MAHORAGA_HALF_W;
+        mahoraga.height = Tuning.MAHORAGA_H;
+        mahoraga.maxHpMilli = mahoraga.hpMilli = Tuning.MAHORAGA_HP_MILLI;
+        wheelOn = config.wheel ? WHEEL_SUKUNA : WHEEL_NONE;
     }
 
     public Fighter fighter(int id) {
-        return id == Fighter.GOJO ? gojo : sukuna;
+        return id == Fighter.GOJO ? gojo : id == Fighter.SUKUNA ? sukuna : mahoraga;
     }
 
     public void step(TickInput in) {
@@ -99,6 +121,10 @@ public final class World {
         red.py = red.y;
         purple.px = purple.x;
         purple.py = purple.y;
+        mahoraga.px = mahoraga.x;
+        mahoraga.py = mahoraga.y;
+        agito.px = agito.x;
+        agito.py = agito.y;
         latch(in);
         if (hitstop > 0) {
             hitstop--;
@@ -110,8 +136,11 @@ public final class World {
         if (config.sukunaAi) ai.think(this, sukunaIntent);
         controlSukuna(sukunaIntent);
         if (!config.sukunaAi) sukunaIntent.clear();
+        controlMahoraga();
         resolveMelee();
         resolveSukunaMelee();
+        resolveMahoragaAttack();
+        updateAgito();
         advanceBlue();
         updateRed();
         updatePurple();
@@ -120,6 +149,7 @@ public final class World {
         resolveWorldSlash();
         integrate(gojo);
         integrate(sukuna);
+        if (mahoraga.present) integrate(mahoraga);
         timers();
     }
 
@@ -691,8 +721,8 @@ public final class World {
         b.radius = Tuning.BLUE_RADIUS * (charged ? Tuning.BLUE_RANGE_MULT_CHARGED : 1f);
         b.pull = charged ? Tuning.BLUE_PULL_MULT_CHARGED : 1f;
         b.accel = Tuning.BLUE_ACCEL * b.pull;
-        b.remainder = 0;
-        b.shownMilli = 0;
+        java.util.Arrays.fill(b.remainder, 0);
+        java.util.Arrays.fill(b.shownMilli, 0);
         blueCd = blueCdMax = charged ? Tuning.BLUE_COOLDOWN_CHARGED : Tuning.BLUE_COOLDOWN;
         events.emit(Events.BLUE_SPAWN, ox, oy, charged ? 1 : 0, tick);
     }
@@ -819,7 +849,9 @@ public final class World {
         clearInputs();
         domainTicks = Tuning.DOMAIN_DURATION;
         domains.sureHit[Fighter.GOJO][Fighter.SUKUNA] = true;
+        domains.sureHit[Fighter.GOJO][Fighter.MAHORAGA] = true;
         interruptSukuna();
+        interruptMahoraga(); // 魔虚罗在场也一样被困住
         if (ampTicks > 0) closeAmp(); // 无量空处生效：展延被迫关闭
         events.emit(Events.DOMAIN_OPEN, gojo.x, gojo.centerY(), Tuning.DOMAIN_DURATION, tick);
     }
@@ -833,7 +865,8 @@ public final class World {
                 && !s.scripted && s.downTicks == 0;
     }
 
-    boolean inBlueField(Fighter f) {
+    /** f 在苍的吸引范围里（被吸着，不能主动行动）。 */
+    public boolean inBlueField(Fighter f) {
         if (blue.phase != BlueOrb.PULL || f.pullResist > 0) return false;
         float dx = blue.cx - f.x, dy = blue.cy - f.centerY();
         return dx * dx + dy * dy < blue.radius * blue.radius;
@@ -842,9 +875,13 @@ public final class World {
     private void controlSukuna(SukunaIntent i) {
         Fighter s = sukuna;
         if (s.state == Fighter.KO) return;
-        if (!sukunaCanAct() && s.state != Fighter.S_RCT) { // 反转术式不可打断：被控住也照样回完
-            interruptSukuna(); // 被控住：手上的动作作废；击飞、吸引的速度不去动它
-            return;
+        if (!sukunaCanAct()) {
+            // 反转术式、变原身不可打断：被控住也照样走完（变身在无量空处里计时暂停）
+            if (s.state == Fighter.S_TRANSFORM && domainTicks > 0) return;
+            if (s.state != Fighter.S_RCT && s.state != Fighter.S_TRANSFORM) {
+                interruptSukuna(); // 被控住：手上的动作作废；击飞、吸引的速度不去动它
+                return;
+            }
         }
         s.stateTick++;
         int st = s.stateTick;
@@ -854,15 +891,19 @@ public final class World {
                     drive(s, 0);
                     return;
                 }
-                if (!config.sukunaAi && i.moveX == 0 && !i.melee && !i.dismantle && !i.jump && !i.amp && !i.ampOff && !i.world && !i.rct) return; // 活靶子：什么都不做
+                if (!config.sukunaAi && i.moveX == 0 && !i.melee && !i.dismantle && !i.jump && !i.amp && !i.ampOff && !i.world && !i.rct
+                        && !i.agito && !i.summon && !i.transform) return; // 活靶子：什么都不做
                 drive(s, i.moveX * Tuning.SUKUNA_SPEED);
                 if (i.jump && s.onGround) {
                     s.vy = Tuning.JUMP_SPEED;
                     s.onGround = false;
                 }
                 boolean amp = ampTicks > 0, technique = !amp && ampLock == 0; // 展延期间、刚关掉时不能用生得术式
+                boolean tenShadows = technique && !sukunaTrueForm;              // 十种影法术（原身以后没有）
                 if (i.ampOff && amp) {
                     closeAmp();
+                } else if (i.transform && config.trueForm && !sukunaTrueForm && s.hpMilli > 0) {
+                    startTransform();
                 } else if (sAttackGap == 0 && i.melee && sMeleeCd == 0) {
                     enter(s, Fighter.S_MELEE);
                     drive(s, 0);
@@ -871,16 +912,25 @@ public final class World {
                     attackSeq++;
                     sMeleeHitId = -1;
                     sMeleeSeq = attackSeq;
-                } else if (technique && sAttackGap == 0 && i.dismantle && dismantleCd == 0) {
+                } else if (technique && config.shrine && sAttackGap == 0 && i.dismantle && dismantleCd == 0) {
                     enter(s, Fighter.S_DISMANTLE);
                     drive(s, 0);
                     dismantleCd = Tuning.DISMANTLE_COOLDOWN;
                     sAttackGap = Tuning.S_ATTACK_GAP;
                     adaptPending = false;
-                } else if (i.amp && !amp && ampCd == 0 && s.onGround) {
+                } else if (tenShadows && config.agito && sAttackGap == 0 && i.agito && agitoCd == 0 && !agito.active) {
+                    enter(s, Fighter.S_AGITO);
+                    drive(s, 0);
+                    agitoCd = Tuning.AGITO_COOLDOWN; // 从起手算，被打断不退
+                    sAttackGap = Tuning.S_ATTACK_GAP;
+                } else if (tenShadows && config.mahoraga && i.summon && !mahoragaUsed && summonCd == 0 && s.onGround) {
+                    enter(s, Fighter.S_SUMMON);
+                    drive(s, 0);
+                    events.emit(Events.SUMMON, s.x, s.centerY(), 0, tick);
+                } else if (i.amp && !amp && ampCd == 0 && s.onGround && !agito.active) { // 顎吐还在飞：不能开展延（十种影法术和展延不能同时用）
                     enter(s, Fighter.S_AMP_START);
                     drive(s, 0);
-                } else if (technique && i.world && worldUnlocked && worldCd == 0 && s.onGround) {
+                } else if (technique && config.shrine && i.world && worldUnlocked && worldCd == 0 && s.onGround) {
                     startWorldSlash();
                 } else if (technique && i.rct && rctUses < Tuning.S_RCT_MAX_USES && rctCd == 0 && s.onGround && s.hpMilli < s.maxHpMilli) {
                     enter(s, Fighter.S_RCT);
@@ -940,12 +990,30 @@ public final class World {
                 if (st > healFrom && st <= healTo && s.hpMilli > 0) { // 每秒 170：按累计量取整，不丢零头；这一 tick 已经被打空就不回
                     long k = st - healFrom;
                     long d = Tuning.S_RCT_HEAL_PER_SEC_MILLI * k / Tuning.HZ - Tuning.S_RCT_HEAL_PER_SEC_MILLI * (k - 1) / Tuning.HZ;
+                    rctHealed += Math.min(d, s.maxHpMilli - s.hpMilli);
                     s.hpMilli = Math.min(s.maxHpMilli, s.hpMilli + d);
                 }
                 if (st == healTo) events.emit(Events.RCT, s.x, s.centerY(), 0, tick);
                 if (st >= healTo + Tuning.S_RCT_RECOVERY) enter(s, Fighter.FREE);
                 break;
             }
+            case Fighter.S_AGITO: // 结手影 → 顎吐飞出去 → 收手
+                drive(s, 0);
+                if (st == Tuning.AGITO_SIGN) launchAgito();
+                if (st >= Tuning.AGITO_SIGN + Tuning.AGITO_RECOVERY) enter(s, Fighter.FREE);
+                break;
+            case Fighter.S_SUMMON: // 念「布瑠部由良由良」→ 魔虚罗显现 → 收招
+                drive(s, 0);
+                if (st == Tuning.SUMMON_CHANT) summonMahoraga();
+                if (st >= Tuning.SUMMON_CHANT + Tuning.SUMMON_RECOVERY) enter(s, Fighter.FREE);
+                break;
+            case Fighter.S_TRANSFORM: // 变原身：不能动，不可打断，照常挨打
+                if (sukunaCanAct()) drive(s, 0);
+                if (st >= Tuning.TRANSFORM_TICKS) {
+                    enter(s, Fighter.FREE);
+                    events.emit(Events.TRANSFORM, s.x, s.centerY(), 0, tick);
+                }
+                break;
             default:
                 break;
         }
@@ -960,7 +1028,16 @@ public final class World {
                 events.emit(Events.WORLD_CHANT, s.x, s.centerY(), -1, Attack.WORLD_SLASH, tick);
                 break;
             case Fighter.S_RCT:
-                return; // 反转术式不可打断（定）
+            case Fighter.S_TRANSFORM:
+                return; // 反转术式（定）、变原身不可打断
+            case Fighter.S_SUMMON:
+                if (s.stateTick < Tuning.SUMMON_CHANT) { // 咏唱被打断：不算用掉，但要僵一会儿、过一阵才能再召
+                    sStagger = Tuning.SUMMON_BREAK_LOCK;
+                    summonCd = Tuning.SUMMON_RETRY;
+                    events.emit(Events.SUMMON, s.x, s.centerY(), -1, tick);
+                }
+                break;
+            case Fighter.S_AGITO: // 结手影时被打断：顎吐不出来（冷却不退）
             case Fighter.S_MELEE:
             case Fighter.S_DISMANTLE:
             case Fighter.S_AMP_START:
@@ -989,13 +1066,231 @@ public final class World {
         turnWheel();
     }
 
-    /** 法阵转一格（两格之间至少隔 1 秒）。 */
+    /** 法阵转一格（不管是自己转、解被挡下还是魔虚罗被挡下，两格之间至少隔 1 秒）。转满时魔虚罗在场就适应了无限。 */
     private void turnWheel() {
-        if (adaptPoints >= Tuning.S_ADAPT_POINTS || fightTicks - adaptLastTick < Tuning.S_ADAPT_POINT_GAP) return;
+        if (wheelOn == WHEEL_NONE || adaptPoints >= Tuning.S_ADAPT_POINTS || fightTicks - adaptLastTick < Tuning.S_ADAPT_POINT_GAP) return;
         adaptPoints++;
         adaptLastTick = fightTicks;
         adaptTimer = 0;
-        events.emit(Events.ADAPT, sukuna.x, sukuna.centerY() + 70, adaptPoints, 0, tick);
+        Fighter h = wheelOn == WHEEL_MAHORAGA ? mahoraga : sukuna;
+        events.emit(Events.ADAPT, h.x, h.y + h.height + 20, adaptPoints, 0, tick);
+        if (adaptPoints >= Tuning.S_ADAPT_POINTS && wheelOn == WHEEL_MAHORAGA) adaptMahoraga();
+    }
+
+    /** 魔虚罗适应了无限：之后它的攻击能打穿（原作第 234 话）。 */
+    private void adaptMahoraga() {
+        if (mahoragaAdapted) return;
+        mahoragaAdapted = true;
+        domains.specialBypass[Fighter.MAHORAGA] = true;
+        events.emit(Events.ADAPT, mahoraga.x, mahoraga.y + mahoraga.height + 20, adaptPoints, 2, tick);
+    }
+
+    /* ---------------- 十种影法术：顎吐、魔虚罗；原身 ---------------- */
+
+    /** 变原身：开始时回满血（定），十种影法术没了（顎吐、魔虚罗、法阵；学会了的世界斩保留）。 */
+    private void startTransform() {
+        Fighter s = sukuna;
+        sukunaTrueForm = true;
+        transformHealed += s.maxHpMilli - s.hpMilli;
+        s.hpMilli = s.maxHpMilli;
+        agito.active = false;
+        removeMahoraga(1);
+        wheelOn = WHEEL_NONE;
+        adaptPending = false;
+        enter(s, Fighter.S_TRANSFORM);
+        drive(s, 0);
+        events.emit(Events.TRANSFORM, s.x, s.centerY(), 1, tick);
+    }
+
+    /** 顎吐从宿傩的影子里飞出去：锁定五条悟此刻的身体中心（最远 AGITO_RANGE），从上方俯冲下去。 */
+    private void launchAgito() {
+        Fighter s = sukuna, g = gojo;
+        Agito a = agito;
+        a.dir = g.x >= s.x ? 1 : -1;
+        a.active = true;
+        a.tick = 0;
+        a.instanceId = ++attackSeq;
+        a.contacted = false;
+        a.x0 = a.x = a.px = s.x + a.dir * 10;
+        a.y0 = a.y = a.py = s.y + 10;
+        a.tx = s.x + clamp(g.x - s.x, -Tuning.AGITO_RANGE, Tuning.AGITO_RANGE);
+        a.ty = g.centerY();
+        events.emit(Events.AGITO, a.x, a.y, 0, tick);
+    }
+
+    /** 顎吐：沿弧线飞到锁定点上方再扑下来（二次贝塞尔，控制点在落点正上方），到了以后电击一下就消失。 */
+    private void updateAgito() {
+        Agito a = agito;
+        if (!a.active) return;
+        a.tick++;
+        if (a.tick <= Tuning.AGITO_DIVE) {
+            float k = a.tick / (float) Tuning.AGITO_DIVE, u = 1 - k;
+            a.x = u * u * a.x0 + (2 * u * k + k * k) * a.tx;
+            a.y = u * u * a.y0 + 2 * u * k * (a.ty + Tuning.AGITO_DROP) + k * k * a.ty;
+            if (a.tick == Tuning.AGITO_DIVE) events.emit(Events.AGITO, a.x, a.y, 1, tick);
+        }
+        Fighter g = gojo;
+        if (a.tick >= Tuning.AGITO_DIVE && !a.contacted && g.state != Fighter.KO && !g.invuln && touches(a.x, a.y, Tuning.AGITO_RADIUS, g)) {
+            a.contacted = true; // 被无限挡住（原作没有穿透的依据），但碰到了就会打断念咒和前摇
+            attack.set(Fighter.SUKUNA, Fighter.GOJO, Attack.AGITO, a.instanceId, Tuning.AGITO_DAMAGE_MILLI,
+                    a.dir * Tuning.AGITO_IMPULSE_X, 0, Tuning.AGITO_HITSTUN, 0);
+            apply(attack);
+        }
+        if (a.tick >= Tuning.AGITO_DIVE + Tuning.AGITO_ACTIVE) {
+            a.active = false;
+            events.emit(Events.AGITO, a.x, a.y, 2, tick);
+        }
+    }
+
+    /** 魔虚罗在宿傩前方（朝五条悟那边）显现：一局一次（定）；法阵移到它头上，进度共用。 */
+    private void summonMahoraga() {
+        Fighter s = sukuna, m = mahoraga;
+        int dir = gojo.x >= s.x ? 1 : -1;
+        mahoragaUsed = true;
+        m.present = true;
+        m.hpMilli = m.maxHpMilli;
+        m.x = m.px = clamp(s.x + dir * Tuning.SUMMON_OFFSET, m.halfW, Tuning.WIDTH - m.halfW);
+        m.y = m.py = 0;
+        m.vx = m.vy = 0;
+        m.onGround = true;
+        m.facing = dir;
+        m.hitstun = m.pullResist = m.downTicks = m.comboHits = m.comboTimer = 0;
+        m.captured = m.knockedAir = m.scripted = false;
+        enter(m, Fighter.M_RISE);
+        mPunchCd = mSwordCd = mGap = mMove = 0;
+        mDecide = 0;
+        mReact = Tuning.MAHORAGA_REACT;
+        if (wheelOn == WHEEL_SUKUNA) wheelOn = WHEEL_MAHORAGA;
+        events.emit(Events.SUMMON, m.x, m.y, 1, tick);
+        if (adaptPoints >= Tuning.S_ADAPT_POINTS && wheelOn == WHEEL_MAHORAGA) adaptMahoraga(); // 法阵早就转满了
+    }
+
+    /** 魔虚罗退场（why 0 被打倒，1 宿傩倒下或变原身）：之后不能再召唤；法阵跟着它没了（没学会的世界斩再也学不会）。 */
+    private void removeMahoraga(int why) {
+        Fighter m = mahoraga;
+        if (!m.present) return;
+        m.present = false;
+        m.captured = false;
+        enter(m, Fighter.FREE);
+        if (wheelOn == WHEEL_MAHORAGA) wheelOn = WHEEL_NONE;
+        mahoragaAdapted = false;
+        domains.specialBypass[Fighter.MAHORAGA] = false;
+        events.emit(Events.MAHORAGA_GONE, m.x, m.centerY(), why, tick);
+    }
+
+    /** 宿傩开着领域展延（从开始起手到关闭后的术式锁定结束）：十种影法术暂停，魔虚罗不动、不出手（原作第 228 话）。 */
+    public boolean tenShadowsPaused() {
+        return ampTicks > 0 || ampLock > 0 || sukuna.state == Fighter.S_AMP_START;
+    }
+
+    /** 魔虚罗现在能不能行动（显现中、被控住、宿傩开着展延时不能）。 */
+    public boolean mahoragaCanAct() {
+        Fighter m = mahoraga;
+        return m.present && m.state != Fighter.M_RISE && m.hitstun == 0 && !m.captured && domainTicks == 0 && !inBlueField(m)
+                && !m.knockedAir && !tenShadowsPaused();
+    }
+
+    /** 魔虚罗自己的 AI（各难度一样，没有随机）：每 12 tick 想一次；够得着就出拳，再远一点挥剑，否则往五条悟那边走。 */
+    private void controlMahoraga() {
+        Fighter m = mahoraga, g = gojo;
+        if (!m.present || m.hpMilli == 0) return;
+        if (m.state == Fighter.M_RISE) { // 刚显现：站着（可以挨打）
+            m.stateTick++;
+            if (m.hitstun == 0 && !m.knockedAir && !m.captured) drive(m, 0);
+            if (m.stateTick >= Tuning.MAHORAGA_RISE) enter(m, Fighter.FREE);
+            return;
+        }
+        if (!mahoragaCanAct()) {
+            interruptMahoraga(); // 起手被控住：作废（冷却不退）
+            boolean controlled = m.hitstun > 0 || m.captured || m.knockedAir || domainTicks > 0 || inBlueField(m);
+            if (!controlled) drive(m, 0); // 展延暂停：站住
+            mWasLocked = true;
+            return;
+        }
+        if (mWasLocked) { // 恢复以后先缓一下再想
+            mWasLocked = false;
+            mReact = Tuning.MAHORAGA_REACT;
+            mMove = 0;
+        }
+        m.stateTick++;
+        int st = m.stateTick;
+        if (m.state == Fighter.M_PUNCH || m.state == Fighter.M_SWORD) {
+            drive(m, 0);
+            boolean sword = m.state == Fighter.M_SWORD;
+            int total = sword ? Tuning.M_SWORD_STARTUP + Tuning.M_SWORD_ACTIVE + Tuning.M_SWORD_RECOVERY
+                    : Tuning.M_PUNCH_STARTUP + Tuning.M_PUNCH_ACTIVE + Tuning.M_PUNCH_RECOVERY;
+            if (st >= total) {
+                enter(m, Fighter.FREE);
+                mGap = Tuning.M_ATTACK_GAP;
+            }
+            return;
+        }
+        if (g.state == Fighter.KO) {
+            drive(m, 0);
+            return;
+        }
+        float dx = g.x - m.x, d = Math.abs(dx);
+        int toward = dx >= 0 ? 1 : -1;
+        m.facing = toward;
+        if (mReact > 0) {
+            mReact--;
+            drive(m, 0);
+            return;
+        }
+        if (--mDecide <= 0) {
+            mDecide = Tuning.MAHORAGA_DECIDE;
+            float dy = Math.abs(g.centerY() - m.centerY());
+            if (mGap == 0 && mPunchCd == 0 && d <= Tuning.M_PUNCH_REACH && dy <= Tuning.M_PUNCH_DY) {
+                startMahoragaAttack(Fighter.M_PUNCH);
+                return;
+            }
+            if (mGap == 0 && mSwordCd == 0 && d <= Tuning.M_SWORD_REACH && dy <= Tuning.M_SWORD_DY) {
+                startMahoragaAttack(Fighter.M_SWORD);
+                return;
+            }
+            mMove = d > Tuning.M_PUNCH_REACH - 10 ? toward : 0; // 两招都用不了：贴到拳头够得着的地方等
+        }
+        drive(m, mMove * Tuning.MAHORAGA_SPEED);
+    }
+
+    private void startMahoragaAttack(int state) {
+        Fighter m = mahoraga;
+        enter(m, state);
+        drive(m, 0);
+        mMove = 0;
+        mSeq = ++attackSeq;
+        if (state == Fighter.M_PUNCH) mPunchCd = Tuning.M_PUNCH_COOLDOWN;
+        else mSwordCd = Tuning.M_SWORD_COOLDOWN;
+    }
+
+    /** 魔虚罗出招被打断（挨了能让它硬直的招、被控住、展延暂停）：作废，冷却不退。 */
+    private void interruptMahoraga() {
+        Fighter m = mahoraga;
+        if (m.state == Fighter.M_PUNCH || m.state == Fighter.M_SWORD) {
+            enter(m, Fighter.FREE);
+            mGap = Tuning.M_ATTACK_GAP;
+        }
+    }
+
+    /** 魔虚罗的重拳、退魔之剑：在有效帧里碰到五条悟就判一次；没适应时被无限挡下（挡下也让法阵转一格）。 */
+    private void resolveMahoragaAttack() {
+        Fighter m = mahoraga, g = gojo;
+        if (!m.present || m.hpMilli == 0 || (m.state != Fighter.M_PUNCH && m.state != Fighter.M_SWORD) || mHitId == mSeq || g.state == Fighter.KO) return;
+        boolean sword = m.state == Fighter.M_SWORD;
+        int su = sword ? Tuning.M_SWORD_STARTUP : Tuning.M_PUNCH_STARTUP, act = sword ? Tuning.M_SWORD_ACTIVE : Tuning.M_PUNCH_ACTIVE;
+        int st = m.stateTick;
+        if (st <= su || st > su + act) return;
+        float dx = (g.x - m.x) * m.facing, dy = Math.abs(g.centerY() - m.centerY());
+        if (dx < -10 || dx > (sword ? Tuning.M_SWORD_REACH : Tuning.M_PUNCH_REACH) || dy > (sword ? Tuning.M_SWORD_DY : Tuning.M_PUNCH_DY)) return;
+        mHitId = mSeq;
+        if (sword) {
+            attack.set(Fighter.MAHORAGA, Fighter.GOJO, Attack.M_SWORD, mSeq, Tuning.M_SWORD_DAMAGE_MILLI,
+                    m.facing * Tuning.M_SWORD_IMPULSE_X, Tuning.M_SWORD_IMPULSE_Y, Tuning.M_SWORD_HITSTUN, Attack.SPECIAL_BYPASS);
+        } else {
+            attack.set(Fighter.MAHORAGA, Fighter.GOJO, Attack.M_PUNCH, mSeq, Tuning.M_PUNCH_DAMAGE_MILLI,
+                    m.facing * Tuning.M_PUNCH_IMPULSE_X, 0, Tuning.M_PUNCH_HITSTUN, Attack.SPECIAL_BYPASS);
+        }
+        if ((apply(attack) & Defense.SHOW_INFINITY) != 0) turnWheel();
     }
 
     private void startWorldSlash() {
@@ -1074,38 +1369,34 @@ public final class World {
     /* ---------------- 命中裁决 ---------------- */
 
     private void resolveMelee() {
-        Fighter g = gojo, s = sukuna;
-        if (s.state == Fighter.KO || meleeHitId == gMeleeSeq) return;
+        Fighter g = gojo;
+        if (meleeHitId == gMeleeSeq) return;
         boolean fist = g.state == Fighter.FIST_ACTIVE;
         if (g.state != Fighter.MELEE_ACTIVE && !fist) return;
-        float dx = (s.x - g.x) * g.facing, dy = Math.abs(s.y - g.y);
         boolean smash = fist && fistSmash;
-        if (smash && fistAir) { // 俯冲：在五条悟前下方
-            float above = g.y - s.y;
-            if (dx < -30 || dx > Tuning.SMASH_REACH || above < -40 || above > 160) return;
-        } else if (dx < -10 || dx > (smash ? Tuning.SMASH_REACH : fist ? Tuning.FIST_REACH : Tuning.MELEE_REACH) || dy > 80) {
-            return;
-        }
+        Fighter s = meleeTarget(sukuna, null, fist, smash); // 宿傩和魔虚罗都够得着：打近的那个（一样近打宿傩）
+        s = meleeTarget(mahoraga, s, fist, smash);
+        if (s == null) return;
         meleeHitId = gMeleeSeq;
         boolean bf = blackFlash.roll(rng); // 只在真正命中时判定（苍拳也算）
         int kind;
         if (bf) {
             kind = Attack.BLACK_FLASH;
-            attack.set(Fighter.GOJO, Fighter.SUKUNA, kind, gMeleeSeq,
+            attack.set(Fighter.GOJO, s.id, kind, gMeleeSeq,
                     smash ? Tuning.SMASH_BLACK_FLASH_DAMAGE_MILLI : fist ? Tuning.FIST_BLACK_FLASH_DAMAGE_MILLI : Tuning.BLACK_FLASH_DAMAGE_MILLI,
                     g.facing * Tuning.BLACK_FLASH_IMPULSE_X, Tuning.BLACK_FLASH_IMPULSE_Y, Tuning.BLACK_FLASH_HITSTUN, 0);
         } else if (fist) {
             kind = Attack.BLUE_FIST;
             if (smash) {
-                attack.set(Fighter.GOJO, Fighter.SUKUNA, kind, gMeleeSeq, Tuning.SMASH_DAMAGE_MILLI,
+                attack.set(Fighter.GOJO, s.id, kind, gMeleeSeq, Tuning.SMASH_DAMAGE_MILLI,
                         g.facing * Tuning.SMASH_IMPULSE_X, Tuning.SMASH_IMPULSE_Y, Tuning.SMASH_HITSTUN, 0);
             } else {
-                attack.set(Fighter.GOJO, Fighter.SUKUNA, kind, gMeleeSeq, Tuning.FIST_DAMAGE_MILLI,
+                attack.set(Fighter.GOJO, s.id, kind, gMeleeSeq, Tuning.FIST_DAMAGE_MILLI,
                         g.facing * Tuning.FIST_IMPULSE_X, Tuning.FIST_IMPULSE_Y, Tuning.FIST_HITSTUN, 0);
             }
         } else {
             kind = Attack.MELEE;
-            attack.set(Fighter.GOJO, Fighter.SUKUNA, kind, gMeleeSeq, Tuning.MELEE_DAMAGE_MILLI,
+            attack.set(Fighter.GOJO, s.id, kind, gMeleeSeq, Tuning.MELEE_DAMAGE_MILLI,
                     g.facing * Tuning.MELEE_IMPULSE, 0, Tuning.MELEE_HITSTUN, 0);
         }
         int mask = apply(attack);
@@ -1114,21 +1405,41 @@ public final class World {
         if (bf) events.emit(Events.BLACK_FLASH, (g.x + s.x) * 0.5f, s.centerY(), g.facing, fist ? Attack.BLUE_FIST : Attack.BLACK_FLASH, tick);
     }
 
+    /** 五条悟这一下够得着 t 吗（在前方、距离和高度都合适；大个子离得远一点也打得到）；够得着而且比 best 近就换成它。 */
+    private Fighter meleeTarget(Fighter t, Fighter best, boolean fist, boolean smash) {
+        Fighter g = gojo;
+        if (!t.present || t.state == Fighter.KO) return best;
+        float extra = t.halfW - Tuning.BODY_HALF_W, tall = t.height - Tuning.BODY_H;
+        float dx = (t.x - g.x) * g.facing, rel = g.y - t.y;
+        if (smash && fistAir) { // 俯冲：在五条悟前下方
+            if (dx < -30 - extra || dx > Tuning.SMASH_REACH + extra || rel < -40 || rel > 160 + tall) return best;
+        } else if (dx < -10 - extra || dx > (smash ? Tuning.SMASH_REACH : fist ? Tuning.FIST_REACH : Tuning.MELEE_REACH) + extra
+                || rel < -80 || rel > 80 + tall) {
+            return best;
+        }
+        return best == null || Math.abs(t.x - g.x) < Math.abs(best.x - g.x) ? t : best;
+    }
+
     /** 一次攻击接触：交给防御裁决，再按允许的部分生效。返回裁决位掩码。 */
     public int apply(Attack a) {
         Fighter t = fighter(a.target);
-        if (t.invuln) return 0; // 闪避、瞬移的固定动作：碰不到
+        if (t.invuln || !t.present) return 0; // 闪避、瞬移的固定动作：碰不到
         int mask = Defense.resolve(this, a);
         // 念咒、苍拳和瞬移的前摇：被攻击就打断（被无限挡住也算：攻击碰到了）
-        if (t == gojo && a.source == Fighter.SUKUNA) breakChant();
+        if (t == gojo && a.source != Fighter.GOJO) breakChant();
         if ((mask & Defense.SHOW_INFINITY) != 0) {
             events.emit(Events.INFINITY_BLOCK, t.x, t.centerY(), a.kind, a.kind, tick);
             if (a.kind == Attack.DISMANTLE && sukuna.state == Fighter.S_DISMANTLE) adaptPending = true; // 收完招再结算
             return mask;
         }
-        if ((mask & Defense.ALLOW_DAMAGE) != 0 && a.damageMilli > 0) {
-            t.hpMilli = Math.max(0, t.hpMilli - a.damageMilli);
-            if (a.kind != Attack.BLUE_FIELD) events.emit(Events.DAMAGE, t.x, t.y + Tuning.BODY_H + 10, a.damageMilli / 1000f, a.kind, tick);
+        // 魔虚罗的霸体：五条悟的普通体术（不是黑闪）照常扣血，但不硬直、不击退、不打断
+        if (t == mahoraga && a.kind == Attack.MELEE) mask &= ~(Defense.ALLOW_IMPULSE | Defense.ALLOW_STUN);
+        // 难度倍率只乘宿傩自己的招（式神的伤害固定）
+        long dmg = a.source == Fighter.SUKUNA && a.kind != Attack.AGITO ? Math.round(a.damageMilli * (double) config.sukunaDamageMult) : a.damageMilli;
+        if ((mask & Defense.ALLOW_DAMAGE) != 0 && dmg > 0) {
+            damageTaken[t.id] += Math.min(dmg, t.hpMilli);
+            t.hpMilli = Math.max(0, t.hpMilli - dmg);
+            if (a.kind != Attack.BLUE_FIELD) events.emit(Events.DAMAGE, t.x, t.y + t.height + 10, dmg / 1000f, a.kind, tick);
         }
         if ((mask & Defense.ALLOW_IMPULSE) != 0 && (a.impulseX != 0 || a.impulseY != 0)) {
             t.vx = clamp(t.vx + a.impulseX, -Tuning.MAX_VX, Tuning.MAX_VX);
@@ -1148,10 +1459,11 @@ public final class World {
             }
             if (!light || t.comboHits <= Tuning.COMBO_STUN_HITS) {
                 t.hitstun = Math.max(t.hitstun, a.hitstun);
-                if (t == sukuna) interruptSukuna(); // 宿傩出招、咏唱、回复被打断
-                else interruptGojo();
-            } else if (t == sukuna && (sukuna.state == Fighter.S_WORLD || sukuna.state == Fighter.S_RCT)) {
-                interruptSukuna(); // 咏唱和回复挨打就断（不管有没有硬直）
+                if (t == sukuna) interruptSukuna(); // 宿傩出招、咏唱被打断（反转术式、变原身不会）
+                else if (t == gojo) interruptGojo();
+                else interruptMahoraga();
+            } else if (t == sukuna && (sukuna.state == Fighter.S_WORLD || sukuna.state == Fighter.S_SUMMON)) {
+                interruptSukuna(); // 世界斩、召唤魔虚罗的咏唱挨打就断（不管有没有硬直）
             }
         }
         if (a.kind != Attack.BLUE_FIELD) {
@@ -1183,14 +1495,20 @@ public final class World {
                 return;
             }
         }
-        Fighter s = sukuna;
-        if (!r.hit && s.state != Fighter.KO && touches(r.x, r.y, r.max ? Tuning.RED_MAX_ORB_R : Tuning.RED_ORB_R, s)) {
+        // 打到弹道上第一个（这一 tick 两个都碰到：沿飞行方向先碰到的那个；一样就是宿傩）
+        float orb = r.max ? Tuning.RED_MAX_ORB_R : Tuning.RED_ORB_R;
+        Fighter s = null;
+        if (!r.hit) {
+            s = shotTarget(r, sukuna, null, orb);
+            s = shotTarget(r, mahoraga, s, orb);
+        }
+        if (s != null) {
             r.hit = true;
             if (r.max) {
-                attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.RED, r.instanceId, Tuning.RED_MAX_DAMAGE_MILLI,
+                attack.set(Fighter.GOJO, s.id, Attack.RED, r.instanceId, Tuning.RED_MAX_DAMAGE_MILLI,
                         r.dir * Tuning.RED_MAX_IMPULSE_X, Tuning.RED_MAX_IMPULSE_Y, Tuning.RED_MAX_HITSTUN, 0);
             } else {
-                attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.RED, r.instanceId, Tuning.RED_DAMAGE_MILLI,
+                attack.set(Fighter.GOJO, s.id, Attack.RED, r.instanceId, Tuning.RED_DAMAGE_MILLI,
                         r.dir * Tuning.RED_IMPULSE_X, Tuning.RED_IMPULSE_Y, Tuning.RED_HITSTUN, 0);
             }
             if ((apply(attack) & Defense.ALLOW_IMPULSE) != 0) {
@@ -1203,6 +1521,20 @@ public final class World {
         }
         boolean end = r.max ? (r.x < 0 || r.x > Tuning.WIDTH) : (r.tick >= Tuning.RED_TRAVEL || r.x < 0 || r.x > Tuning.WIDTH);
         if (end) burstRed();
+    }
+
+    /** 飞行的球碰到 t 了吗；碰到了而且沿飞行方向比 best 先碰到就换成它（一样早就是编号小的，宿傩在前）。 */
+    private Fighter shotTarget(Shot r, Fighter t, Fighter best, float radius) {
+        if (!t.present || t.state == Fighter.KO || !touches(r.x, r.y, radius, t)) return best;
+        if (best == null) return t;
+        return entry(r, t, radius) < entry(r, best, radius) ? t : best;
+    }
+
+    /** 水平飞行的圆（半径 radius）第一次碰到 t 的身体时，球心沿飞行方向走过的距离（从上一 tick 的位置算）。 */
+    private static float entry(Shot r, Fighter t, float radius) {
+        float dy = r.y - clamp(r.y, t.y, t.y + t.height); // 球心高出（低于）身体多少
+        float reach = (float) Math.sqrt(Math.max(0, radius * radius - dy * dy));
+        return (t.x - r.dir * (t.halfW + reach) - r.px) * r.dir;
     }
 
     private void burstRed() {
@@ -1218,23 +1550,27 @@ public final class World {
         p.tick++;
         float r = p.max ? Tuning.PURPLE_200_R : Tuning.PURPLE_R;
         p.x += p.dir * (p.max ? Tuning.PURPLE_200_SPEED : Tuning.PURPLE_SPEED) * Tuning.DT;
-        Fighter s = sukuna;
-        if (!p.hit && s.state != Fighter.KO && touches(p.x, p.y, r, s)) {
-            p.hit = true;
-            if (p.max) {
-                attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.PURPLE, p.instanceId, Tuning.PURPLE_200_DAMAGE_MILLI,
-                        p.dir * Tuning.PURPLE_200_IMPULSE_X, Tuning.PURPLE_200_IMPULSE_Y, Tuning.PURPLE_200_HITSTUN, 0);
-            } else {
-                attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.PURPLE, p.instanceId, Tuning.PURPLE_DAMAGE_MILLI,
-                        p.dir * Tuning.PURPLE_IMPULSE_X, Tuning.PURPLE_IMPULSE_Y, Tuning.PURPLE_HITSTUN, 0);
-            }
-            if ((apply(attack) & Defense.ALLOW_IMPULSE) != 0) {
-                s.captured = false;
-                s.pullResist = Tuning.RED_PULL_RESIST;
-                if (p.max) hitstop = Tuning.PURPLE_200_HITSTOP;
-            }
-        }
+        purpleHit(p, sukuna, r); // 穿透：宿傩、魔虚罗各打一次
+        purpleHit(p, mahoraga, r);
         if (p.x < -r * 2 || p.x > Tuning.WIDTH + r * 2) p.active = false;
+    }
+
+    private void purpleHit(Shot p, Fighter s, float r) {
+        int bit = 1 << s.id;
+        if ((p.hitMask & bit) != 0 || !s.present || s.state == Fighter.KO || !touches(p.x, p.y, r, s)) return;
+        p.hitMask |= bit;
+        if (p.max) {
+            attack.set(Fighter.GOJO, s.id, Attack.PURPLE, p.instanceId, Tuning.PURPLE_200_DAMAGE_MILLI,
+                    p.dir * Tuning.PURPLE_200_IMPULSE_X, Tuning.PURPLE_200_IMPULSE_Y, Tuning.PURPLE_200_HITSTUN, 0);
+        } else {
+            attack.set(Fighter.GOJO, s.id, Attack.PURPLE, p.instanceId, Tuning.PURPLE_DAMAGE_MILLI,
+                    p.dir * Tuning.PURPLE_IMPULSE_X, Tuning.PURPLE_IMPULSE_Y, Tuning.PURPLE_HITSTUN, 0);
+        }
+        if ((apply(attack) & Defense.ALLOW_IMPULSE) != 0) {
+            s.captured = false;
+            s.pullResist = Tuning.RED_PULL_RESIST;
+            if (p.max) hitstop = Tuning.PURPLE_200_HITSTOP;
+        }
     }
 
     /* ---------------- 无指向茈：向四周扩张，扩到谁就打谁（五条悟一半） ---------------- */
@@ -1247,10 +1583,11 @@ public final class World {
         h.x = x;
         h.y = y;
         h.radius = 0;
-        h.hitSukuna = h.hitGojo = false;
+        h.hitMask = 0;
         red.active = false;
         blue.phase = BlueOrb.OFF;      // 苍和赫都被吃掉了
         sukuna.captured = false;
+        mahoraga.captured = false;
         events.emit(Events.HOLLOW_FORM, x, y, Tuning.HOLLOW_RADIUS, Attack.HOLLOW, tick);
     }
 
@@ -1260,16 +1597,12 @@ public final class World {
         h.tick++;
         float k = Math.min(1f, h.tick / (float) Tuning.HOLLOW_GROW);
         h.radius = Tuning.HOLLOW_RADIUS * (1 - (1 - k) * (1 - k)); // 先快后慢
-        Fighter s = sukuna, g = gojo;
-        if (!h.hitSukuna && s.state != Fighter.KO && touches(h.x, h.y, h.radius, s)) {
-            h.hitSukuna = true;
-            float dir = s.x >= h.x ? 1 : -1;
-            attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.HOLLOW, h.instanceId, Tuning.HOLLOW_DAMAGE_MILLI,
-                    dir * Tuning.HOLLOW_IMPULSE_X, Tuning.HOLLOW_IMPULSE_Y, Tuning.HOLLOW_HITSTUN, 0);
-            if ((apply(attack) & Defense.ALLOW_IMPULSE) != 0) s.pullResist = Tuning.RED_PULL_RESIST;
-        }
-        if (!h.hitGojo && g.state != Fighter.KO && touches(h.x, h.y, h.radius, g)) {
-            h.hitGojo = true;
+        Fighter g = gojo;
+        hollowHit(h, sukuna);
+        hollowHit(h, mahoraga);
+        int gb = 1 << Fighter.GOJO;
+        if ((h.hitMask & gb) == 0 && g.state != Fighter.KO && touches(h.x, h.y, h.radius, g)) {
+            h.hitMask |= gb;
             float dir = g.x >= h.x ? 1 : -1;
             attack.set(Fighter.GOJO, Fighter.GOJO, Attack.HOLLOW, h.instanceId, Tuning.HOLLOW_SELF_DAMAGE_MILLI,
                     dir * Tuning.HOLLOW_SELF_IMPULSE_X, Tuning.HOLLOW_SELF_IMPULSE_Y, Tuning.HOLLOW_SELF_HITSTUN, 0);
@@ -1279,6 +1612,16 @@ public final class World {
             h.active = false;
             events.emit(Events.HOLLOW_END, h.x, h.y, 0, Attack.HOLLOW, tick);
         }
+    }
+
+    private void hollowHit(Hollow h, Fighter s) {
+        int bit = 1 << s.id;
+        if ((h.hitMask & bit) != 0 || !s.present || s.state == Fighter.KO || !touches(h.x, h.y, h.radius, s)) return;
+        h.hitMask |= bit;
+        float dir = s.x >= h.x ? 1 : -1;
+        attack.set(Fighter.GOJO, s.id, Attack.HOLLOW, h.instanceId, Tuning.HOLLOW_DAMAGE_MILLI,
+                dir * Tuning.HOLLOW_IMPULSE_X, Tuning.HOLLOW_IMPULSE_Y, Tuning.HOLLOW_HITSTUN, 0);
+        if ((apply(attack) & Defense.ALLOW_IMPULSE) != 0) s.pullResist = Tuning.RED_PULL_RESIST;
     }
 
     /** 从 (x0, y0) 沿 (dx, dy) 走一段（t 从 0 到 1），第一次进入以原点为圆心、半径 r 的圆时的 t；进不去返回 -1。 */
@@ -1299,8 +1642,8 @@ public final class World {
 
     /** 圆（cx, cy, r）是否碰到人的身体（一个竖着的矩形）。 */
     private static boolean touches(float cx, float cy, float r, Fighter f) {
-        float nx = clamp(cx, f.x - Tuning.BODY_HALF_W, f.x + Tuning.BODY_HALF_W);
-        float ny = clamp(cy, f.y, f.y + Tuning.BODY_H);
+        float nx = clamp(cx, f.x - f.halfW, f.x + f.halfW);
+        float ny = clamp(cy, f.y, f.y + f.height);
         float dx = cx - nx, dy = cy - ny;
         return dx * dx + dy * dy <= r * r;
     }
@@ -1332,8 +1675,13 @@ public final class World {
             endBlue();
             return;
         }
-        Fighter s = sukuna;
-        if (s.state == Fighter.KO) return;
+        blueOn(b, sukuna, 1f);
+        blueOn(b, mahoraga, Tuning.MAHORAGA_PULL); // 魔虚罗：吸力减半，伤害不减
+    }
+
+    /** 苍对一个目标：吸引（pullMult 乘在最后的加速度上）和持续伤害，各算各的。 */
+    private void blueOn(BlueOrb b, Fighter s, float pullMult) {
+        if (!s.present || s.state == Fighter.KO) return;
         float dx = b.cx - s.x, dy = b.cy - s.centerY();
         float r = s.captured ? 0f : (float) Math.sqrt(dx * dx + dy * dy);
         if (r >= b.radius) return;
@@ -1350,30 +1698,32 @@ public final class World {
                 axx *= amax / m;
                 ayy *= amax / m;
             }
-            s.ax += axx;
-            s.ay += ayy;
+            s.ax += axx * pullMult;
+            s.ay += ayy * pullMult;
             s.pulled = true;
             s.gravityScale = Math.min(s.gravityScale, 1f - q); // 越靠近中心越失重
         }
         // 持续伤害：离中心越近越高，核心最高每秒 100；按余数累计，不因截断丢血
         float qd = clamp((b.radius - r) / (b.radius - Tuning.BLUE_CORE), 0f, 1f);
         long dpsMilli = Math.round(Tuning.BLUE_MAX_DPS_MILLI * (double) (qd * qd));
-        b.remainder += dpsMilli;
-        long dmg = b.remainder / Tuning.HZ;
-        b.remainder %= Tuning.HZ;
+        int id = s.id;
+        b.remainder[id] += dpsMilli;
+        long dmg = b.remainder[id] / Tuning.HZ;
+        b.remainder[id] %= Tuning.HZ;
         if (dmg > 0) {
-            attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.BLUE_FIELD, b.instanceId, dmg, 0, 0, 0, 0);
-            if ((apply(attack) & Defense.ALLOW_DAMAGE) != 0) b.shownMilli += dmg;
+            attack.set(Fighter.GOJO, id, Attack.BLUE_FIELD, b.instanceId, dmg, 0, 0, 0, 0);
+            if ((apply(attack) & Defense.ALLOW_DAMAGE) != 0) b.shownMilli[id] += dmg;
         }
-        if (b.tick % 30 == 0 && b.shownMilli > 0) {
-            events.emit(Events.DAMAGE, s.x, s.y + Tuning.BODY_H + 10, b.shownMilli / 1000f, Attack.BLUE_FIELD, tick);
-            b.shownMilli = 0;
+        if (b.tick % 30 == 0 && b.shownMilli[id] > 0) {
+            events.emit(Events.DAMAGE, s.x, s.y + s.height + 10, b.shownMilli[id] / 1000f, Attack.BLUE_FIELD, tick);
+            b.shownMilli[id] = 0;
         }
     }
 
     private void endBlue() {
         blue.phase = BlueOrb.OFF;
         sukuna.captured = false;
+        mahoraga.captured = false;
         events.emit(Events.BLUE_END, blue.cx, blue.cy, 0, tick);
     }
 
@@ -1386,7 +1736,7 @@ public final class World {
             f.onGround = f.y <= 0;
         } else if (f.captured) {
             f.x = blue.cx;
-            f.y = blue.cy - Tuning.BODY_H * 0.5f;
+            f.y = blue.cy - f.height * 0.5f;
             f.vx = f.vy = 0;
             f.onGround = false;
         } else {
@@ -1397,11 +1747,11 @@ public final class World {
             f.x += f.vx * dt;
             f.y += f.vy * dt;
             // 防穿过：这一 tick 的移动线段经过苍的核心，就被抓住
-            if (f.id == Fighter.SUKUNA && blue.phase == BlueOrb.PULL && f.pullResist == 0
+            if (f.id != Fighter.GOJO && blue.phase == BlueOrb.PULL && f.pullResist == 0
                     && segmentNear(ox, oy, f.x, f.centerY(), blue.cx, blue.cy, Tuning.BLUE_CORE)) {
                 f.captured = true;
                 f.x = blue.cx;
-                f.y = blue.cy - Tuning.BODY_H * 0.5f;
+                f.y = blue.cy - f.height * 0.5f;
                 f.vx = f.vy = 0;
                 f.knockedAir = false;
             }
@@ -1421,7 +1771,7 @@ public final class World {
             }
         }
         // 墙：夹在战场内，清掉朝墙外的速度
-        float lo = Tuning.BODY_HALF_W, hi = Tuning.WIDTH - Tuning.BODY_HALF_W;
+        float lo = f.halfW, hi = Tuning.WIDTH - f.halfW;
         if (f.x < lo) {
             f.x = lo;
             if (f.vx < 0) f.vx = 0;
@@ -1471,15 +1821,27 @@ public final class World {
         if (worldCd > 0) worldCd--;
         if (rctCd > 0) rctCd--;
         if (sStagger > 0) sStagger--;
-        // 法阵自己慢慢转（没开展延、没倒下时）
-        if (adaptPoints < Tuning.S_ADAPT_POINTS && ampTicks == 0 && sukuna.state != Fighter.KO && ++adaptTimer >= Tuning.S_ADAPT_PASSIVE) turnWheel();
-        if (!worldUnlocked && adaptPoints >= Tuning.S_ADAPT_POINTS && fightTicks >= Tuning.S_ADAPT_UNLOCK_MIN_TICKS) {
+        if (summonCd > 0) summonCd--;
+        if (agitoCd > 0) agitoCd--;
+        if (mPunchCd > 0) mPunchCd--;
+        if (mSwordCd > 0) mSwordCd--;
+        if (mGap > 0) mGap--;
+        // 魔虚罗被打空：先退场（不会复活，也不能再召唤），再算法阵（法阵跟着它没了）
+        if (mahoraga.present && mahoraga.hpMilli == 0) removeMahoraga(0);
+        boolean sukunaUp = sukuna.state != Fighter.KO && sukuna.hpMilli > 0;
+        // 法阵自己慢慢转（有法阵、十种影没被展延暂停、宿傩没倒下时）
+        if (wheelOn != WHEEL_NONE && adaptPoints < Tuning.S_ADAPT_POINTS && !tenShadowsPaused() && sukunaUp
+                && ++adaptTimer >= Tuning.S_ADAPT_PASSIVE) turnWheel();
+        // 学会世界斩：转满而且打了够久；这时候法阵还得在（魔虚罗退场、变了原身就没了），宿傩也得站着
+        if (!worldUnlocked && config.shrine && wheelOn != WHEEL_NONE && sukunaUp && adaptPoints >= Tuning.S_ADAPT_POINTS
+                && fightTicks >= Tuning.S_ADAPT_UNLOCK_MIN_TICKS) {
             worldUnlocked = true; // 适应完成：学会了世界斩
             domains.specialBypass[Fighter.SUKUNA] = true;
             events.emit(Events.ADAPT, sukuna.x, sukuna.centerY() + 70, adaptPoints, 1, tick);
         }
         if (domainTicks > 0 && --domainTicks == 0) {
             domains.sureHit[Fighter.GOJO][Fighter.SUKUNA] = false;
+            domains.sureHit[Fighter.GOJO][Fighter.MAHORAGA] = false;
             domainCd = Tuning.DOMAIN_COOLDOWN;
             events.emit(Events.DOMAIN_CLOSE, gojo.x, gojo.centerY(), 0, tick);
         } else if (domainTicks == 0 && domainCd > 0) {
@@ -1496,8 +1858,9 @@ public final class World {
             for (int i = 0; i < bqSize; i++) bqTtl[(bqHead + i) % BQ]--;
             while (bqSize > 0 && bqTtl[bqHead] <= 0) bluePop(); // 越早的越先到期，到期的总在队头
         }
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < Fighter.COUNT; i++) {
             Fighter f = fighter(i);
+            if (!f.present) continue;
             if (f.hitstun > 0) f.hitstun--;
             if (f.comboTimer > 0 && --f.comboTimer == 0) f.comboHits = 0;
             if (f.downTicks > 0 && f.onGround && !f.knockedAir && !f.scripted) f.downTicks--; // 被击倒：落地后才开始算
@@ -1513,6 +1876,8 @@ public final class World {
                 if (f != gojo) {
                     interruptSukuna();
                     if (ampTicks > 0) closeAmp();
+                    agito.active = false;
+                    removeMahoraga(1); // 宿傩倒下：式神跟着消失（一局只能召一次，复活也不会回来）
                 }
                 f.state = Fighter.KO;
                 f.stateTick = 0;

@@ -196,6 +196,32 @@ public final class Tuning {
     public static final long S_RCT_HEAL_PER_SEC_MILLI = 170_000;
     public static final long S_RCT_TOTAL_MILLI = S_RCT_HEAL_PER_SEC_MILLI * S_RCT_DURATION / HZ; // 255
 
+    // ---- 十种影法术与原身（Luna 考证、Astra 定的首版数值，见 notes/宿傩平衡.md） ----
+    // 嵌合兽「顎吐」（原作第 234 话）：结手影（可被打断）→ 从影子里飞出，从锁定点上方俯冲电击 → 消失。
+    // 被无限挡住（原作没有穿透的依据），碰到五条悟时照样打断念咒和前摇。伤害固定（不吃难度倍率）
+    public static final long AGITO_DAMAGE_MILLI = 60_000;
+    public static final int AGITO_SIGN = 30, AGITO_DIVE = 30, AGITO_ACTIVE = 6, AGITO_RECOVERY = 18, AGITO_COOLDOWN = 720;
+    public static final float AGITO_RANGE = 560f, AGITO_RADIUS = 48f, AGITO_DROP = 180f;
+    public static final int AGITO_HITSTUN = 12;
+    public static final float AGITO_IMPULSE_X = 120f;
+    // 魔虚罗（里梅以上）：召唤要念「布瑠部由良由良」，被打断不算用掉、但 5 秒后才能重试；成功后一局不能再召（定）
+    public static final int SUMMON_CHANT = 120, SUMMON_RECOVERY = 24, SUMMON_BREAK_LOCK = 36, SUMMON_RETRY = 600;
+    public static final float SUMMON_OFFSET = 80f;
+    public static final long MAHORAGA_HP_MILLI = 850_000;         // 定：一发茈（850）正好打掉
+    public static final float MAHORAGA_HALF_W = 34f, MAHORAGA_H = 150f, MAHORAGA_SPEED = 270f;
+    public static final int MAHORAGA_RISE = 48;                   // 显现后多久才开始行动（可以挨打）
+    public static final int MAHORAGA_DECIDE = 12, MAHORAGA_REACT = 24;
+    public static final float MAHORAGA_PULL = 0.5f;               // 苍对它的吸力减半（伤害不减）
+    // 重拳、退魔之剑：伤害固定；没适应无限时被挡住（挡下也让法阵转一格），适应后能打穿无限（原作第 234 话）
+    public static final long M_PUNCH_DAMAGE_MILLI = 90_000, M_SWORD_DAMAGE_MILLI = 140_000;
+    public static final int M_PUNCH_STARTUP = 36, M_PUNCH_ACTIVE = 6, M_PUNCH_RECOVERY = 42, M_PUNCH_COOLDOWN = 120;
+    public static final int M_SWORD_STARTUP = 60, M_SWORD_ACTIVE = 6, M_SWORD_RECOVERY = 60, M_SWORD_COOLDOWN = 240;
+    public static final float M_PUNCH_REACH = 120f, M_PUNCH_DY = 100f, M_SWORD_REACH = 210f, M_SWORD_DY = 120f;
+    public static final int M_PUNCH_HITSTUN = 18, M_SWORD_HITSTUN = 30, M_ATTACK_GAP = 24;
+    public static final float M_PUNCH_IMPULSE_X = 180f, M_SWORD_IMPULSE_X = 300f, M_SWORD_IMPULSE_Y = 120f;
+    // 原身（里梅以上，一局一次）：开始时回满血（定），之后不能用十种影法术（定）；变身 1 秒，不可打断，照常挨打
+    public static final int TRANSFORM_TICKS = 120;
+
     // 无指向茈：赫与苍重叠或互相在作用范围内时生成；伤害和茈一样 850（定），范围内的五条悟也挨，只有一半（定）
     public static final long HOLLOW_DAMAGE_MILLI = PURPLE_DAMAGE_MILLI;
     public static final long HOLLOW_SELF_DAMAGE_MILLI = HOLLOW_DAMAGE_MILLI / 2;

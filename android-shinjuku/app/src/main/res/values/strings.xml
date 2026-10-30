@@ -4,13 +4,15 @@
     <string name="title">新宿决战</string>
     <string name="subtitle">SHINJUKU  SHOWDOWN</string>
     <string name="start_game">开始游戏</string>
+    <string name="god_war">神战模式</string>
+    <string name="god_war_desc">神战模式，暂未开放</string>
+    <string name="god_war_not_open">神战模式暂未开放</string>
     <string name="vacant">空置</string>
     <string name="not_open">未开放</string>
-    <string name="vacant_1_desc">空置一，未开放</string>
-    <string name="vacant_2_desc">空置二，未开放</string>
+    <string name="vacant_desc">空置，未开放</string>
     <string name="back">返回</string>
     <string name="arrow_back" translatable="false">←</string>
     <string name="select_title">选择难度</string>
     <string name="select_sub">新宿决战 · 宿傩</string>
-    <string name="version">v0.4</string>
+    <string name="version">v0.8</string>
 </resources>

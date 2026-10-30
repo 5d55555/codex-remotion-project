@@ -15,6 +15,11 @@ package com.shinjuku.showdown.core;
  * - 看到五条悟念 200% 茈：反应过来就去打断（够得着就打，否则用解；碰到就算打断，被无限挡住也一样）。
  * - 两种打法换着来：开领域展延贴身打（只有展延下的体术能破无限）；或者在中距离用解试探，攒魔虚罗的适应。
  * - 学会世界斩以后，在中远距离按一定概率念世界斩；血少、离得远、没有来招时用反转术式回血。
+ * 十种影法术与原身（能不能用看 BattleConfig：三轮只有顎吐，里梅以上还有魔虚罗和原身；Astra 的方案）：
+ * - 优先级：血线到了就变原身 → 处理飞来的招 → 安全的时候召唤魔虚罗 → 打断、抓破绽 → 平常的打法。
+ * - 原身：血量跌破血线就变（魔虚罗不在场时马上变；在场时先等它，到紧急血线或等太久就不等了）。
+ * - 魔虚罗：打了够久、血量不太满、离得够远、估计五条悟来不及打断咏唱时才召唤。
+ * - 顎吐：中距离牵制（按难度的概率），或者念咒还剩够长时用来打断；魔虚罗在场时只用来打断。三轮没有解：顎吐冷却时就去贴身。
  */
 final class SukunaAi {
     private final BattleConfig.AiTuning t;
@@ -26,7 +31,8 @@ final class SukunaAi {
     private boolean approachMode = true;
     private int modeTimer;
     private float moveIntent;
-    private boolean wantMelee, wantDismantle, wantJump, wantAmp, wantAmpOff, wantWorld, wantRct;
+    private boolean wantMelee, wantDismantle, wantJump, wantAmp, wantAmpOff, wantWorld, wantRct, wantAgito, wantSummon, wantTransform;
+    private int transformWaitFrom = -1; // 血量第一次跌破变原身血线的时刻（回血也不重置）
 
     // ---- 战术层（里梅以上）----
     private int aiClock;                       // think() 跑了多少次（只在逻辑推进时走）
@@ -54,6 +60,8 @@ final class SukunaAi {
         Fighter s = w.sukuna, g = w.gojo;
         if (jumpCool > 0) jumpCool--;
         if (t.tacticLevel > 0) observe(w); // 被控住的时候也在看
+        // 变原身的等待从血量第一次跌破血线算起（被控住、正在出招时也记）
+        if (transformWaitFrom < 0 && w.config.trueForm && !w.sukunaTrueForm && s.hpMilli <= s.maxHpMilli * t.transformHp) transformWaitFrom = w.fightTicks;
         if (!w.sukunaCanAct()) {
             wasLocked = true;
             react = -1;
@@ -74,6 +82,11 @@ final class SukunaAi {
         float dxs = g.x - s.x, d = Math.abs(dxs);
         int toward = dxs >= 0 ? 1 : -1;
         boolean amp = w.ampTicks > 0;
+        if (wantsTransform(w, s)) { // 变原身：回满血，最优先
+            wantTransform = true;
+            emit(s, toward, out);
+            return;
+        }
 
         // 威胁：看到新的就排一个反应时间
         int threat = threatId(w, s);
@@ -111,8 +124,11 @@ final class SukunaAi {
             } else if (amp) {
                 moveIntent = toward; // 展延中：贴上去打
                 holdTimer = 0;
-            } else if (d <= Tuning.DISMANTLE_RANGE && w.ampLock == 0) {
+            } else if (w.config.shrine && d <= Tuning.DISMANTLE_RANGE && w.ampLock == 0) {
                 wantDismantle = true;
+            } else if (agitoReady(w) && d <= Tuning.AGITO_RANGE
+                    && Tuning.CHANT_PHRASE * Tuning.CHANT_PHRASES - g.stateTick > Tuning.AGITO_SIGN + Tuning.AGITO_DIVE + 2) {
+                wantAgito = true; // 十影宿傩没有解：念咒还剩够长就放顎吐去打断
             } else {
                 moveIntent = toward;
                 holdTimer = 0;
@@ -120,6 +136,11 @@ final class SukunaAi {
         }
 
         boolean heal = wantsHeal(w, s, d);
+        if (wantsSummon(w, s, d, threat, amp)) { // 召唤魔虚罗（只在估计他来不及打断时）
+            wantSummon = true;
+            emit(s, toward, out);
+            return;
+        }
         if (t.tacticLevel > 0 && tactic(w, s, g, d, toward, amp, threat)) {
             emit(s, toward, out);
             return;
@@ -131,10 +152,11 @@ final class SukunaAi {
                 modeTimer = range(30, 60); // 以决策次数计：约 1.5–3 秒
             }
             if (amp) approachMode = true;
+            if (!w.config.shrine && w.agitoCd > 0) approachMode = true; // 十影宿傩没有解：顎吐冷却时别在中距离空等，贴上去
             // 反转术式：血少、离得够远、没有来招
             if (heal && d >= t.rctDistance && threat < 0 && w.rctCd == 0) {
                 wantRct = true;
-            } else if (w.worldUnlocked && w.worldCd == 0 && !amp && w.ampLock == 0 && s.onGround
+            } else if (w.config.shrine && w.worldUnlocked && w.worldCd == 0 && !amp && w.ampLock == 0 && s.onGround
                     && d >= t.worldMin && d <= t.worldMax && (t.tacticLevel == 0 ? rng.nextUnitDouble() < t.worldChance : worldChance(w, d, threat))) {
                 wantWorld = true;
             } else if (!amp && w.ampCd == 0 && s.onGround && d <= t.ampMax && (approachMode || d < t.ampMin)) {
@@ -146,7 +168,7 @@ final class SukunaAi {
                 if (heal && w.rctCd == 0) {
                     lo = t.rctDistance;
                     hi = Tuning.WIDTH;
-                } else if (w.worldUnlocked && w.worldCd == 0 && !amp) { // 世界斩能放：拉到中距离
+                } else if (w.config.shrine && w.worldUnlocked && w.worldCd == 0 && !amp) { // 世界斩能放：拉到中距离
                     lo = t.worldMin + 60;
                     hi = t.worldMin + 400;
                 } else if (amp) {
@@ -173,14 +195,17 @@ final class SukunaAi {
                 if (rng.nextUnitDouble() < t.attackChance) {
                     if (amp) {
                         if (d <= Tuning.S_MELEE_REACH + 6) wantMelee = true;
-                    } else if (d <= Tuning.DISMANTLE_RANGE && w.ampLock == 0) {
-                        wantDismantle = true;
+                    } else if (w.ampLock == 0) {
+                        poke(w, d); // 中距离试探：顎吐（按概率）或解
                     }
                 }
             }
             // 还没学会世界斩：展延冷却的空当里多用解试探
-            if (!amp && !w.worldUnlocked && w.ampCd > 0 && d <= Tuning.DISMANTLE_RANGE && w.ampLock == 0 && w.dismantleCd == 0
+            if (w.config.shrine && !amp && !w.worldUnlocked && w.ampCd > 0 && d <= Tuning.DISMANTLE_RANGE && w.ampLock == 0 && w.dismantleCd == 0
                     && rng.nextUnitDouble() < t.attackChance * 0.25f) wantDismantle = true;
+            // 展延冷却的空当：按难度的概率放顎吐牵制（魔虚罗在场时不放）
+            else if (!amp && w.ampCd > 0 && agitoReady(w) && !w.mahoraga.present && d >= 180 && d <= Tuning.AGITO_RANGE
+                    && rng.nextUnitDouble() < t.agitoChance * 0.25f) wantAgito = true;
         }
         emit(s, toward, out);
     }
@@ -197,6 +222,9 @@ final class SukunaAi {
         out.ampOff = wantAmpOff;
         out.world = wantWorld;
         out.rct = wantRct;
+        out.agito = wantAgito;
+        out.summon = wantSummon;
+        out.transform = wantTransform;
         // 出手、跳只发一次（执行器当 tick 不收也就算了，下一次决策再说）
         clearWants();
     }
@@ -208,7 +236,46 @@ final class SukunaAi {
     }
 
     private void clearWants() {
-        wantJump = wantMelee = wantDismantle = wantAmp = wantAmpOff = wantWorld = wantRct = false;
+        wantJump = wantMelee = wantDismantle = wantAmp = wantAmpOff = wantWorld = wantRct = wantAgito = wantSummon = wantTransform = false;
+    }
+
+    /* ---------------- 十种影法术与原身 ---------------- */
+
+    /** 顎吐现在放得出来吗（有十种影法术、冷却好了、没在飞、没开展延）。 */
+    private static boolean agitoReady(World w) {
+        return w.config.agito && !w.sukunaTrueForm && w.agitoCd == 0 && !w.agito.active && w.ampTicks == 0 && w.ampLock == 0;
+    }
+
+    /** 中距离试探：魔虚罗不在场时按概率放顎吐（180–560），不然有解就用解。 */
+    private void poke(World w, float d) {
+        if (agitoReady(w) && !w.mahoraga.present && d >= 180 && d <= Tuning.AGITO_RANGE && rng.nextUnitDouble() < t.agitoChance) {
+            wantAgito = true;
+        } else if (w.config.shrine && d <= Tuning.DISMANTLE_RANGE) {
+            wantDismantle = true;
+        }
+    }
+
+    /** 变原身：血量跌破血线（魔虚罗在场时先等它退场；到紧急血线或等太久就不等了）。 */
+    private boolean wantsTransform(World w, Fighter s) {
+        if (!w.config.trueForm || w.sukunaTrueForm || s.hpMilli == 0) return false;
+        float hp = s.hpMilli / (float) s.maxHpMilli;
+        if (hp > t.transformHp) return false;
+        if (!w.mahoraga.present) return true;
+        return hp <= t.transformHpEmergency || w.fightTicks - transformWaitFrom >= t.transformMaxWait;
+    }
+
+    /**
+     * 召唤魔虚罗：打了够久、血量不太满、离开一段距离、没有来招、他手上没在起招，赫的射程内看到过他用赫（推算冷却）。
+     * 冲过来打断、瞬移、苍、茈都留给玩家（被打断不算用掉，5 秒后再试）：只在“绝对安全”时才召唤的话几乎召不出来。
+     */
+    private boolean wantsSummon(World w, Fighter s, float d, int threat, boolean amp) {
+        if (!w.config.mahoraga || w.mahoragaUsed || w.sukunaTrueForm || w.summonCd > 0 || amp || w.ampLock > 0 || !s.onGround || threat >= 0) {
+            return false;
+        }
+        if (w.fightTicks < t.summonMinTicks || s.hpMilli > s.maxHpMilli * t.summonHp || d < t.summonDistance) return false;
+        if (gojoWindingUp(w.gojo)) return false;
+        boolean redReady = aiClock - seenRed > Tuning.RED_COOLDOWN && d <= Tuning.RED_REACH;
+        return !redReady || Tuning.RED_WINDUP + d / Tuning.RED_SPEED * Tuning.HZ + w.gojo.hitstun > Tuning.SUMMON_CHANT + t.summonMargin;
     }
 
     /* ---------------- 战术层（里梅以上） ---------------- */
@@ -339,6 +406,9 @@ final class SukunaAi {
                             opp = OPP_NONE;
                         } else if (d <= reach && canMelee && left > Tuning.S_MELEE_STARTUP + 1) {
                             wantMelee = true;
+                            opp = OPP_NONE;
+                        } else if (agitoReady(w) && w.sAttackGap == 0 && d <= Tuning.AGITO_RANGE && left > Tuning.AGITO_SIGN + Tuning.AGITO_DIVE + 1) {
+                            wantAgito = true; // 念咒还剩够长：放顎吐去碰他一下
                             opp = OPP_NONE;
                         } else if (amp && t.tacticLevel >= 2 && d > reach + 120 && left > Tuning.S_AMP_EXIT + Tuning.DISMANTLE_WINDUP + 8) {
                             wantAmpOff = true; // 太远：关掉展延改用解（关掉后 12 tick 才能用术式，下一轮再看）
@@ -485,7 +555,16 @@ final class SukunaAi {
     /** 里梅以上的世界斩：估计五条悟最快多久能打断（按看到过的招推算冷却，没看到就当能用），来得及才抽一次签。 */
     private boolean worldChance(World w, float d, int threat) {
         if (worldRecheck > 0 || threat >= 0) return false; // 有招正在飞过来：先别念
-        switch (w.gojo.state) { // 他手上已经在起招：先别念
+        if (gojoWindingUp(w.gojo)) return false;            // 他手上已经在起招：先别念
+        int windup = w.worldBound ? Tuning.S_WORLD_WINDUP : Tuning.S_WORLD_FIRST_WINDUP;
+        if (fastestInterrupt(w, d) <= windup + t.worldSafetyMargin) return false;
+        worldRecheck = t.worldRecheckGap;
+        return rng.nextUnitDouble() < t.worldChance;
+    }
+
+    /** 五条悟手上正在起招（出拳、蓄苍拳、苍赫茈的起手和念咒、瞬移前摇、闪避）。 */
+    private static boolean gojoWindingUp(Fighter g) {
+        switch (g.state) {
             case Fighter.MELEE:
             case Fighter.FIST_WINDUP:
             case Fighter.RED_HOLD:
@@ -497,19 +576,20 @@ final class SukunaAi {
             case Fighter.PURPLE_CHANT:
             case Fighter.TP_WINDUP:
             case Fighter.DODGE:
-                return false;
+                return true;
             default:
-                break;
+                return false;
         }
-        int windup = w.worldBound ? Tuning.S_WORLD_WINDUP : Tuning.S_WORLD_FIRST_WINDUP;
+    }
+
+    /** 估计五条悟最快多久能碰到宿傩（走过去出拳；按看到过的招推算瞬移、赫、苍、茈的冷却，没看到就当能用）。 */
+    private float fastestInterrupt(World w, float d) {
         float fastest = Math.max(0, d - Tuning.MELEE_REACH) / Tuning.MOVE_SPEED * Tuning.HZ + Tuning.MELEE_STARTUP;
         if (aiClock - seenTp > Tuning.TP_COOLDOWN) fastest = Math.min(fastest, Tuning.TP_WINDUP + 2);
         if (aiClock - seenRed > Tuning.RED_COOLDOWN && d <= Tuning.RED_REACH) fastest = Math.min(fastest, Tuning.RED_WINDUP + d / Tuning.RED_SPEED * Tuning.HZ);
         if (aiClock - seenBlue > Tuning.BLUE_COOLDOWN && d <= Tuning.BLUE_MAX_THROW + Tuning.BLUE_RADIUS) fastest = Math.min(fastest, Tuning.BLUE_WINDUP + Tuning.BLUE_FLY);
         if (aiClock - seenPurple > Tuning.PURPLE_COOLDOWN) fastest = Math.min(fastest, Tuning.PURPLE_WINDUP + d / Tuning.PURPLE_SPEED * Tuning.HZ);
-        if (fastest <= windup + t.worldSafetyMargin) return false;
-        worldRecheck = t.worldRecheckGap;
-        return rng.nextUnitDouble() < t.worldChance;
+        return fastest;
     }
 
     /** 当前朝宿傩来的威胁的编号（没有返回 -1）。 */

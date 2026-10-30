@@ -9,8 +9,43 @@ public final class BattleConfig {
     /** 随机种子：同一个种子 + 同一串输入 = 完全相同的一场战斗（回放、测试用）。 */
     public long seed = 0x5EED_5EEDL;
 
+    /** 宿傩的基础血量（三轮）：按自动对战模拟定的，见 notes/宿傩平衡.md。 */
+    public static final float SUKUNA_BASE_HP = 10800f;
+
     public float gojoMaxHp = 1000f;
-    public float sukunaMaxHp = 10800f; // 按自动对战模拟定的（标准脚本的五条悟胜率约 56%），见 notes/宿傩平衡.md
+    public float sukunaMaxHp = SUKUNA_BASE_HP;
+    /** 宿傩自己的攻击伤害倍率（难度每高一档 ×1.1，定；血量的倍率直接乘在 sukunaMaxHp 上）。 */
+    public float sukunaDamageMult = 1f;
+    // 宿傩能用什么（难度决定）。默认是测试用的：御厨子全套，没有十种影法术、没有原身
+    public boolean shrine = true;     // 御厨子：解、世界斩（三轮的十影宿傩没有，定）
+    public boolean wheel = true;      // 魔虚罗的法阵（适应无限、学会世界斩）；三轮没有
+    public boolean agito = false;     // 十种影法术：嵌合兽「顎吐」
+    public boolean mahoraga = false;  // 十种影法术：魔虚罗（里梅以上，定；一局只能召唤一次，定）
+    public boolean trueForm = false;  // 原身（里梅以上，定；回满血，之后不能用十种影法术，定）
+
+    /** 难度的数值档：第 n 档（三轮 0）宿傩伤害、血量都 ×1.1 的 n 次方（定）。 */
+    public void tier(int n) {
+        double m = Math.pow(1.1, n);
+        sukunaDamageMult = (float) m;
+        sukunaMaxHp = (float) (SUKUNA_BASE_HP * m);
+    }
+
+    /**
+     * 宿傩的难度（应用的四个难度和自动对战模拟共用）：0 三轮、1 里梅、2 万、3 史上最强。
+     * 三轮是十影宿傩：没有御厨子（解、世界斩）、没有法阵和魔虚罗、不能变原身，十种影法术只有顎吐（定）。
+     * 里梅以上：御厨子 + 十种影法术（顎吐、魔虚罗）+ 法阵 + 原身（定）。都没有领域（还没给素材）。
+     */
+    public void sukunaDifficulty(int level) {
+        sukunaAi = true;
+        ai.preset(level);
+        tier(level);
+        boolean full = level > 0;
+        shrine = full;
+        wheel = full;
+        agito = true;
+        mahoraga = full;
+        trueForm = full;
+    }
     /** 宿傩有没有 AI。测试模式没有（活靶子）。 */
     public boolean sukunaAi = false;
     /** 宿傩 AI 的参数（默认是三轮的；更高难度用 ai.preset(难度)）。 */
@@ -47,6 +82,14 @@ public final class BattleConfig {
         public float vaultChance;                   // 被逼到墙边：从五条悟头上跳过去的概率（每次被逼到墙边抽一次）
         public int learnMinSamples;                 // 0：不读习惯
         public float learnThreshold, learnExploitChance;
+        // 十种影法术与原身（里梅以上才有魔虚罗和原身；三轮只有顎吐）
+        public float agitoChance;                   // 中距离牵制：每个合适的机会用顎吐的概率
+        public int summonMinTicks;                  // 打了这么久（有效战斗时间）才召唤魔虚罗
+        public float summonHp;                      // 血量不高于这个比例才召唤
+        public float summonDistance;                // 离五条悟至少这么远
+        public int summonMargin;                    // 估计五条悟来不及打断的时间要比咏唱多出这么多
+        public float transformHp, transformHpEmergency; // 变原身的血线（魔虚罗不在场 / 在场时的紧急血线）
+        public int transformMaxWait;                // 魔虚罗在场时最多再等多久（从血量第一次跌破血线算）
 
         public AiTuning() {
             reset();
@@ -99,6 +142,14 @@ public final class BattleConfig {
             learnMinSamples = 0;
             learnThreshold = 0.7f;
             learnExploitChance = 0.65f;
+            agitoChance = 0.4f;
+            summonMinTicks = 360;
+            summonHp = 1f;
+            summonDistance = 300;
+            summonMargin = 12;
+            transformHp = 0.35f;
+            transformHpEmergency = 0.2f;
+            transformMaxWait = 360;
         }
 
         /** 各难度的参数：0 三轮（就是 reset() 的默认值）、1 里梅、2 万、3 史上最强。越高越聪明（不加血、不加攻）。 */
@@ -149,6 +200,14 @@ public final class BattleConfig {
             learnMinSamples = level == 3 ? 6 : 0;
             kiteChance = level == 1 ? 0.5f : level == 2 ? 0.75f : 1f;
             vaultChance = level == 1 ? 0.7f : 1f;
+            agitoChance = level == 1 ? 0.3f : level == 2 ? 0.25f : 0.2f;
+            summonMinTicks = level == 1 ? 360 : level == 2 ? 240 : 120; // 开场拉开距离时就召（越难越早）
+            summonHp = 1f;
+            summonDistance = level == 1 ? 300 : level == 2 ? 280 : 260;
+            summonMargin = level == 1 ? 12 : level == 2 ? 18 : 24;
+            transformHp = level == 1 ? 0.35f : level == 2 ? 0.3f : 0.25f;
+            transformHpEmergency = level == 1 ? 0.2f : level == 2 ? 0.18f : 0.15f;
+            transformMaxWait = level == 1 ? 360 : level == 2 ? 480 : 600;
         }
     }
 }

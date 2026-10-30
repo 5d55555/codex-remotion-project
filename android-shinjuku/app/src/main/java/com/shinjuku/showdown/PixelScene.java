@@ -2,6 +2,7 @@ package com.shinjuku.showdown;
 
 import android.graphics.Bitmap;
 
+import com.shinjuku.showdown.core.Agito;
 import com.shinjuku.showdown.core.Attack;
 import com.shinjuku.showdown.core.BlueOrb;
 import com.shinjuku.showdown.core.Events;
@@ -30,6 +31,9 @@ final class PixelScene {
     // 宿傩：领域展延的灰白轮廓、魔虚罗法阵的金色、世界斩的红、反转术式的白
     private static final int AMP_LIGHT = 0xFFE9EAF2, AMP_DARK = 0xFF7D8294, WHEEL = 0xFFE0B25A, WHEEL_LIT = 0xFFFFF0B8,
             CUT_RED = 0xFFB0101E, WORLD_RED = 0xFFFF3A4A, RCT_LIGHT = 0xFFE6FFF0;
+    // 十种影法术的影子、魔虚罗的白、顎吐的电、原身的暗红
+    private static final int SHADOW = 0xFF120A1E, SHADOW_EDGE = 0xFF4A2E6E, MAHO_LIGHT = 0xFFF3EFE6, MAHO_DARK = 0xFF8C8577,
+            BOLT = 0xFF6FE0FF, BOLT_CORE = 0xFFE8FBFF, TRUE_DARK = 0xFF3A0610, TRUE_RED = 0xFFC0182C;
 
     private final Atlas atlas;
     private final int bgW, bgH, skyColor;
@@ -85,6 +89,9 @@ final class PixelScene {
     // 宿傩：头上小字（领域展延、反转术式、适应完成）出现的时刻、法阵转到的角度、世界斩斩出的那一道
     private float ampT0 = -99, rctT0 = -99, adaptedT0 = -99, wheelAngle, wheelT0 = -99;
     private float worldT0 = -99, worldX0, worldY0, worldX1;
+    // 十种影法术、原身：顎吐出手、魔虚罗适应无限、变原身的时刻；魔虚罗这一帧的位置
+    private float agitoT0 = -99, mahoAdaptT0 = -99, trueT0 = -99, mahoSX, mahoSY;
+    private float mahoLag = 1;
 
     private float gojoLag = 1, sukunaLag = 1, lastTime;
     private long seenEvents;
@@ -170,6 +177,12 @@ final class PixelScene {
         if (g.state == Fighter.PURPLE_CHANT) t.rect(0, 0, VW, vh, withAlpha(0xFF0A0418, 0.14f + 0.1f * Math.max(0, w.chantPhase)));
         shadow(t, gx, g.y, sy);
         shadow(t, kx, k.y, sy);
+        Fighter m = w.mahoraga;
+        float mx = X(lerp(m.px, m.x, alpha)) + sx, my = Y(lerp(m.py, m.y, alpha)) + sy;
+        mahoSX = mx;
+        mahoSY = my;
+        if (m.present) shadow(t, mx, m.y, sy);
+        if (k.state == Fighter.S_SUMMON) summonPool(t, w, sx, sy);
 
         BlueOrb b = w.blue;
         float bx = X(lerp(b.px, b.x, alpha)) + sx, by = Y(lerp(b.py, b.y, alpha)) + sy;
@@ -179,19 +192,31 @@ final class PixelScene {
 
         poseSukuna(w, time);
         if (k.state != Fighter.KO) sukunaBack(t, w, kx, ky, time);
-        figure(t, false, kx, ky);
+        figure(t, w.sukunaTrueForm ? TRUE_RIG : SUKUNA_RIG, kx, ky);
         if (k.state != Fighter.KO) sukunaFront(t, w, kx, ky, time, dt, sx, sy);
         if (w.domainTicks > 0 && k.state != Fighter.KO) overload(t, kx, ky, time);
+        if (m.present) {
+            poseMahoraga(w, time);
+            if (m.state == Fighter.M_RISE) ghost = withAlpha(0xFF2A2236, 0.35f + 0.65f * Math.min(1, m.stateTick / (float) Tuning.MAHORAGA_RISE)); // 从影子里浮出来
+            figure(t, MAHO_RIG, mx, my);
+            ghost = 0;
+            mahoragaFront(t, w, mx, my, time);
+            if (w.domainTicks > 0) overload(t, mx, my - 20, time);
+        }
+        if (w.wheelOn == World.WHEEL_SUKUNA && k.state != Fighter.KO) wheel(t, w, kx, ky - 64, w.worldUnlocked, w.ampTicks > 0, time, dt);
+        else if (w.wheelOn == World.WHEEL_MAHORAGA) wheel(t, w, mx, my - 76, w.mahoragaAdapted, w.tenShadowsPaused(), time, dt);
+        Agito ag = w.agito;
+        if (ag.active) agito(t, ag, X(lerp(ag.px, ag.x, alpha)) + sx, Y(lerp(ag.py, ag.y, alpha)) + sy, time, dt);
         poseGojo(w, time);
         if (g.state == Fighter.DODGE) { // 闪避：身后两道半透明的残影
             float dir = Math.signum(g.vx);
             for (int i = 2; i >= 1; i--) {
                 ghost = withAlpha(0xFF9FD8FF, 0.22f * (3 - i));
-                figure(t, true, gx - dir * i * 9, gy);
+                figure(t, GOJO_RIG, gx - dir * i * 9, gy);
             }
             ghost = 0;
         }
-        figure(t, true, gx, gy);
+        figure(t, GOJO_RIG, gx, gy);
         handFx(t, w, handX, handY, backHandX, backHandY, time, dt);
 
         if (b.active()) blueFront(t, b, bx, by, time);
@@ -423,6 +448,66 @@ final class PixelScene {
                         adaptedT0 = time;
                         flash(0x40FFF0B8, time);
                         fx(FX_RING, x, y, 0.6f, 6, 40, WHEEL_LIT, WHEEL);
+                    } else if (kind == 2) { // 魔虚罗适应了无限
+                        mahoAdaptT0 = time;
+                        flash(0x40FFF0B8, time);
+                        fx(FX_RING, x, y, 0.6f, 6, 46, WHEEL_LIT, WHEEL);
+                    }
+                    break;
+                case Events.SUMMON: {
+                    int v = Math.round(ev.value[i]);
+                    if (v == 0) {         // 开始念「布瑠部由良由良」
+                        fx(FX_RING_IN, x, y, 0.4f, 1, 30, SHADOW_EDGE, 0);
+                    } else if (v > 0) {   // 魔虚罗从影子里显现
+                        flash(0x99000000, time);
+                        shake(7, time);
+                        fx(FX_RING, x, y, 0.6f, 4, 60, MAHO_LIGHT, SHADOW_EDGE);
+                        fx(FX_RING, x, y, 0.9f, 8, 110, SHADOW_EDGE, SHADOW);
+                        sparks(x, y - 30, 30, MAHO_LIGHT, SHADOW_EDGE, 160);
+                        dust(x, y, 1);
+                        banner(Atlas.BIG_MAHORAGA, HudText.SUB_SUMMON, MAHO_LIGHT, time);
+                    } else {              // 被打断
+                        sparks(x, y, 16, SHADOW_EDGE, AMP_DARK, 90);
+                        fx(FX_RING, x, y, 0.3f, 14, 4, AMP_DARK, SHADOW_EDGE);
+                    }
+                    break;
+                }
+                case Events.AGITO: {
+                    int v = Math.round(ev.value[i]);
+                    if (v == 0) {         // 从影子里飞出
+                        agitoT0 = time;
+                        fx(FX_RING, x, y, 0.3f, 4, 20, SHADOW_EDGE, SHADOW);
+                        sparks(x, y, 10, SHADOW_EDGE, SHADOW, 80);
+                    } else if (v == 1) {  // 俯冲电击
+                        fx(FX_RING, x, y, 0.25f, 4, Tuning.AGITO_RADIUS * PPU, BOLT_CORE, BOLT);
+                        fx(FX_DISC, x, y, 0.08f, 10, 0, BOLT_CORE, 0);
+                        sparks(x, y, 18, BOLT_CORE, BOLT, 160);
+                        shake(2.5f, time);
+                    } else {              // 消失
+                        sparks(x, y, 12, SHADOW_EDGE, SHADOW, 60);
+                    }
+                    break;
+                }
+                case Events.TRANSFORM:
+                    if (ev.value[i] > 0) { // 变原身：回满血
+                        trueT0 = time;
+                        flash(0xCC3A0610, time);
+                        shake(9, time);
+                        fx(FX_RING, x, y, 0.7f, 6, 70, TRUE_RED, TRUE_DARK);
+                        sparks(x, y, 40, TRUE_RED, TRUE_DARK, 200);
+                        banner(Atlas.BIG_TRUE_FORM, HudText.SUB_TRUE_FORM, TRUE_RED, time);
+                    } else {
+                        fx(FX_RING, x, y, 0.4f, 8, 40, TRUE_RED, TRUE_DARK);
+                    }
+                    break;
+                case Events.MAHORAGA_GONE:
+                    if (ev.value[i] == 0) { // 被打倒：碎成白色的光
+                        fx(FX_RING, x, y, 0.6f, 6, 70, MAHO_LIGHT, MAHO_DARK);
+                        sparks(x, y, 50, MAHO_LIGHT, MAHO_DARK, 220);
+                        shake(6, time);
+                    } else {                // 宿傩倒下、变原身：沉回影子里
+                        fx(FX_RING_IN, x, y, 0.5f, 1, 50, SHADOW_EDGE, 0);
+                        sparks(x, Y(0), 24, SHADOW_EDGE, SHADOW, 90);
                     }
                     break;
                 case Events.WORLD_CHANT: {
@@ -1165,17 +1250,17 @@ final class PixelScene {
         t.additive(false);
     }
 
-    /** 宿傩身前：头上的魔虚罗法阵、世界斩的预警（第一次是往前裂开的空间，之后是锁定的斩线）、反转术式的光。 */
-    private void sukunaFront(PixelTarget t, World w, float kx, float ky, float time, float dt, int sx, int sy) {
-        Fighter s = w.sukuna;
-        // 法阵：八根辐条的轮，每适应一次转 45 度；展延时暗（不转），学会世界斩后发亮
+    /**
+     * 魔虚罗的法阵（八根辐条的轮）：在宿傩头上，召出魔虚罗后在它头上。每适应一次转 45 度；暂停时暗（展延），
+     * 适应完成后发亮（宿傩学会世界斩 / 魔虚罗适应了无限）。
+     */
+    private void wheel(PixelTarget t, World w, float cx, float cy, boolean lit, boolean dim, float time, float dt) {
         float target = w.adaptPoints * 45f;
         wheelAngle += (target - wheelAngle) * Math.min(1, dt * 8);
-        float wx = Math.round(kx), wy = Math.round(ky) - 64 + ((int) (time * 2) & 1);
-        boolean lit = w.worldUnlocked;
+        float wx = Math.round(cx), wy = Math.round(cy) + ((int) (time * 2) & 1);
         float turning = Math.max(0, 1 - (time - wheelT0) / 0.4f);
         int c = lit ? WHEEL_LIT : WHEEL;
-        float a = w.ampTicks > 0 ? 0.4f : 0.9f;
+        float a = dim ? 0.4f : 0.9f;
         if (lit || turning > 0) {
             t.additive(true);
             t.shape(wx, wy, 11, 0, 0, 7, withAlpha(c, (lit ? 0.18f + 0.1f * (float) Math.sin(time * 5) : 0) + 0.4f * turning));
@@ -1190,7 +1275,22 @@ final class PixelScene {
         }
         t.shape(wx, wy, 6, 5, 0, 7, withAlpha(c, a));
         t.shape(wx, wy, 1.5f, 0, 0, 7, withAlpha(c, a));
+    }
 
+    /** 宿傩身前：世界斩的预警（第一次是往前裂开的空间，之后是锁定的斩线）、反转术式的光、变原身的暗红。 */
+    private void sukunaFront(PixelTarget t, World w, float kx, float ky, float time, float dt, int sx, int sy) {
+        Fighter s = w.sukuna;
+        if (s.state == Fighter.S_TRANSFORM) { // 变原身：身上翻涌着暗红，咒纹的黑点往外飘
+            float k = Math.min(1, s.stateTick / 30f);
+            t.additive(true);
+            t.shape(Math.round(kx), Math.round(ky) - 28, 26 + 4 * (float) Math.sin(time * 9), 0, 0, 7, withAlpha(TRUE_RED, 0.22f * k));
+            t.additive(false);
+            if (dt > 0) {
+                for (int i = 0; i < 3; i++) {
+                    emit(kx + (rnd() - 0.5f) * 30, ky - rnd() * 50, (rnd() - 0.5f) * 30, -20 - 40 * rnd(), 0.6f, rnd() < 0.6f ? TRUE_DARK : TRUE_RED, rnd() < 0.3f ? 2 : 1, -10, 1, 0);
+                }
+            }
+        }
         if (s.state == Fighter.S_WORLD) {
             int st = s.stateTick;
             float y = Y(w.worldY) + sy, x0 = Math.round(kx) + w.worldDir * 8;
@@ -1885,6 +1985,32 @@ final class PixelScene {
                 p.armBack = -25;
                 p.lean = -2;
                 return;
+            case Fighter.S_SUMMON: // 念「布瑠部由良由良」：两手在胸前交叠结印
+                p.armFront = st <= Tuning.SUMMON_CHANT ? 125 : 60;
+                p.armBack = st <= Tuning.SUMMON_CHANT ? 115 : -20;
+                p.lean = -3;
+                p.legFront = 14;
+                p.legBack = -14;
+                p.bob = st <= Tuning.SUMMON_CHANT && ((st / 20) & 1) == 0 ? 1 : 0;
+                return;
+            case Fighter.S_AGITO: { // 结手影：两手往前低低地伸出去，放出去时一甩
+                boolean out = st > Tuning.AGITO_SIGN;
+                p.armFront = out ? 70 : 55;
+                p.armBack = out ? 60 : 45;
+                p.lean = out ? 8 : 2;
+                p.legFront = 16;
+                p.legBack = -16;
+                return;
+            }
+            case Fighter.S_TRANSFORM: { // 变原身：仰着头张开手
+                float k = Math.min(1, st / 20f);
+                p.armFront = 70 * k;
+                p.armBack = 70 * k;
+                p.lean = -10 * k;
+                p.legFront = 12;
+                p.legBack = -12;
+                return;
+            }
             default:
                 break;
         }
@@ -1908,6 +2034,144 @@ final class PixelScene {
         }
     }
 
+    /** 魔虚罗的姿势：走、重拳（拉开 → 打出 → 收）、退魔之剑（举过头 → 劈下来）、挨打、被吸、无量空处里僵住。 */
+    private void poseMahoraga(World w, float time) {
+        Fighter m = w.mahoraga;
+        Pose p = pose;
+        p.reset();
+        p.face = m.facing;
+        int since = w.tick - m.lastHitTick;
+        p.hurt = Math.max(0, 1 - since / 10f);
+        boolean air = m.y > 1;
+        if (m.captured || w.inBlueField(m)) {
+            p.lean = -12;
+            p.armFront = 80 + (float) Math.sin(time * 9) * 14;
+            p.armBack = 60;
+            p.legFront = 18;
+            p.legBack = -20;
+            return;
+        }
+        if (m.hitstun > 0 || (air && m.knocked())) {
+            float f = Math.min(1, m.hitstun / 18f);
+            p.lean = -14 * Math.max(f, air ? 1 : 0);
+            p.armFront = 40;
+            p.armBack = -30;
+            return;
+        }
+        if (w.domainTicks > 0 && !air) {
+            p.lean = -4;
+            p.armFront = 18;
+            p.armBack = -14;
+            p.bob = ((int) (time * 24) % 9) == 0 ? 1 : 0;
+            return;
+        }
+        int st = m.stateTick;
+        switch (m.state) {
+            case Fighter.M_RISE: // 显现：低着头站起来
+                p.lean = -8 * (1 - Math.min(1, st / (float) Tuning.MAHORAGA_RISE));
+                p.armFront = 10;
+                p.armBack = -10;
+                return;
+            case Fighter.M_PUNCH: {
+                int su = Tuning.M_PUNCH_STARTUP, act = su + Tuning.M_PUNCH_ACTIVE;
+                if (st <= su) {
+                    float k = st / (float) su;
+                    p.armBack = -60 * k; // 后手（拳）往后拉
+                    p.armFront = 30 * k;
+                    p.lean = -8 * k;
+                    p.legFront = 18 * k;
+                    p.legBack = -16 * k;
+                } else {
+                    float back = st <= act ? 1 : Math.max(0, 1 - (st - act) / (float) Tuning.M_PUNCH_RECOVERY);
+                    p.armBack = 95 * back;
+                    p.armFront = -20 * back;
+                    p.lean = 14 * back;
+                    p.legFront = 22 * back;
+                    p.legBack = -20 * back;
+                }
+                return;
+            }
+            case Fighter.M_SWORD: {
+                int su = Tuning.M_SWORD_STARTUP, act = su + Tuning.M_SWORD_ACTIVE;
+                if (st <= su) { // 剑举到头前上方（不挡住脸）
+                    float k = Math.min(1, st / (su * 0.6f));
+                    p.armFront = 145 * k;
+                    p.armBack = -30 * k;
+                    p.lean = -6 * k;
+                    p.legFront = 16 * k;
+                    p.legBack = -16 * k;
+                } else {
+                    float back = st <= act ? 1 : Math.max(0, 1 - (st - act) / (float) Tuning.M_SWORD_RECOVERY);
+                    p.armFront = 145 - 110 * Math.min(1, (st - su) / (float) Tuning.M_SWORD_ACTIVE); // 劈下来，停在前下方
+                    p.armFront = p.armFront * (0.4f + 0.6f * back) + 10 * (1 - back);
+                    p.armBack = -30 * back;
+                    p.lean = 16 * back;
+                    p.legFront = 22 * back;
+                    p.legBack = -20 * back;
+                }
+                return;
+            }
+            default:
+                break;
+        }
+        if (air) {
+            p.legFront = 26;
+            p.legBack = -10;
+            p.armFront = 30;
+            p.armBack = -25;
+        } else if (Math.abs(m.vx) > 30) { // 走：沉重的大步
+            float sn = (float) Math.sin(m.x * 0.03f);
+            p.legFront = sn * 24;
+            p.legBack = -sn * 24;
+            p.armFront = -sn * 16;
+            p.armBack = sn * 16;
+            p.lean = 6;
+            p.bob = Math.abs(sn) > 0.7f ? 1 : 0;
+        } else {
+            p.bob = Math.sin(time * 1.6f) > 0.4f ? 1 : 0;
+            p.armFront = 8;
+            p.armBack = -8;
+        }
+    }
+
+    /** 魔虚罗身前：举剑到最后时剑尖一闪（前摇的提示）。 */
+    private void mahoragaFront(PixelTarget t, World w, float mx, float my, float time) {
+        Fighter m = w.mahoraga;
+        if (m.state == Fighter.M_SWORD && m.stateTick > Tuning.M_SWORD_STARTUP * 0.6f && m.stateTick <= Tuning.M_SWORD_STARTUP) {
+            float k = (m.stateTick - Tuning.M_SWORD_STARTUP * 0.6f) / (Tuning.M_SWORD_STARTUP * 0.4f);
+            t.additive(true);
+            t.shape(Math.round(handX), Math.round(handY), 2 + 3 * k, 0, 0, 7, withAlpha(0xFFFFFFFF, 0.5f + 0.5f * k));
+            t.additive(false);
+        }
+    }
+
+    /** 召唤魔虚罗的咏唱：它将要显现的地方，地上一摊影子越铺越大，往上冒黑气。 */
+    private void summonPool(PixelTarget t, World w, int sx, int sy) {
+        Fighter s = w.sukuna;
+        float k = Math.min(1, s.stateTick / (float) Tuning.SUMMON_CHANT);
+        if (s.stateTick > Tuning.SUMMON_CHANT) return;
+        int dir = w.gojo.x >= s.x ? 1 : -1;
+        float wx = Math.max(Tuning.MAHORAGA_HALF_W, Math.min(Tuning.WIDTH - Tuning.MAHORAGA_HALF_W, s.x + dir * Tuning.SUMMON_OFFSET));
+        float cx = Math.round(X(wx)) + sx, cy = Math.round(Y(0)) + sy;
+        float r = 4 + 16 * k;
+        for (int row = -2; row <= 2; row++) { // 扁扁的一摊（每行一条）
+            float half = r * (float) Math.sqrt(1 - (row / 2.5f) * (row / 2.5f));
+            t.rect(Math.round(cx - half), cy + row, Math.round(half * 2), 1, withAlpha(row == -2 || row == 2 ? SHADOW_EDGE : SHADOW, 0.85f));
+        }
+        if (rnd() < 0.5f + 0.5f * k) emit(cx + (rnd() - 0.5f) * r * 1.6f, cy, (rnd() - 0.5f) * 8, -20 - 40 * k * rnd(), 0.6f, rnd() < 0.5f ? SHADOW : SHADOW_EDGE, rnd() < 0.3f ? 2 : 1, -10, 1, 0);
+    }
+
+    /** 顎吐：从影子里飞出来的嵌合兽，飞的时候拖着电光，扑到落点时周身噼啪作响。 */
+    private void agito(PixelTarget t, Agito a, float x, float y, float time, float dt) {
+        int img = Atlas.AGITO;
+        boolean striking = a.tick >= Tuning.AGITO_DIVE;
+        float deg = striking ? 0 : a.dir * 20; // 俯冲时头朝下
+        t.sprite(PixelTarget.TEX_ATLAS, atlas.x[img], atlas.y[img], atlas.w[img], atlas.h[img], Math.round(x), Math.round(y),
+                atlas.px[img], atlas.py[img], deg, a.dir, 1, 0xFFFFFFFF, striking ? 0x303030 : 0);
+        if (striking) crackle(t, x, y, Tuning.AGITO_RADIUS * PPU, (int) (time * 30), BOLT, 6);
+        if (dt > 0 && rnd() < 0.7f) emit(x - a.dir * 6, y, -a.dir * 20 * rnd(), (rnd() - 0.5f) * 20, 0.25f, rnd() < 0.5f ? BOLT : BOLT_CORE, 1, 0, 2, 1);
+    }
+
     private static void knockedOut(Pose p, float since) {
         float f = Math.min(1, since / 0.2f);
         p.spin = -90 * f;
@@ -1923,10 +2187,48 @@ final class PixelScene {
     private float figX, figY, figFace, figCos = 1, figSin;
     private int ghost; // 不为 0 时画残影：所有部件用这个颜色乘（半透明）
 
-    /** 画一个人：脚底在 (fx, fy)。头和身体不转（只按前倾平移整数像素，保持像素干净），手脚绕关节转。 */
-    private void figure(PixelTarget t, boolean gojo, float fx, float fy) {
+    /**
+     * 一套骨骼：部件和关节位置（虚拟像素，以脚底中心为原点，向上为负）。人：腿挂在 (±2,-13)，身体底边 (0,-12)，肩 (±6,-24)，
+     * 脖子 (0,-26)；魔虚罗按 1.5 倍；原身多一对手臂挂在 (±6,-18)。
+     */
+    static final class Rig {
+        final int head, torso, armFront, armBack, leg, arm2;
+        final float hipX, hipY, torsoY, shoulderX, shoulderY, neckY, arm2Y, handReach;
+
+        Rig(int head, int torso, int armFront, int armBack, int leg, int arm2,
+            float hipX, float hipY, float torsoY, float shoulderX, float shoulderY, float neckY, float arm2Y, float handReach) {
+            this.head = head;
+            this.torso = torso;
+            this.armFront = armFront;
+            this.armBack = armBack;
+            this.leg = leg;
+            this.arm2 = arm2;
+            this.hipX = hipX;
+            this.hipY = hipY;
+            this.torsoY = torsoY;
+            this.shoulderX = shoulderX;
+            this.shoulderY = shoulderY;
+            this.neckY = neckY;
+            this.arm2Y = arm2Y;
+            this.handReach = handReach;
+        }
+    }
+
+    static final Rig GOJO_RIG = new Rig(Atlas.GOJO_HEAD, Atlas.GOJO_TORSO, Atlas.GOJO_ARM, Atlas.GOJO_ARM, Atlas.GOJO_LEG, -1,
+            2, -13, -12, 6, -24, -26, 0, 9.5f);
+    static final Rig SUKUNA_RIG = new Rig(Atlas.SUKUNA_HEAD, Atlas.SUKUNA_TORSO, Atlas.SUKUNA_ARM, Atlas.SUKUNA_ARM, Atlas.SUKUNA_LEG, -1,
+            2, -13, -12, 6, -24, -26, 0, 9.5f);
+    static final Rig TRUE_RIG = new Rig(Atlas.TRUE_HEAD, Atlas.TRUE_TORSO, Atlas.TRUE_ARM, Atlas.TRUE_ARM, Atlas.SUKUNA_LEG, Atlas.TRUE_ARM2,
+            2, -13, -12, 6, -24, -26, -18, 9.5f);
+    static final Rig MAHO_RIG = new Rig(Atlas.MAHO_HEAD, Atlas.MAHO_TORSO, Atlas.MAHO_SWORD, Atlas.MAHO_ARM, Atlas.MAHO_LEG, -1,
+            3, -20, -18, 10, -37, -39, 0, 14f);
+
+    private Rig rig = GOJO_RIG;
+
+    /** 画一个角色：脚底在 (fx, fy)。头和身体不转（只按前倾平移整数像素，保持像素干净），手脚绕关节转。 */
+    private void figure(PixelTarget t, Rig r, float fx, float fy) {
         Pose p = pose;
-        int head = gojo ? Atlas.GOJO_HEAD : Atlas.SUKUNA_HEAD, torso = head + 1, arm = head + 2, leg = head + 3;
+        rig = r;
         figX = Math.round(fx);
         figY = Math.round(fy - p.bob);
         figFace = p.face;
@@ -1937,34 +2239,37 @@ final class PixelScene {
         int back = ghost != 0 ? ghost : 0xFFB4B4BC, front = ghost != 0 ? ghost : 0xFFFFFFFF;
         float lean = p.lean;
         int dTorso = Math.round(lean * 0.12f), dHead = Math.round(lean * 0.2f), dShoulder = Math.round(lean * 0.16f);
-        part(t, arm, -6 + dShoulder, SHOULDER_Y, -p.armBack, back, add);
-        part(t, leg, -2, -13, -p.legBack, back, add);
-        part(t, leg, 2, -13, -p.legFront, front, add);
-        part(t, torso, dTorso, -12, 0, front, add);
-        part(t, head, dHead, -26 + Math.round(Math.abs(lean) * 0.04f), 0, front, add);
-        part(t, arm, 6 + dShoulder, SHOULDER_Y, -p.armFront, front, add);
+        float sx = r.shoulderX;
+        if (r.arm2 >= 0) part(t, r.arm2, -sx + dTorso, r.arm2Y, -p.armBack * 0.6f - 20, back, add); // 原身：后面那只多出来的手
+        part(t, r.armBack, -sx + dShoulder, r.shoulderY, -p.armBack, back, add);
+        part(t, r.leg, -r.hipX, r.hipY, -p.legBack, back, add);
+        part(t, r.leg, r.hipX, r.hipY, -p.legFront, front, add);
+        part(t, r.torso, dTorso, r.torsoY, 0, front, add);
+        part(t, r.head, dHead, r.neckY + Math.round(Math.abs(lean) * 0.04f), 0, front, add);
+        part(t, r.armFront, sx + dShoulder, r.shoulderY, -p.armFront, front, add);
+        if (r.arm2 >= 0) part(t, r.arm2, sx + dTorso, r.arm2Y, -p.armFront * 0.6f + 20, front, add); // 原身：前面那只多出来的手
         // 两只手的位置（给手上的术式用）
-        float[] q = hand(6 + dShoulder, -p.armFront);
+        float[] q = hand(sx + dShoulder, -p.armFront);
         handX = q[0];
         handY = q[1];
-        q = hand(-6 + dShoulder, -p.armBack);
+        q = hand(-sx + dShoulder, -p.armBack);
         backHandX = q[0];
         backHandY = q[1];
     }
 
-    private static final int SHOULDER_Y = -24;
-    private static final float HAND_REACH = 9.5f; // 手掌中心离肩关节多远（像素）
-
     private float[] hand(float shoulderX, float deg) {
         double a = Math.toRadians(deg);
-        return toWorld(shoulderX - HAND_REACH * (float) Math.sin(a), SHOULDER_Y + HAND_REACH * (float) Math.cos(a));
+        float reach = rig.handReach;
+        return toWorld(shoulderX - reach * (float) Math.sin(a), rig.shoulderY + reach * (float) Math.cos(a));
     }
 
     private final float[] tw = new float[2];
 
+    /** 骨骼坐标 → 像素层坐标：绕脖子转（翻跟头），再按朝向翻转。 */
     private float[] toWorld(float lx, float ly) {
-        float dx = lx, dy = ly + 26;
-        float rx = dx * figCos - dy * figSin, ry = dx * figSin + dy * figCos - 26;
+        float pivot = -rig.neckY;
+        float dx = lx, dy = ly + pivot;
+        float rx = dx * figCos - dy * figSin, ry = dx * figSin + dy * figCos - pivot;
         tw[0] = figX + figFace * rx;
         tw[1] = figY + ry;
         return tw;
@@ -2007,7 +2312,7 @@ final class PixelScene {
         int face = 30;
         float pl = Math.round(bx + br + 4), pr = Math.round(mx - br - 4) - face;
         portrait(t, Atlas.GOJO_HEAD, pl, top, 1, 0xFF6FC3FF);
-        portrait(t, Atlas.SUKUNA_HEAD, pr, top, -1, 0xFFE0303F);
+        portrait(t, w.sukunaTrueForm ? Atlas.TRUE_HEAD : Atlas.SUKUNA_HEAD, pr, top, -1, 0xFFE0303F);
         barTop = top + 13;
         barH = 9;
         barL1 = pl + face + 3;
@@ -2018,6 +2323,23 @@ final class PixelScene {
         bar(t, barL2, barR2, sHp, sukunaLag, 0xFFB0101E, 0xFFFF6A5A, true);
         drawNumber(t, (int) ((w.gojo.hpMilli + 999) / 1000), barR1 - 2 - digitsWidth((int) ((w.gojo.hpMilli + 999) / 1000)), barTop, 1, 0xF2FFFFFF, false);
         drawNumber(t, (int) ((w.sukuna.hpMilli + 999) / 1000), barL2 + 2, barTop, 1, 0xF2FFFFFF, false);
+        // 魔虚罗在场：宿傩血条下面一条细的
+        Fighter m = w.mahoraga;
+        if (m.present) {
+            float mHp = m.hpMilli / (float) m.maxHpMilli;
+            mahoLag = lag(mahoLag, mHp, dt);
+            float l0 = barL2 + 34, r0 = barR2, top2 = barTop + barH + 4, bw = r0 - l0;
+            t.rect(l0 - 1, top2 - 1, bw + 2, 6, 0xFF05040A);
+            t.rect(l0, top2, bw, 4, 0xFF2A2D3C);
+            if (mahoLag > mHp) t.rect(Math.round(r0 - bw * mahoLag), top2, Math.round(bw * mahoLag), 4, 0xFFFFE6A8);
+            float fw = Math.round(bw * mHp);
+            if (fw > 0) {
+                t.rect(r0 - fw, top2, fw, 4, w.mahoragaAdapted ? WHEEL_LIT : MAHO_LIGHT);
+                t.rect(r0 - fw, top2 + 3, fw, 1, 0x66000000);
+            }
+        } else {
+            mahoLag = 1;
+        }
         if (statsOn) {
             float y = top + 30;
             drawNumber(t, Math.round(fpsAvg), VW * 0.5f, y, 1, 0xFF9FFF9F, true);
@@ -2207,10 +2529,13 @@ final class PixelScene {
             for (int k = 0; k < ph; k++) hudCenter(t, first + k, cx, y - (ph - k) * step, dim);
             hudCenter(t, first + ph, cx, y - 4 * dp * Math.max(0, 1 - local * 6), withAlpha(bright, Math.min(1, local * 6)));
         }
-        // 宿傩头上：世界斩的咏唱（念到哪段亮哪段）；领域展延、反转术式、适应完成的小字
+        // 宿傩头上：世界斩的咏唱（念到哪段亮哪段）、召唤魔虚罗的咏唱；领域展延、反转术式、适应完成、顎吐、原身的小字
         Fighter k = w.sukuna;
         float kcx = Math.max(60 * dp, Math.min(laidW - 60 * dp, sukunaSX * s)), ktop = Math.max(l.hudTop + 44 * dp, (sukunaSY - 76) * s);
-        if (k.state == Fighter.S_WORLD && w.worldWindup == Tuning.S_WORLD_WINDUP) {
+        if (k.state == Fighter.S_SUMMON && k.stateTick <= Tuning.SUMMON_CHANT) { // 「布瑠部由良由良」：一个字一个字亮起来的感觉用透明度代替
+            float local = k.stateTick / (float) Tuning.SUMMON_CHANT;
+            hudCenter(t, HudText.SUMMON_CHANT, kcx, ktop - ht.h[HudText.SUMMON_CHANT], withAlpha(0xFFE8E0FF, 0.45f + 0.55f * Math.min(1, local * 3)));
+        } else if (k.state == Fighter.S_WORLD && w.worldWindup == Tuning.S_WORLD_WINDUP) {
             int tt = k.stateTick - Tuning.S_WORLD_SIGN;
             if (tt >= 0) {
                 int ph = Math.min(2, tt / Tuning.S_WORLD_CHANT_PHRASE);
@@ -2222,7 +2547,13 @@ final class PixelScene {
         } else {
             int label = -1;
             float lt = 99;
-            if (time - adaptedT0 < 1.2f) {
+            if (time - trueT0 < 1.2f) {
+                label = HudText.TRUE_FORM;
+                lt = time - trueT0;
+            } else if (time - agitoT0 < 0.9f) {
+                label = HudText.AGITO;
+                lt = time - agitoT0 + 0.3f;
+            } else if (time - adaptedT0 < 1.2f) {
                 label = HudText.ADAPTED;
                 lt = time - adaptedT0;
             } else if (time - rctT0 < 1.0f) {
@@ -2234,7 +2565,19 @@ final class PixelScene {
             }
             if (label >= 0) {
                 float a = lt < 0.8f ? 1 : Math.max(0, (1.2f - lt) / 0.4f);
-                hudCenter(t, label, kcx, ktop - ht.h[label], withAlpha(label == HudText.ADAPTED ? 0xFFFFF0B8 : 0xFFEFF2FF, a));
+                int c = label == HudText.ADAPTED ? 0xFFFFF0B8 : label == HudText.TRUE_FORM ? 0xFFFFB0B8 : label == HudText.AGITO ? 0xFFD8F8FF : 0xFFEFF2FF;
+                hudCenter(t, label, kcx, ktop - ht.h[label], withAlpha(c, a));
+            }
+        }
+        // 魔虚罗：血条旁边的名字；适应了无限时头上一行小字
+        Fighter m = w.mahoraga;
+        if (m.present) {
+            hudAt(t, HudText.MAHORAGA, (barL2 + 32) * s, (barTop + barH + 9) * s + 2 * dp, true, 0xFFEFF2FF);
+            float lt = time - mahoAdaptT0;
+            if (lt < 1.4f) {
+                float a = lt < 1f ? 1 : (1.4f - lt) / 0.4f;
+                float mcx = Math.max(60 * dp, Math.min(laidW - 60 * dp, mahoSX * s)), mtop = Math.max(l.hudTop + 44 * dp, (mahoSY - 92) * s);
+                hudCenter(t, HudText.MAHO_ADAPTED, mcx, mtop - ht.h[HudText.MAHO_ADAPTED], withAlpha(0xFFFFF0B8, a));
             }
         }
         // 解：宿傩头上一个“解”字

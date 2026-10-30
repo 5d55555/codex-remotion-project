@@ -21,7 +21,8 @@ final class HudText {
     static final int SUB_WORLD = 31, SUB_WORLD_BOUND = 32;
     static final int BLUE_CHANT0 = 33;               // 苍的三段咒词：位相、黄昏、智慧之瞳
     static final int RED_CHANT0 = 36;                // 赫的三段咒词：位相、波罗蜜、光之柱
-    static final int COUNT = 39;
+    static final int MAHORAGA = 39, SUMMON_CHANT = 40, SUB_SUMMON = 41, AGITO = 42, TRUE_FORM = 43, SUB_TRUE_FORM = 44, MAHO_ADAPTED = 45;
+    static final int COUNT = 46;
 
     final Bitmap bitmap;
     final float dp;
@@ -37,9 +38,11 @@ final class HudText {
                 "领域展延", "反转术式", "适应完成",
                 "龙鳞", "反发", "番之流星",
                 "斩断世界的斩击", "斩断世界的斩击 · 束缚",
-                "位相", "黄昏", "智慧之瞳", "位相", "波罗蜜", "光之柱"};
+                "位相", "黄昏", "智慧之瞳", "位相", "波罗蜜", "光之柱",
+                "魔虚罗", "布瑠部由良由良", "八握剑异戒神将 · 魔虚罗", "十种影法术 · 顎吐", "原身", "两面宿傩 · 原身", "适应无限"};
         float[] size = {13, 13, 16, 10, 15, 15, 22, 22, 22, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 17, 17, 17, 17, 16,
-                13, 13, 14, 17, 17, 17, 15, 15, 17, 17, 17, 17, 17, 17};
+                13, 13, 14, 17, 17, 17, 15, 15, 17, 17, 17, 17, 17, 17,
+                11, 17, 15, 13, 14, 15, 14};
         Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         fill.setTypeface(Typeface.DEFAULT_BOLD);
         fill.setColor(0xFFFFFFFF);
