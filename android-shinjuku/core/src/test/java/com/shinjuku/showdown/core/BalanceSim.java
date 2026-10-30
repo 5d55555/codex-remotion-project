@@ -14,7 +14,7 @@ public final class BalanceSim {
         int winner = -1; // 0 五条悟赢，1 宿傩赢，-1 超时
         int ticks;
         long ampMelee, world, heal, gojoDealt;
-        int unlockTick = -1, worldStarted, worldFired, worldHit, domainUsed, rctUsed;
+        int unlockTick = -1, worldStarted, worldFired, worldHit, domainUsed, rctUsed, tp, tpBroken, chants, chantBroken, amps;
     }
 
     static Result play(int level, long seed, BattleConfig cfg) {
@@ -49,6 +49,15 @@ public final class BalanceSim {
                     r.worldStarted++;
                 } else if (e.type[i] == Events.RCT && e.value[i] > 0) {
                     r.rctUsed++;
+                } else if (e.type[i] == Events.TELEPORT) {
+                    r.tp++;
+                } else if (e.type[i] == Events.CHANT && e.kind[i] == Attack.BLUE_FIST && e.value[i] < 0) {
+                    r.tpBroken++; // 瞬移或下砸苍拳的前摇被打断
+                } else if (e.type[i] == Events.CHANT && e.kind[i] != Attack.BLUE_FIST) {
+                    if (e.value[i] == 0) r.chants++;
+                    else if (e.value[i] < 0) r.chantBroken++;
+                } else if (e.type[i] == Events.AMP && e.value[i] > 0) {
+                    r.amps++;
                 }
             }
             if (w.sukuna.hpMilli > lastSukunaHp && w.sukuna.state != Fighter.KO) r.heal += w.sukuna.hpMilli - lastSukunaHp;
@@ -68,10 +77,20 @@ public final class BalanceSim {
         return r;
     }
 
+    static final String[] DIFFICULTY = {"三轮", "里梅", "万", "史上最强"};
+
     public static void main(String[] args) {
         int n = args.length > 0 ? Integer.parseInt(args[0]) : 200;
         float hp = args.length > 1 ? Float.parseFloat(args[1]) : 0;
-        for (int level = 0; level < 3; level++) report(level, n, hp > 0 ? c -> c.sukunaMaxHp = hp : null);
+        int seed0 = args.length > 2 ? Integer.parseInt(args[2]) : 0;
+        for (int diff = 0; diff < 4; diff++) {
+            final int dl = diff;
+            System.out.println("== 难度：" + DIFFICULTY[diff]);
+            for (int level = 0; level < 3; level++) report(level, n, seed0, c -> {
+                c.ai.preset(dl);
+                if (hp > 0) c.sukunaMaxHp = hp;
+            });
+        }
         for (int mode = 0; mode < 3; mode++) {
             long[] dmg = new long[100];
             for (int i = 0; i < dmg.length; i++) dmg[i] = domainBurst(mode, i);
@@ -120,19 +139,19 @@ public final class BalanceSim {
         return hp0 - w.sukuna.hpMilli;
     }
 
-    static void report(int level, int n, java.util.function.Consumer<BattleConfig> tweak) {
+    static void report(int level, int n, int seed0, java.util.function.Consumer<BattleConfig> tweak) {
         int[] wins = new int[3];
         int[] gojoTtk = new int[n], sukunaTtk = new int[n], unlock = new int[n];
         long[] heal = new long[n];
         int gk = 0, sk = 0, uk = 0;
         long ampSum = 0, worldSum = 0;
-        int fired = 0, hit = 0, started = 0, rct = 0;
+        int fired = 0, hit = 0, started = 0, rct = 0, tp = 0, tpBroken = 0, chants = 0, chantBroken = 0, amps = 0;
         long gojoDealt = 0;
         for (int i = 0; i < n; i++) {
             BattleConfig cfg = new BattleConfig();
             cfg.sukunaAi = true;
             if (tweak != null) tweak.accept(cfg);
-            Result r = play(level, i, cfg);
+            Result r = play(level, seed0 + i, cfg);
             wins[r.winner + 1]++;
             if (r.winner == 0) gojoTtk[gk++] = r.ticks;
             if (r.winner == 1) sukunaTtk[sk++] = r.ticks;
@@ -143,6 +162,11 @@ public final class BalanceSim {
             fired += r.worldFired;
             started += r.worldStarted;
             rct += r.rctUsed;
+            tp += r.tp;
+            tpBroken += r.tpBroken;
+            chants += r.chants;
+            chantBroken += r.chantBroken;
+            amps += r.amps;
             gojoDealt += r.gojoDealt;
             hit += r.worldHit;
         }
@@ -154,6 +178,8 @@ public final class BalanceSim {
         System.out.printf("  宿傩伤害构成：展延体术 %.0f%%、世界斩 %.0f%%（平均每局 %.0f）；世界斩起手 %d 次、斩出 %d 次、命中 %d 次；反转术式 %d 次，回复中位数 %.0f；五条悟平均每局打出 %.0f%n",
                 dealt == 0 ? 0 : 100.0 * ampSum / dealt, dealt == 0 ? 0 : 100.0 * worldSum / dealt, dealt / 1000.0 / n,
                 started, fired, hit, rct, median(heal) / 1000.0, gojoDealt / 1000.0 / n);
+        System.out.printf("  每局：瞬移成功 %.2f、前摇被打断 %.2f；念咒 %.2f、被打断 %.2f；展延 %.2f 次%n",
+                tp / (double) n, tpBroken / (double) n, chants / (double) n, chantBroken / (double) n, amps / (double) n);
     }
 
     private static String sec(int[] a, int n) {

@@ -175,6 +175,17 @@ class BattlePreviewTest {
     }
 
     @Test
+    fun blueFistCharging() {
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
+            world.gojo.x = 520f
+            world.sukuna.x = 640f
+            steps(10)
+            input.melee = true; input.meleeHeld = true
+            steps(18 + 10)
+        })
+    }
+
+    @Test
     fun blueFistAirWindup() {
         paparazzi.snapshot(Scene(paparazzi.context, Difficulty.TEST) {
             world.gojo.x = 540f

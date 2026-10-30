@@ -41,22 +41,33 @@ public final class Tuning {
     public static final int BLACK_FLASH_HITSTUN = 40;
     public static final int BLACK_FLASH_HITSTOP = 10; // 命中停顿（逻辑计数，不 sleep）
 
-    // 苍拳：长按跳跃时点体术（定）。从上往下砸：空中是往下俯冲一拳，地上是举起来往下劈；115 伤害（定），有前摇和后摇（定），
-    // 前摇时被宿傩的攻击碰到（哪怕被无限挡住）就打断（“容易被打断”，定）。黑闪照样能出，黑闪伤害按体术的同样倍数（×7）
-    public static final int FIST_WINDUP = 14, FIST_ACTIVE = 6, FIST_DIVE_MAX = 30, FIST_RECOVERY = 26; // 占位
-    public static final long FIST_DAMAGE_MILLI = 115_000;
-    public static final long FIST_BLACK_FLASH_DAMAGE_MILLI = FIST_DAMAGE_MILLI * 7; // 805
-    public static final float FIST_REACH = 100f, FIST_DIVE_VX = 220f, FIST_DIVE_VY = -1000f;
-    public static final float FIST_IMPULSE_X = 260f, FIST_IMPULSE_Y = 0f;
+    // 苍拳（长按体术，定）：按住体术 FIST_HOLD tick 变成苍拳，苍附在手上往前冲一拳；伤害是体术的 1.7 倍（黑闪也是）（定），后摇比体术大（定）
+    public static final int FIST_HOLD = 18;        // 占位：按住 0.15 秒
+    public static final int FIST_WINDUP = 14, FIST_ACTIVE = 5, FIST_RECOVERY = 30, FIST_CANCEL = 20; // 占位
+    public static final long FIST_DAMAGE_MILLI = MELEE_DAMAGE_MILLI * 17 / 10;              // 85
+    public static final long FIST_BLACK_FLASH_DAMAGE_MILLI = BLACK_FLASH_DAMAGE_MILLI * 17 / 10; // 595
+    public static final float FIST_REACH = 104f, FIST_LUNGE = 260f;
+    public static final float FIST_IMPULSE_X = 330f, FIST_IMPULSE_Y = 140f;
     public static final int FIST_HITSTUN = 30, FIST_HITSTOP = 7;
+
+    // 下砸苍拳（按住跳跃时点体术，定）：从上往下砸，空中是往下俯冲一拳，地上是举起来往下劈；115（定），有前摇和后摇（定），
+    // 前摇时被宿傩的攻击碰到（哪怕被无限挡住）就打断（“容易被打断”，定）。黑闪照样能出，黑闪伤害按体术的同样倍数（×7）
+    public static final int SMASH_WINDUP = 14, SMASH_ACTIVE = 6, SMASH_DIVE_MAX = 30, SMASH_RECOVERY = 26; // 占位
+    public static final long SMASH_DAMAGE_MILLI = 115_000;
+    public static final long SMASH_BLACK_FLASH_DAMAGE_MILLI = SMASH_DAMAGE_MILLI * 7; // 805
+    public static final float SMASH_REACH = 100f, SMASH_DIVE_VX = 220f, SMASH_DIVE_VY = -1000f;
+    public static final float SMASH_IMPULSE_X = 260f, SMASH_IMPULSE_Y = 0f;
+    public static final int SMASH_HITSTUN = 30;
 
     // 闪避（定）：默认往面朝的方向，推着摇杆就往摇杆的方向；闪避期间无敌；冷却 0.5 秒
     public static final int DODGE_TICKS = 18, DODGE_COOLDOWN = 60; // 占位：闪 0.15 秒
     public static final float DODGE_SPEED = 1000f;                 // 占位：闪 150 的距离
 
-    // 瞬移（长按闪避时点苍 / 点赫，定）：前摇可被打断（被宿傩的攻击碰到就断）；之后出现在宿傩背后，放固定动作，镜头拉近
+    // 瞬移（闪避 + 苍 / 赫，先按哪个都行，定）：按住闪避时点苍 / 点赫，或者按住苍 / 赫时点闪避；刚点过闪避（TP_LENIENCY 内）再点苍 / 赫也算。
+    // 前摇可被打断（被宿傩的攻击碰到就断）；之后出现在宿傩背后，放固定动作，镜头拉近
     // 苍：用苍把宿傩吸到空中，苍拳连打 5 下（每下 115），最后一下击飞、击倒。赫：在背后放一发很大的赫，把宿傩轰出战场宽度 85%，击倒
     public static final int TP_WINDUP = 24, TP_COOLDOWN = 1200;    // 占位：前摇 0.2 秒；冷却 10 秒
+    public static final int TP_LENIENCY = 30;                      // 刚点过闪避 0.25 秒内再点苍 / 赫，也算组合
     public static final float TP_BEHIND = 70f;
     public static final int TP_BLUE_LIFT = 30, TP_BLUE_FIRST_HIT = 36, TP_BLUE_HIT_GAP = 14, TP_BLUE_HITS = 5; // 占位
     public static final float TP_BLUE_HEIGHT = 120f, TP_BLUE_LAUNCH_X = 620f, TP_BLUE_LAUNCH_Y = 420f;
@@ -179,10 +190,11 @@ public final class Tuning {
     public static final float S_WORLD_RANGE = 960f, S_WORLD_HEIGHT = 50f, S_WORLD_HALF_THICKNESS = 10f;
     public static final float S_WORLD_IMPULSE_X = 420f, S_WORLD_IMPULSE_Y = 120f;
 
-    // 反转术式：起手 0.3 秒，之后 1.5 秒每 tick 回 2.5（共 450），收招 0.2 秒；一局最多 2 次，冷却 15 秒；受击、被控就断
+    // 反转术式：每秒回 170（定），不可打断（定）。起手 0.3 秒，回 1.5 秒（共 255），收招 0.2 秒；一局最多 2 次，冷却 15 秒（占位）
     public static final int S_RCT_STARTUP = 36, S_RCT_DURATION = 180, S_RCT_RECOVERY = 24;
     public static final int S_RCT_COOLDOWN = 1800, S_RCT_MAX_USES = 2;
-    public static final long S_RCT_HEAL_PER_TICK_MILLI = 2_500;
+    public static final long S_RCT_HEAL_PER_SEC_MILLI = 170_000;
+    public static final long S_RCT_TOTAL_MILLI = S_RCT_HEAL_PER_SEC_MILLI * S_RCT_DURATION / HZ; // 255
 
     // 无指向茈：赫与苍重叠或互相在作用范围内时生成；伤害和茈一样 850（定），范围内的五条悟也挨，只有一半（定）
     public static final long HOLLOW_DAMAGE_MILLI = PURPLE_DAMAGE_MILLI;

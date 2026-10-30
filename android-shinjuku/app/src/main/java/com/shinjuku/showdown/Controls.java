@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicIntegerArray;
 
 /**
  * 触屏操作：左下浮动摇杆，右下 体术 / 跳 / 苍 / 赫 / 茈 / 领域 / 闪避 七个键，顶部 返回 和 音乐 两个小按钮。
- * 组合：按住跳时点体术是苍拳；按住闪避时点苍、点赫是瞬移。
+ * 组合：长按体术是苍拳；按住跳时点体术是下砸苍拳；闪避和苍 / 赫一起按（先按哪个都行）是瞬移。
  * 主线程处理触摸；战斗线程每个 tick 取一次（sample）。
  * 按键：主线程把“第几个键、按下还是松开、什么时候”写进预分配的事件环（单写单读，不加锁、不分配），
  * 战斗线程按时间顺序取。同一个键在一个 tick 里最多取一次按下加一次松开（点按不丢），再多的顺延到下一个 tick，
@@ -157,6 +157,7 @@ final class Controls {
         in.blueDown = (downs & (1 << BLUE)) != 0;
         in.blueUp = (ups & (1 << BLUE)) != 0;
         in.blueHeld = (heldBits & (1 << BLUE)) != 0;
+        in.meleeHeld = (heldBits & (1 << MELEE)) != 0;
         in.redHeld = (heldBits & (1 << RED)) != 0;
         in.purpleHeld = (heldBits & (1 << PURPLE)) != 0;
         in.jumpHeld = (heldBits & (1 << JUMP)) != 0;

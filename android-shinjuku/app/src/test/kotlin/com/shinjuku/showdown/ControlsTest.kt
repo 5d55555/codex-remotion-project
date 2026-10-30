@@ -62,12 +62,13 @@ class ControlsTest {
 
     @Test
     fun holdsAreReportedForJumpDodgeRedPurple() {
+        c.push(Controls.MELEE, true, 10)
         c.push(Controls.JUMP, true, 10)
         c.push(Controls.DODGE, true, 10)
         c.push(Controls.RED, true, 10)
         c.push(Controls.PURPLE, true, 10)
         val a = tick()
-        assertTrue(a.jump && a.jumpHeld && a.dodge && a.dodgeHeld && a.red && a.redHeld && a.purple && a.purpleHeld)
+        assertTrue(a.melee && a.meleeHeld && a.jump && a.jumpHeld && a.dodge && a.dodgeHeld && a.red && a.redHeld && a.purple && a.purpleHeld)
         val b = tick()
         assertTrue("按住不放：下一个 tick 还是按着，但没有新的按下", b.jumpHeld && b.dodgeHeld && b.redHeld && b.purpleHeld && !b.jump && !b.dodge && !b.red && !b.purple)
         c.push(Controls.RED, false, 20)

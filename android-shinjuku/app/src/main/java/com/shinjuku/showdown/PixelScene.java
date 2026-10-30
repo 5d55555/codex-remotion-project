@@ -889,6 +889,12 @@ final class PixelScene {
         hy = Math.round(hy);
         int st = g.stateTick;
         switch (g.state) {
+            case Fighter.MELEE:
+                if (st > Tuning.MELEE_STARTUP) { // 还按着：苍开始往拳头上聚
+                    float k = Math.min(1, (st - Tuning.MELEE_STARTUP) / (float) (Tuning.FIST_HOLD - Tuning.MELEE_STARTUP));
+                    fistBlue(t, hx, hy, 1.5f + 2.5f * k, k, time, dt);
+                }
+                break;
             case Fighter.MELEE_ACTIVE: { // 出拳的一瞬：拳头前一点白光、身后两道速度线
                 t.additive(true);
                 t.shape(hx, hy, 3, 0, 0, 7, withAlpha(0xFFFFFFFF, 0.8f));
@@ -899,15 +905,16 @@ final class PixelScene {
                 break;
             }
             case Fighter.FIST_WINDUP:
-                fistBlue(t, hx, hy, 4 + 3 * Math.min(1, st / (float) Tuning.FIST_WINDUP), 1, time, dt);
+                fistBlue(t, hx, hy, 4 + 3 * Math.min(1, st / (float) (w.fistSmash() ? Tuning.SMASH_WINDUP : Tuning.FIST_WINDUP)), 1, time, dt);
                 break;
-            case Fighter.FIST_ACTIVE: { // 往下砸：拳头上的苍拖出一道往上的残光
+            case Fighter.FIST_ACTIVE: { // 拳头上的苍拖出一道残光：前冲是往后拖，下砸是往上拖
                 fistBlue(t, hx, hy, 7, 1, time, dt);
                 float f = g.facing;
-                boolean dive = w.fistAir();
+                boolean smash = w.fistSmash(), dive = w.fistAir();
                 t.additive(true);
                 for (int i = 1; i <= 5; i++) {
-                    float tx = dive ? hx - f * i * 2 : hx - f * i * 3, ty = dive ? hy - i * 7 : hy - i * 5;
+                    float tx = !smash ? hx - f * i * 6 : dive ? hx - f * i * 2 : hx - f * i * 3;
+                    float ty = !smash ? hy : dive ? hy - i * 7 : hy - i * 5;
                     t.shape(tx, ty, 6 - i, 0, 0, 7, withAlpha(BLUE_MID, 0.55f - i * 0.1f));
                 }
                 t.additive(false);
@@ -1471,8 +1478,9 @@ final class PixelScene {
             p.armBack = -8;
         }
         switch (g.state) {
-            case Fighter.MELEE: // 起手
+            case Fighter.MELEE: // 起手；还按着就是在蓄苍拳：拳头往后收
                 meleeWindup(p, (w.meleeCombo - 1) % 3, Math.min(1, st / (float) Tuning.MELEE_STARTUP));
+                if (st > Tuning.MELEE_STARTUP) punchWindup(p, Math.min(1, (st - Tuning.MELEE_STARTUP) / (float) (Tuning.FIST_HOLD - Tuning.MELEE_STARTUP)));
                 break;
             case Fighter.MELEE_ACTIVE:
                 meleeStrike(p, (w.meleeCombo - 1) % 3, 1);
@@ -1480,16 +1488,27 @@ final class PixelScene {
             case Fighter.MELEE_RECOVER:
                 meleeStrike(p, (w.meleeCombo - 1) % 3, 1 - st / (float) Tuning.MELEE_RECOVERY);
                 break;
-            case Fighter.FIST_WINDUP: // 苍拳：拳头举过头顶
-                fistWindup(p, Math.min(1, st / (float) Tuning.FIST_WINDUP));
+            case Fighter.FIST_WINDUP: // 苍拳：长按体术是收拳蓄力；下砸是拳头举过头顶
+                if (!w.fistSmash()) {
+                    punchWindup(p, 1);
+                    p.bob = 0;
+                    break;
+                }
+                fistWindup(p, Math.min(1, st / (float) Tuning.SMASH_WINDUP));
                 if (w.fistAir()) {
                     p.legFront = 40;
                     p.legBack = 10;
                 }
                 p.bob = 0;
                 break;
-            case Fighter.FIST_ACTIVE: // 往下砸：空中俯冲（拳头朝前下方），地上往下劈
-                if (w.fistAir()) {
+            case Fighter.FIST_ACTIVE: // 前冲一拳；下砸：空中俯冲（拳头朝前下方），地上往下劈
+                if (!w.fistSmash()) {
+                    p.armFront = 95;
+                    p.armBack = -45;
+                    p.lean = 22;
+                    p.legFront = 32;
+                    p.legBack = -30;
+                } else if (w.fistAir()) {
                     p.armFront = 55;
                     p.armBack = -60;
                     p.lean = 24;
@@ -1506,7 +1525,15 @@ final class PixelScene {
                 p.bob = 0;
                 break;
             case Fighter.FIST_RECOVER: {
-                float f = 1 - st / (float) Tuning.FIST_RECOVERY;
+                float f = 1 - st / (float) (w.fistSmash() ? Tuning.SMASH_RECOVERY : Tuning.FIST_RECOVERY);
+                if (!w.fistSmash()) {
+                    p.armFront = 10 + 85 * f;
+                    p.armBack = -45 * f;
+                    p.lean = 22 * f;
+                    p.legFront = 32 * f;
+                    p.legBack = -30 * f;
+                    break;
+                }
                 p.armFront = 10 + 40 * f;
                 p.armBack = -40 * f;
                 p.lean = 24 * f;
@@ -1701,7 +1728,16 @@ final class PixelScene {
         }
     }
 
-    /** 苍拳的前摇：拳头举过头顶，身体往后仰。 */
+    /** 长按体术的苍拳蓄力：拳头收到身后，身体压低。 */
+    private static void punchWindup(Pose p, float k) {
+        p.armFront = -40 - 25 * k;
+        p.armBack = 30 * k;
+        p.lean = -8 - 4 * k;
+        p.legFront = 20 + 6 * k;
+        p.legBack = -18 - 6 * k;
+    }
+
+    /** 下砸苍拳的前摇：拳头举过头顶，身体往后仰。 */
     private static void fistWindup(Pose p, float k) {
         p.armFront = 20 + 155 * k;
         p.armBack = -30 * k;
@@ -2085,14 +2121,19 @@ final class PixelScene {
                 if (g.state == Fighter.BLUE_HOLD) prog = Math.min(1, st / (float) Tuning.BLUE_HOLD_THRESHOLD) * 0.25f;
                 else if (g.state == Fighter.BLUE_CHANT) prog = 0.25f + 0.75f * Math.min(1, st / (float) chant3);
             } else if (i == Controls.MELEE) {
-                if (g.state == Fighter.FIST_WINDUP) prog = st / (float) Tuning.FIST_WINDUP;
+                if (g.state == Fighter.MELEE && pressed && st > Tuning.MELEE_STARTUP) prog = st / (float) Tuning.FIST_HOLD;
+                else if (g.state == Fighter.FIST_WINDUP) full = true;
             } else if (i == Controls.RED) {
                 if (g.state == Fighter.RED_HOLD && pressed && st > Tuning.RED_WINDUP) prog = st / (float) Tuning.RED_HOLD * 0.25f;
                 else if (g.state == Fighter.RED_CHANT) prog = 0.25f + 0.75f * Math.min(1, st / (float) chant3);
             } else if (i == Controls.DODGE) {
-                if (g.state == Fighter.TP_WINDUP) prog = st / (float) Tuning.TP_WINDUP;
-                else if (w.tpCd > 0) { // 瞬移的冷却：外圈一道细线慢慢走满
-                    t.shape(x, y, r + 2, r + 1, (float) (-Math.PI / 2), (float) (Math.PI * 2 * (1 - w.tpCd / (float) Tuning.TP_COOLDOWN)), 0x80EFF2FF);
+                if (g.state == Fighter.TP_WINDUP) {
+                    prog = st / (float) Tuning.TP_WINDUP;
+                } else if (w.tpCd > 0) { // 瞬移的冷却：外圈一道线慢慢走满，键的右上角写还剩几秒
+                    t.shape(x, y, r + 3, r + 1, (float) (-Math.PI / 2), (float) (Math.PI * 2 * (1 - w.tpCd / (float) Tuning.TP_COOLDOWN)), 0x99EFF2FF);
+                    drawNumber(t, (w.tpCd + Tuning.HZ - 1) / Tuning.HZ, x + r * 0.75f, y - r - 6, 1, 0xFFB8F0E0, true);
+                } else { // 瞬移好了：外圈亮一圈
+                    t.shape(x, y, r + 3, r + 1, 0, 7, 0xCCB8F0E0);
                 }
             } else if (i == Controls.PURPLE) {
                 if (g.state == Fighter.PURPLE_WINDUP && pressed) prog = st / (float) Tuning.PURPLE_HOLD * 0.25f;

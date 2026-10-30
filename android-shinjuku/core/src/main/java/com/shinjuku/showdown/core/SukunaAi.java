@@ -1,7 +1,13 @@
 package com.shinjuku.showdown.core;
 
 /**
- * 宿傩的 AI（标准难度“三轮”的结构；更高难度改 BattleConfig.AiTuning 的参数）。
+ * 宿傩的 AI。三轮（标准）用下面这套基础结构；里梅、万、史上最强在基础结构上再开“战术层”（tacticLevel 1–3，越高越聪明，
+ * Astra 的方案，见 notes/宿傩AI.md）：
+ * - 里梅：进退试探（走近一下再退开，看五条悟怎么应对）；看到念咒（苍、赫、茈）和瞬移的前摇会去打断；抓长后摇；被连打时想办法脱身；
+ *   世界斩只在估计五条悟来不及打断时才念（按看到过的招推算冷却）。
+ * - 万：再加开着展延停在边缘骗闪避、骗出招，看到闪避等无敌过了再追；够不着太久就关掉展延改用解。
+ * - 史上最强：再加读习惯——记下五条悟在“展延贴近”时的第一反应（闪避、出招、跳、退、不动），习惯明显就针对着改节奏。
+ * 每个机会只抽一次签、只排一次反应时间，不会每 tick 重抽。
  * 只输出意图（走、跳、体术、解、开关领域展延、世界斩、反转术式），能不能做由 World 的动作执行器判断。
  * 全部用整数倒计时和自己的固定种子随机数，结果可复现；只看画面上看得到的东西（招式、念咒），不读玩家的输入。
  * - 被控住（倒地、硬直、被苍吸住/抓住、领域里、被打飞还没落地）：什么都不想；脱离控制后迟疑一会儿。
@@ -20,7 +26,22 @@ final class SukunaAi {
     private boolean approachMode = true;
     private int modeTimer;
     private float moveIntent;
-    private boolean wantMelee, wantDismantle, wantJump, wantAmp, wantWorld, wantRct;
+    private boolean wantMelee, wantDismantle, wantJump, wantAmp, wantAmpOff, wantWorld, wantRct;
+
+    // ---- 战术层（里梅以上）----
+    private int aiClock;                       // think() 跑了多少次（只在逻辑推进时走）
+    private int gSeenState = -1, gSince;       // 看到的五条悟动作、从什么时候开始
+    private static final int OPP_NONE = 0, OPP_INTERRUPT = 1, OPP_PUNISH = 2, OPP_DODGE = 3;
+    private int opp, oppReadyAt, oppUntil, oppGState, oppSince; // 一个待处理的机会（每个只抽一次签）
+    private int seenTp = -100_000, seenRed = -100_000, seenBlue = -100_000, seenPurple = -100_000; // 看到五条悟用过（推算冷却）
+    private int probePhase, probeTimer, probeCool, baitTimer, baitCool, escapeCool, farTicks, worldRecheck;
+    private float prevD = 9999;
+    private boolean kiteRolled, kiting, vaultRolled, vaulting;
+    // 读习惯（史上最强）：展延贴近时五条悟的第一反应，最近 16 次
+    private static final int R_DODGE = 0, R_ATTACK = 1, R_JUMP = 2, R_BACK = 3, R_NONE = 4;
+    private final int[] habit = new int[16];
+    private int habitN, habitHead, watchUntil = -1;
+    private float watchD;
 
     SukunaAi(BattleConfig.AiTuning t, CombatRng rng) {
         this.t = t;
@@ -32,6 +53,7 @@ final class SukunaAi {
         out.clear();
         Fighter s = w.sukuna, g = w.gojo;
         if (jumpCool > 0) jumpCool--;
+        if (t.tacticLevel > 0) observe(w); // 被控住的时候也在看
         if (!w.sukunaCanAct()) {
             wasLocked = true;
             react = -1;
@@ -72,8 +94,8 @@ final class SukunaAi {
             }
         }
 
-        // 五条悟在念 200% 茈：反应过来就去打断
-        if (g.state == Fighter.PURPLE_CHANT) {
+        // 五条悟在念 200% 茈：反应过来就去打断（里梅以上由战术层统一处理苍、赫、茈的咏唱）
+        if (t.tacticLevel == 0 && g.state == Fighter.PURPLE_CHANT) {
             if (!chantSeen) {
                 chantSeen = true;
                 chantReact = rng.nextUnitDouble() < t.mistake ? -1 : range(t.reactMin, t.reactMax);
@@ -98,6 +120,10 @@ final class SukunaAi {
         }
 
         boolean heal = wantsHeal(w, s, d);
+        if (t.tacticLevel > 0 && tactic(w, s, g, d, toward, amp, threat)) {
+            emit(s, toward, out);
+            return;
+        }
         if (--decide <= 0) {
             decide = t.decideInterval;
             if (--modeTimer <= 0) {
@@ -109,7 +135,7 @@ final class SukunaAi {
             if (heal && d >= t.rctDistance && threat < 0 && w.rctCd == 0) {
                 wantRct = true;
             } else if (w.worldUnlocked && w.worldCd == 0 && !amp && w.ampLock == 0 && s.onGround
-                    && d >= t.worldMin && d <= t.worldMax && rng.nextUnitDouble() < t.worldChance) {
+                    && d >= t.worldMin && d <= t.worldMax && (t.tacticLevel == 0 ? rng.nextUnitDouble() < t.worldChance : worldChance(w, d, threat))) {
                 wantWorld = true;
             } else if (!amp && w.ampCd == 0 && s.onGround && d <= t.ampMax && (approachMode || d < t.ampMin)) {
                 wantAmp = true; // 准备贴身、或者已经被贴身：开展延（贴身时打到第三下以后五条悟的轻拳就打不断起手）
@@ -156,15 +182,19 @@ final class SukunaAi {
             if (!amp && !w.worldUnlocked && w.ampCd > 0 && d <= Tuning.DISMANTLE_RANGE && w.ampLock == 0 && w.dismantleCd == 0
                     && rng.nextUnitDouble() < t.attackChance * 0.25f) wantDismantle = true;
         }
-        if (holdTimer > 0) holdTimer--;
+        emit(s, toward, out);
+    }
+
+    private void emit(Fighter s, int toward, SukunaIntent out) {
+        if (holdTimer > 0) holdTimer--; // 战术层接管的 tick 也照样计时
         // 背后是墙就别再退
         if (moveIntent * toward < 0 && (s.x < Tuning.BODY_HALF_W + 8 || s.x > Tuning.WIDTH - Tuning.BODY_HALF_W - 8)) moveIntent = 0;
-
         out.moveX = moveIntent;
         out.jump = wantJump;
         out.melee = wantMelee;
         out.dismantle = wantDismantle;
         out.amp = wantAmp;
+        out.ampOff = wantAmpOff;
         out.world = wantWorld;
         out.rct = wantRct;
         // 出手、跳只发一次（执行器当 tick 不收也就算了，下一次决策再说）
@@ -172,12 +202,314 @@ final class SukunaAi {
     }
 
     private boolean wantsHeal(World w, Fighter s, float d) {
+        float line = t.tacticLevel > 0 && w.rctUses >= 1 ? t.rctSecondHp : t.rctHp; // 里梅以上：第二次留到更低的血线
         return w.rctUses < Tuning.S_RCT_MAX_USES && w.ampTicks == 0
-                && s.hpMilli <= s.maxHpMilli * t.rctHp && s.maxHpMilli - s.hpMilli >= Tuning.S_RCT_HEAL_PER_TICK_MILLI * Tuning.S_RCT_DURATION;
+                && s.hpMilli <= s.maxHpMilli * line && s.maxHpMilli - s.hpMilli >= Tuning.S_RCT_TOTAL_MILLI;
     }
 
     private void clearWants() {
-        wantJump = wantMelee = wantDismantle = wantAmp = wantWorld = wantRct = false;
+        wantJump = wantMelee = wantDismantle = wantAmp = wantAmpOff = wantWorld = wantRct = false;
+    }
+
+    /* ---------------- 战术层（里梅以上） ---------------- */
+
+    /** 看五条悟的动作：每开始一个新动作，按种类登记一次机会（只抽一次签），顺便记下他用过哪些招、读习惯。 */
+    private void observe(World w) {
+        aiClock++;
+        if (probeCool > 0) probeCool--;
+        if (baitCool > 0) baitCool--;
+        if (escapeCool > 0) escapeCool--;
+        if (worldRecheck > 0) worldRecheck--;
+        Fighter g = w.gojo, s = w.sukuna;
+        float d = Math.abs(g.x - s.x);
+        if (g.state != gSeenState) {
+            gSeenState = g.state;
+            gSince = aiClock;
+            switch (g.state) {
+                case Fighter.TP_WINDUP:
+                    seenTp = aiClock;
+                    offer(OPP_INTERRUPT, t.interruptChance, Tuning.TP_WINDUP, g.state);
+                    break;
+                case Fighter.BLUE_CHANT:
+                case Fighter.RED_CHANT:
+                    offer(OPP_INTERRUPT, t.interruptChance, Tuning.CHANT3_PHRASE * Tuning.CHANT3_PHRASES, g.state);
+                    break;
+                case Fighter.PURPLE_CHANT:
+                    offer(OPP_INTERRUPT, t.interruptChance, Tuning.CHANT_PHRASE * Tuning.CHANT_PHRASES, g.state);
+                    break;
+                case Fighter.RED_ACTIVE:
+                    seenRed = aiClock;
+                    break;
+                case Fighter.BLUE_RECOVER:
+                    seenBlue = aiClock;
+                    break;
+                case Fighter.PURPLE_RECOVER:
+                    seenPurple = aiClock;
+                    offer(OPP_PUNISH, t.punishChance, Tuning.PURPLE_RECOVER, g.state);
+                    break;
+                case Fighter.FIST_RECOVER:
+                    offer(OPP_PUNISH, t.punishChance, Tuning.FIST_CANCEL, g.state);
+                    break;
+                case Fighter.RED_RECOVER:
+                    offer(OPP_PUNISH, t.punishChance, Tuning.RED_CANCEL, g.state);
+                    break;
+                case Fighter.DODGE:
+                    if (t.dodgePunishChance > 0) offer(OPP_DODGE, t.dodgePunishChance, Tuning.DODGE_COOLDOWN, g.state);
+                    record(R_DODGE);
+                    break;
+                case Fighter.MELEE:
+                case Fighter.FIST_WINDUP:
+                case Fighter.RED_HOLD:
+                case Fighter.BLUE_HOLD:
+                case Fighter.PURPLE_WINDUP:
+                    record(R_ATTACK);
+                    break;
+                default:
+                    break;
+            }
+        }
+        // 读习惯：开着展延贴近（距离从 145 外进到 145 内）时开一个观察窗口，记五条悟的第一反应
+        if (t.learnMinSamples > 0) {
+            if (w.ampTicks > 0 && prevD > 145 && d <= 145 && watchUntil < 0) {
+                watchUntil = aiClock + t.probeObserveTicks;
+                watchD = d;
+            }
+            if (watchUntil >= 0) {
+                if (g.vy > 0 && !g.onGround && g.state == Fighter.FREE) record(R_JUMP);
+                else if (d > watchD + 40) record(R_BACK);
+                else if (aiClock >= watchUntil) record(R_NONE);
+            }
+        }
+        prevD = d;
+    }
+
+    /** 观察窗口里的第一反应（同一个窗口只记一次）。 */
+    private void record(int r) {
+        if (watchUntil < 0) return;
+        watchUntil = -1;
+        habit[habitHead] = r;
+        habitHead = (habitHead + 1) % habit.length;
+        if (habitN < habit.length) habitN++;
+    }
+
+    /** 习惯成立了吗：样本够、某一种反应占到阈值以上。返回那种反应，没有就是 -1。 */
+    private int habitTag() {
+        if (t.learnMinSamples == 0 || habitN < t.learnMinSamples) return -1;
+        int[] c = counts;
+        java.util.Arrays.fill(c, 0);
+        for (int i = 0; i < habitN; i++) c[habit[i]]++;
+        int best = 0;
+        for (int i = 1; i < c.length; i++) if (c[i] > c[best]) best = i;
+        return c[best] * 100 >= habitN * Math.round(t.learnThreshold * 100) ? best : -1;
+    }
+
+    private final int[] counts = new int[5];
+
+    /** 登记一个机会：抽一次签决定理不理它，排一个反应时间；优先级 打断 > 追闪避 > 抓后摇。 */
+    private void offer(int type, float chance, int window, int gState) {
+        if (opp != OPP_NONE && aiClock < oppUntil && priority(opp) > priority(type)) return; // 已有更要紧的
+        if (rng.nextUnitDouble() >= chance) return;
+        opp = type;
+        oppGState = gState;
+        oppSince = aiClock;
+        oppReadyAt = aiClock + range(t.reactMin, t.reactMax);
+        oppUntil = aiClock + window;
+    }
+
+    private static int priority(int type) {
+        return type == OPP_INTERRUPT ? 3 : type == OPP_DODGE ? 2 : 1;
+    }
+
+    /** 战术层这一 tick 接管了就返回 true（已经填好意图和移动）。 */
+    private boolean tactic(World w, Fighter s, Fighter g, float d, int toward, boolean amp, int threat) {
+        float reach = Tuning.S_MELEE_REACH + 6;
+        boolean canMelee = w.sMeleeCd == 0 && w.sAttackGap == 0;
+        // 1. 机会：打断前摇和念咒、追闪避、抓后摇
+        if (opp != OPP_NONE) {
+            boolean valid = aiClock < oppUntil + (opp == OPP_DODGE ? Tuning.DODGE_TICKS : 0) && (opp == OPP_DODGE || g.state == oppGState);
+            if (!valid) {
+                opp = OPP_NONE;
+            } else if (aiClock >= oppReadyAt) {
+                switch (opp) {
+                    case OPP_INTERRUPT: { // 碰到就算打断（被无限挡住也一样）；只选来得及的招，来不及就放弃
+                        int left = oppUntil - aiClock;
+                        if (!amp && w.ampLock == 0 && w.dismantleCd == 0 && w.sAttackGap == 0 && d <= Tuning.DISMANTLE_RANGE
+                                && Math.abs(g.centerY() - s.centerY()) <= 70 && left > Tuning.DISMANTLE_WINDUP + 1) {
+                            wantDismantle = true; // 解最快：2 tick 就斩到
+                            opp = OPP_NONE;
+                        } else if (d <= reach && canMelee && left > Tuning.S_MELEE_STARTUP + 1) {
+                            wantMelee = true;
+                            opp = OPP_NONE;
+                        } else if (amp && t.tacticLevel >= 2 && d > reach + 120 && left > Tuning.S_AMP_EXIT + Tuning.DISMANTLE_WINDUP + 8) {
+                            wantAmpOff = true; // 太远：关掉展延改用解（关掉后 12 tick 才能用术式，下一轮再看）
+                        } else if (left > Tuning.S_MELEE_STARTUP + 1 + (d - reach) / Tuning.SUKUNA_SPEED * Tuning.HZ) {
+                            moveIntent = toward; // 走过去还来得及
+                        } else {
+                            opp = OPP_NONE; // 来不及了：不白白冲上去
+                            return false;
+                        }
+                        return true;
+                    }
+                    case OPP_PUNISH:
+                        if (!amp) { // 没开展延打不到：顺势开展延
+                            if (w.ampCd == 0 && s.onGround && d <= t.ampMax + 40) wantAmp = true;
+                            opp = OPP_NONE;
+                            return wantAmp;
+                        }
+                        if (d <= reach && canMelee) {
+                            wantMelee = true;
+                            opp = OPP_NONE;
+                        } else {
+                            moveIntent = toward;
+                        }
+                        return true;
+                    case OPP_DODGE: // 等闪避的无敌过去，在他闪避冷却好之前打一拳
+                        if (!amp) {
+                            opp = OPP_NONE;
+                            return false;
+                        }
+                        moveIntent = d > reach - 10 ? toward : 0;
+                        if (aiClock >= oppSince + Tuning.DODGE_TICKS && d <= reach && canMelee && g.state != Fighter.DODGE) {
+                            wantMelee = true;
+                            opp = OPP_NONE;
+                        }
+                        return true;
+                    default:
+                        break;
+                }
+            }
+        }
+        // 2. 被连打：轻拳打到不再硬直以后，想办法脱身
+        if (s.comboHits >= Tuning.COMBO_STUN_HITS && s.comboTimer > 0 && escapeCool == 0 && d < 150) {
+            escapeCool = t.escapeCd;
+            if (rng.nextUnitDouble() < t.escapeChance) {
+                if (amp && d <= reach && canMelee) {
+                    wantMelee = true;
+                } else if (!amp && w.ampCd == 0 && s.onGround) {
+                    wantAmp = true;
+                } else {
+                    moveIntent = -toward;
+                    holdTimer = 24;
+                    if (s.onGround && jumpCool == 0) {
+                        wantJump = true;
+                        jumpCool = t.jumpGap;
+                    }
+                }
+                return true;
+            }
+        }
+        // 3. 走位：没开展延时被贴身（体术打不到他、他的拳却打得到我），拉开距离；被逼到墙边就从他头上跳过去
+        if (!amp && w.ampCd > 0 && d < 150) {
+            if (!kiteRolled) {
+                kiteRolled = true;
+                kiting = rng.nextUnitDouble() < t.kiteChance;
+            }
+            if (kiting) {
+                float wall = -toward > 0 ? Tuning.WIDTH - s.x : s.x; // 往后退那边离墙多远
+                if (wall < 90 && !vaultRolled) {
+                    vaultRolled = true;
+                    vaulting = rng.nextUnitDouble() < t.vaultChance;
+                }
+                if (wall < 90 && !vaulting) { // 退不动、也不跳：不再拉扯，交给基础打法
+                    kiting = false;
+                    return false;
+                }
+                if (vaulting && wall < 90 && s.onGround && jumpCool == 0) {
+                    wantJump = true; // 起跳往他那边冲：越过头顶（一跳能越过 150 以内的人）
+                    jumpCool = t.jumpGap / 2;
+                    moveIntent = toward;
+                    holdTimer = 30;
+                } else if (holdTimer <= 0 || moveIntent != toward) {
+                    moveIntent = -toward;
+                }
+                return true;
+            }
+        } else if (d > 200) {
+            kiteRolled = vaultRolled = false;
+        }
+        // 4. 万以上：开着展延却一直够不着，关掉改用解
+        if (amp && t.ampExitFarTicks > 0) {
+            farTicks = d > reach + 60 ? farTicks + 1 : 0;
+            if (farTicks >= t.ampExitFarTicks) {
+                farTicks = 0;
+                wantAmpOff = true;
+                return true;
+            }
+        }
+        // 5. 万以上：开着展延停在边缘（110–145）等一下，骗他先闪避或出招（史上最强按习惯调整）
+        if (baitTimer > 0) {
+            baitTimer--;
+            moveIntent = 0;
+            if (g.state != Fighter.FREE) baitTimer = 0; // 他动了：交给上面的机会处理
+            return true;
+        }
+        if (amp && t.ampBaitChance > 0 && baitCool == 0 && d >= 110 && d <= 145) {
+            baitCool = t.ampBaitCd;
+            float chance = t.ampBaitChance;
+            int tag = habitTag();
+            if (tag >= 0 && rng.nextUnitDouble() < t.learnExploitChance) {
+                chance = tag == R_DODGE || tag == R_ATTACK ? 0.95f : tag == R_NONE ? 0 : chance; // 习惯闪或抢招：一定骗；不动：直接压
+            }
+            if (rng.nextUnitDouble() < chance) {
+                baitTimer = range(t.baitWaitMin, t.baitWaitMax);
+                moveIntent = 0;
+                return true;
+            }
+        }
+        // 6. 进退试探：走近一下（不出手）再退开，看他怎么反应
+        if (probePhase != 0) {
+            if (probePhase == 1) {
+                moveIntent = toward;
+                if (--probeTimer <= 0 || d <= 115) {
+                    probePhase = 2;
+                    probeTimer = t.probeOutTicks;
+                }
+            } else {
+                moveIntent = -toward;
+                if (--probeTimer <= 0 || d >= 180) probePhase = 0;
+            }
+            return true;
+        }
+        if (!amp && threat < 0 && probeCool == 0 && d >= 150 && d <= 240 && s.onGround) {
+            probeCool = t.probeCd;
+            if (rng.nextUnitDouble() < t.probeChance) {
+                probePhase = 1;
+                probeTimer = t.probeInTicks;
+                moveIntent = toward;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 里梅以上的世界斩：估计五条悟最快多久能打断（按看到过的招推算冷却，没看到就当能用），来得及才抽一次签。 */
+    private boolean worldChance(World w, float d, int threat) {
+        if (worldRecheck > 0 || threat >= 0) return false; // 有招正在飞过来：先别念
+        switch (w.gojo.state) { // 他手上已经在起招：先别念
+            case Fighter.MELEE:
+            case Fighter.FIST_WINDUP:
+            case Fighter.RED_HOLD:
+            case Fighter.RED_CHANT:
+            case Fighter.BLUE_HOLD:
+            case Fighter.BLUE_CHANT:
+            case Fighter.BLUE_WINDUP:
+            case Fighter.PURPLE_WINDUP:
+            case Fighter.PURPLE_CHANT:
+            case Fighter.TP_WINDUP:
+            case Fighter.DODGE:
+                return false;
+            default:
+                break;
+        }
+        int windup = w.worldBound ? Tuning.S_WORLD_WINDUP : Tuning.S_WORLD_FIRST_WINDUP;
+        float fastest = Math.max(0, d - Tuning.MELEE_REACH) / Tuning.MOVE_SPEED * Tuning.HZ + Tuning.MELEE_STARTUP;
+        if (aiClock - seenTp > Tuning.TP_COOLDOWN) fastest = Math.min(fastest, Tuning.TP_WINDUP + 2);
+        if (aiClock - seenRed > Tuning.RED_COOLDOWN && d <= Tuning.RED_REACH) fastest = Math.min(fastest, Tuning.RED_WINDUP + d / Tuning.RED_SPEED * Tuning.HZ);
+        if (aiClock - seenBlue > Tuning.BLUE_COOLDOWN && d <= Tuning.BLUE_MAX_THROW + Tuning.BLUE_RADIUS) fastest = Math.min(fastest, Tuning.BLUE_WINDUP + Tuning.BLUE_FLY);
+        if (aiClock - seenPurple > Tuning.PURPLE_COOLDOWN) fastest = Math.min(fastest, Tuning.PURPLE_WINDUP + d / Tuning.PURPLE_SPEED * Tuning.HZ);
+        if (fastest <= windup + t.worldSafetyMargin) return false;
+        worldRecheck = t.worldRecheckGap;
+        return rng.nextUnitDouble() < t.worldChance;
     }
 
     /** 当前朝宿傩来的威胁的编号（没有返回 -1）。 */

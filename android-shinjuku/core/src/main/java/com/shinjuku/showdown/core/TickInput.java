@@ -8,7 +8,7 @@ public final class TickInput {
     public float moveX, moveY;     // -1..1，y 向上
     public boolean jump, melee, red, purple, domain, dodge;
     public boolean blueDown, blueUp, blueHeld;
-    public boolean redHeld, purpleHeld;  // 按住：赫、茈念咒
+    public boolean meleeHeld, redHeld, purpleHeld; // 按住：体术蓄苍拳，苍、赫、茈念咒
     public boolean jumpHeld, dodgeHeld;  // 按住跳跃时点体术是苍拳；按住闪避时点苍、点赫是瞬移
 
     public void clearEdges() {
@@ -17,7 +17,7 @@ public final class TickInput {
 
     public void clearAll() {
         clearEdges();
-        blueHeld = redHeld = purpleHeld = jumpHeld = dodgeHeld = false;
+        blueHeld = meleeHeld = redHeld = purpleHeld = jumpHeld = dodgeHeld = false;
         moveX = moveY = 0;
     }
 }
