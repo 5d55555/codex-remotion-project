@@ -9,6 +9,7 @@ package com.shinjuku.showdown.core;
  * 魔虚罗（Astra 的方案）：基础不管它（体术照样打到够得着的最近一个）。标准看到它 24–36 tick 后把它当优先目标：茈好了就转过去放
  * （850 正好打掉）；领域里也先用普通茈打它。熟练 12–18 tick 就反应，先等最多 60 tick，找宿傩和魔虚罗在同一边、一发茈穿两个的机会。
  * 适应了无限的魔虚罗出招：标准一半概率闪开，熟练都闪。最大输出赫的“安全”也要看魔虚罗和顎吐。
+ * v0.9：标准、熟练的瞬移在茈好了时优先用瞬移·茈（念完咒词闪到背后贴脸一发）；领域里苍、赫、茈都好了就念茈·最大输出（同时按住苍和赫）。
  */
 final class GojoBot {
     static final int BASIC = 0, STANDARD = 1, SKILLED = 2;
@@ -16,7 +17,7 @@ final class GojoBot {
 
     private final int level, reactMin, reactMax;
     private final CombatRng rng;
-    private int worldSeenAt = -1, worldReactAt, purpleHold, redHold, punchSeenAt = -1, punchReactAt;
+    private int worldSeenAt = -1, worldReactAt, purpleHold, redHold, maxHold, punchSeenAt = -1, punchReactAt;
     private boolean punchDodge;
     private int mahoSeenAt = -1, mahoReactAt, mHitReactAt;
     private boolean mDodge, mSwingSeen;
@@ -39,7 +40,14 @@ final class GojoBot {
         boolean free = g.state == Fighter.FREE && g.hitstun == 0;
         boolean sukunaStuck = !w.sukunaCanAct() || s.state == Fighter.KO;
 
-        // 按住着的招：茈（念咒）、赫（最大输出）
+        // 按住着的招：茈·最大输出（苍和赫一起按着）、茈（念咒）、赫（最大输出）
+        if (maxHold > 0) {
+            if (g.state == Fighter.RED_HOLD || g.state == Fighter.BLUE_HOLD || g.state == Fighter.PURPLE_MAX_CHANT) {
+                in.blueHeld = in.redHeld = true;
+                return;
+            }
+            maxHold = 0;
+        }
         if (purpleHold > 0) {
             if (g.state == Fighter.PURPLE_WINDUP || g.state == Fighter.PURPLE_CHANT) {
                 in.purpleHeld = true;
@@ -134,8 +142,13 @@ final class GojoBot {
             }
         }
 
-        // 瞬移连段：标准、熟练好了就用（按住闪避点苍；苍在冷却就点赫）
+        // 瞬移连段：标准、熟练好了就用（茈好了就按住闪避点茈；不然点苍；苍在冷却就点赫）
         if (level != BASIC && w.tpCd == 0 && !sukunaStuck && s.state != Fighter.KO) {
+            if (w.purpleCd == 0 && w.purpleFailLock == 0 && purpleSafe(w) && !(w.domainTicks > 0 && maxReady(w))) {
+                in.dodgeHeld = true;
+                in.purple = true;
+                return;
+            }
             if (w.blueCd == 0) {
                 in.dodgeHeld = true;
                 in.blueDown = in.blueUp = true;
@@ -164,6 +177,13 @@ final class GojoBot {
         if (level != BASIC && !domainUsed && w.domainCd == 0 && w.domainTicks == 0 && d < 600) {
             in.domain = true;
             domainUsed = true;
+            return;
+        }
+        // 茈·最大输出：领域里苍、赫、茈都好了就念（宿傩动不了，十段咒词念得完）
+        if (level != BASIC && w.domainTicks > 500 && maxReady(w)) {
+            in.blueDown = in.blueHeld = true;
+            in.red = in.redHeld = true;
+            maxHold = 1;
             return;
         }
         // 200% 茈：标准在领域里念；熟练只在宿傩被控时念（魔虚罗在场时先用普通茈打它）
@@ -203,6 +223,10 @@ final class GojoBot {
             return;
         }
         in.moveX = toward;
+    }
+
+    private static boolean maxReady(World w) {
+        return w.blueCd == 0 && w.redCd == 0 && w.purpleCd == 0 && w.blueFailLock == 0 && w.redFailLock == 0 && w.purpleFailLock == 0;
     }
 
     /** 放茈的起手（30 tick）会不会被打断：开着展延的宿傩或者适应了无限的魔虚罗贴得太近就先别放。 */

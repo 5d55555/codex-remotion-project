@@ -11,13 +11,15 @@ public final class Fighter {
     // 宿傩：S_MELEE 体术、S_DISMANTLE 解、S_AMP_START 开领域展延、S_WORLD 世界斩的起手（结印、咏唱、指向）、
     // S_WORLD_RECOVER 世界斩收招、S_RCT 反转术式（起手、回复、收招）、S_SUMMON 召唤魔虚罗（咏唱、收招）、S_AGITO 顎吐（结手影、收招）、
     // S_TRANSFORM 变原身。魔虚罗：M_RISE 刚显现（还不能动）、M_PUNCH 重拳、M_SWORD 退魔之剑。
+    // 五条悟：TP_PURPLE 瞬移·茈（拍肩、回头、贴脸一发茈）；PURPLE_MAX_CHANT 茈·最大输出的十段咏唱，PURPLE_MAX 它的固定动作。
     public static final int FREE = 0, MELEE = 1, BLUE_HOLD = 2, BLUE_WINDUP = 3, RED_WINDUP = 4, RED_ACTIVE = 5,
             RED_RECOVER = 6, BLUE_RECOVER = 7, KO = 8, PURPLE_WINDUP = 9, PURPLE_RECOVER = 10,
             MELEE_ACTIVE = 11, MELEE_RECOVER = 12, FIST_WINDUP = 13, FIST_ACTIVE = 14, FIST_RECOVER = 15,
             RED_HOLD = 16, PURPLE_CHANT = 17, DOMAIN_CAST = 18, S_MELEE = 19, S_DISMANTLE = 20,
             S_AMP_START = 21, S_WORLD = 22, S_WORLD_RECOVER = 23, S_RCT = 24,
             BLUE_CHANT = 25, RED_CHANT = 26, DODGE = 27, TP_WINDUP = 28, TP_BLUE = 29, TP_RED = 30,
-            S_SUMMON = 31, S_AGITO = 32, S_TRANSFORM = 33, M_RISE = 34, M_PUNCH = 35, M_SWORD = 36;
+            S_SUMMON = 31, S_AGITO = 32, S_TRANSFORM = 33, M_RISE = 34, M_PUNCH = 35, M_SWORD = 36,
+            TP_PURPLE = 37, PURPLE_MAX_CHANT = 38, PURPLE_MAX = 39;
 
     public final int id;
     public float halfW = Tuning.BODY_HALF_W, height = Tuning.BODY_H; // 身体的半宽和身高（魔虚罗比人大）

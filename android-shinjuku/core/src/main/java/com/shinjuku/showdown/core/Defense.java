@@ -20,7 +20,7 @@ public final class Defense {
 
     static boolean bypassesInfinity(World w, Attack a) {
         // 自己的无指向茈：无限挡不住自己的术式（原作第 235 话五条被卷进自己的茈里）
-        if (a.kind == Attack.HOLLOW && a.source == a.target) return true;
+        if ((a.kind == Attack.HOLLOW || a.kind == Attack.PURPLE_MAX) && a.source == a.target) return true;
         Domains d = w.domains;
         if ((a.flags & Attack.SURE_HIT) != 0 && d.sureHit[a.source][a.target]) return true;
         if ((a.flags & Attack.DOMAIN_AMPLIFICATION) != 0 && d.amplification[a.source]) return true;

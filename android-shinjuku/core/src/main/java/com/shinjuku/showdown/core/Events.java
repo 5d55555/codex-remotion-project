@@ -21,11 +21,17 @@ public final class Events {
             SUMMON = 28,           // 召唤魔虚罗：value 0 开始念「布瑠部由良由良」、1 魔虚罗在 (x, y) 显现、-1 被打断
             AGITO = 29,            // 顎吐：value 0 从 (x, y) 飞出、1 在 (x, y) 俯冲电击、2 消失
             TRANSFORM = 30,        // 宿傩变原身：value 1 开始（回满血）、0 变完
-            MAHORAGA_GONE = 31;    // 魔虚罗退场：value 0 被打倒、1 宿傩倒下或变原身（十种影法术没了）
+            MAHORAGA_GONE = 31,    // 魔虚罗退场：value 0 被打倒、1 宿傩倒下或变原身（十种影法术没了）
+            CINE = 32;             // 固定动作里的节点：value 见下面的 CINE_*，(x, y) 是发生的位置
+    public static final int CINE_RED = 1, CINE_SLASH = 2, CINE_MAHO_SWING = 3, CINE_CHANT = 4, CINE_CONTACT = 5, CINE_BLAST = 6,
+            CINE_END = 7, CINE_TAP = 10, CINE_TURN = 11;
+    // CINE_SLASH：宿傩朝赫斩出去，kind 是斩到哪里停下的 x（被苍挡下）；CINE_CHANT：kind 是第几段追加咏唱
     // ADAPT 的 kind：0 法阵转了一格，1 宿傩学会了世界斩，2 魔虚罗适应了无限（攻击能打穿）
     // CHANT 的 kind：Attack.PURPLE（200% 茈，四段）、Attack.BLUE_FIELD（出力最大的苍，三段）、Attack.RED（最大输出的赫，三段）
-    // CAST 的 value：0 普通，1 苍出力最大 / 赫最大输出 / 世界斩（咏唱版），2 茈 200%；世界斩第一次（束缚，免咏唱）是 3
-    // RED_FIRE / RED_BURST 的 kind：0 普通，1 最大输出，2 瞬移后的大赫
+    // CAST 的 value：0 普通，1 苍出力最大 / 赫最大输出 / 世界斩（咏唱版），2 茈 200%；世界斩第一次（束缚，免咏唱）是 3；
+    // 4 瞬移；5 茈·最大输出（固定动作开始）
+    // RED_FIRE / RED_BURST 的 kind：0 普通，1 最大输出，2 瞬移后的大赫；PURPLE_FIRE 的 kind：0 普通，1 200%，2 瞬移·茈（贴脸）
+    // CHANT 的 kind 还有 Attack.PURPLE_MAX（茈·最大输出的十段：value 0–2 苍、3–5 赫、6–9 茈）
 
     public static final int CAP = 128, MASK = CAP - 1;
     public final int[] type = new int[CAP];

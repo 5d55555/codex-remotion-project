@@ -107,8 +107,8 @@ final class SukunaAi {
             }
         }
 
-        // 五条悟在念 200% 茈：反应过来就去打断（里梅以上由战术层统一处理苍、赫、茈的咏唱）
-        if (t.tacticLevel == 0 && g.state == Fighter.PURPLE_CHANT) {
+        // 五条悟在念 200% 茈或茈·最大输出：反应过来就去打断（里梅以上由战术层统一处理苍、赫、茈的咏唱）
+        if (t.tacticLevel == 0 && (g.state == Fighter.PURPLE_CHANT || g.state == Fighter.PURPLE_MAX_CHANT)) {
             if (!chantSeen) {
                 chantSeen = true;
                 chantReact = rng.nextUnitDouble() < t.mistake ? -1 : range(t.reactMin, t.reactMax);
@@ -127,7 +127,8 @@ final class SukunaAi {
             } else if (w.config.shrine && d <= Tuning.DISMANTLE_RANGE && w.ampLock == 0) {
                 wantDismantle = true;
             } else if (agitoReady(w) && d <= Tuning.AGITO_RANGE
-                    && Tuning.CHANT_PHRASE * Tuning.CHANT_PHRASES - g.stateTick > Tuning.AGITO_SIGN + Tuning.AGITO_DIVE + 2) {
+                    && (g.state == Fighter.PURPLE_MAX_CHANT ? MAX_CHANT_TICKS : Tuning.CHANT_PHRASE * Tuning.CHANT_PHRASES) - g.stateTick
+                    > Tuning.AGITO_SIGN + Tuning.AGITO_DIVE + 2) {
                 wantAgito = true; // 十影宿傩没有解：念咒还剩够长就放顎吐去打断
             } else {
                 moveIntent = toward;
@@ -293,9 +294,12 @@ final class SukunaAi {
             gSeenState = g.state;
             gSince = aiClock;
             switch (g.state) {
-                case Fighter.TP_WINDUP:
+                case Fighter.TP_WINDUP: // 瞬移·茈先念四段咒词：窗口长得多
                     seenTp = aiClock;
-                    offer(OPP_INTERRUPT, t.interruptChance, Tuning.TP_WINDUP, g.state);
+                    offer(OPP_INTERRUPT, t.interruptChance, w.tpKind() == Attack.PURPLE ? Tuning.CHANT_PHRASE * Tuning.CHANT_PHRASES : Tuning.TP_WINDUP, g.state);
+                    break;
+                case Fighter.PURPLE_MAX_CHANT: // 茈·最大输出的十段咒词：一定要打断
+                    offer(OPP_INTERRUPT, Math.min(1f, t.interruptChance + 0.1f), MAX_CHANT_TICKS, g.state);
                     break;
                 case Fighter.BLUE_CHANT:
                 case Fighter.RED_CHANT:
@@ -563,8 +567,11 @@ final class SukunaAi {
     }
 
     /** 五条悟手上正在起招（出拳、蓄苍拳、苍赫茈的起手和念咒、瞬移前摇、闪避）。 */
+    private static final int MAX_CHANT_TICKS = Tuning.CHANT3_PHRASE * 6 + Tuning.CHANT_PHRASE * Tuning.CHANT_PHRASES;
+
     private static boolean gojoWindingUp(Fighter g) {
         switch (g.state) {
+            case Fighter.PURPLE_MAX_CHANT:
             case Fighter.MELEE:
             case Fighter.FIST_WINDUP:
             case Fighter.RED_HOLD:

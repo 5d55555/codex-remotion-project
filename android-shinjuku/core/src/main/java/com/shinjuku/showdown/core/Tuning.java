@@ -76,6 +76,12 @@ public final class Tuning {
     public static final long TP_RED_DAMAGE_MILLI = 550_000;        // 占位：和赫·最大输出一样
     public static final float TP_RED_DISTANCE = 0.85f * WIDTH, TP_RED_ARC = 70f;
     public static final int DOWN_TICKS = 60;                       // 被击倒：落地后这么久起不来
+    // 瞬移·茈（按住闪避 + 茈，先按哪个都行，定）：先念茈的四段咒词（不用一直按着；被攻击碰到就断），然后闪到宿傩背后，
+    // 拍拍他的肩膀，他回头时贴脸一发茈，击飞（定）；1900（定）。用掉瞬移冷却和 200% 茈的冷却（30 秒，占位）
+    public static final long TP_PURPLE_DAMAGE_MILLI = 1_900_000;
+    public static final int TP_PURPLE_TAP = 24, TP_PURPLE_TURN = 46, TP_PURPLE_FIRE = 70, TP_PURPLE_AFTER = 50; // 占位
+    public static final float TP_PURPLE_IMPULSE_X = 1300f, TP_PURPLE_IMPULSE_Y = 560f;
+    public static final int TP_PURPLE_HITSTUN = 110;
 
 
     // 苍：吸力；投掷最远不超过战场宽度 30%；离中心越近伤害越高，最高每秒 100（定）
@@ -144,6 +150,19 @@ public final class Tuning {
     public static final int PURPLE_200_HITSTUN = 110, PURPLE_200_HITSTOP = 14, PURPLE_200_RECOVER = 34;
     public static final int PURPLE_200_COOLDOWN = 3600; // 占位：30 秒
     public static final int CHANT_BROKEN_LOCK = 30;     // 被打断后 0.25 秒内不能再按
+    // 茈·最大输出（同时按住苍和赫，定）：先念苍、赫的咒词，再念茈的咒词（十段；松开任何一个或被攻击碰到就断，定），
+    // 念完放一段 11 秒的固定动作（定：10 秒以上）：全场暂停只走这段动画，五条悟和宿傩都在空中——空中留一个巨大的苍，
+    // 向天空发射赫朝苍移动，宿傩（和魔虚罗）想阻止两者接触，五条追加咏唱增强苍挡下干扰，最后苍和赫在空中相撞，爆成大范围的茈（定）。
+    // 宿傩（魔虚罗在场也一样）3500（定）；五条悟开始时离爆心不超过爆炸半径的话自己挨 700（定）。三种术式都要好了才能用
+    public static final long PURPLE_MAX_DAMAGE_MILLI = 3_500_000, PURPLE_MAX_SELF_DAMAGE_MILLI = 700_000;
+    public static final int PURPLE_MAX_COOLDOWN = 7200;   // 占位：60 秒
+    // 固定动作的时间线（tick）：苍张开 → 赫射上天 → 宿傩（魔虚罗）干扰 → 追加咏唱、苍变大把他们吸回去 → 相撞 → 爆发 → 落地
+    public static final int PMAX_RISE = 120, PMAX_RED = 240, PMAX_INTERFERE = 360, PMAX_CHANT = 600, PMAX_PULLBACK = 720,
+            PMAX_CLOSE = 900, PMAX_CONTACT = 1020, PMAX_HIT = 1060, PMAX_END = 1320;
+    public static final int PMAX_CHANT_GAP = 100;        // 追加咏唱每段的间隔
+    public static final float PMAX_SKY_Y = 250f, PMAX_GOJO_Y = 170f, PMAX_BLUE_R = 140f, PMAX_BLUE_R_MAX = 220f;
+    public static final float PMAX_RADIUS = 0.35f * WIDTH; // 爆炸半径（占位）
+    public static final int PMAX_HITSTUN = 150;
     // 苍、赫长按的三段咏唱（定）：苍「位相、黄昏、智慧之瞳」，赫「位相、波罗蜜、光之柱」；和茈一样念的时候不能动，松手或被攻击碰到就打断
     public static final int CHANT3_PHRASE = 36, CHANT3_PHRASES = 3; // 占位：每段 0.3 秒
 

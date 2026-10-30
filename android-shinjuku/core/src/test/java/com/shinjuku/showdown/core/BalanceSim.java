@@ -17,6 +17,7 @@ public final class BalanceSim {
         long ampMelee, world, mahoDealt, heal, transformHeal, gojoDealt, mahoTaken;
         int unlockTick = -1, worldStarted, worldFired, worldHit, domainUsed, rctUsed, tp, tpBroken, chants, chantBroken, amps;
         int agitoCast, agitoTouch, summonTry, summonBroken, summonTick = -1, mahoGoneTick = -1, mahoAdaptTick = -1, transformTick = -1;
+        int tpPurple, maxPurple, maxBroken;
         boolean mahoKilled, mahoOneShot;
         float transformHp;
     }
@@ -74,6 +75,11 @@ public final class BalanceSim {
                     r.rctUsed++;
                 } else if (e.type[i] == Events.TELEPORT) {
                     r.tp++;
+                    if (e.kind[i] == Attack.PURPLE) r.tpPurple++;
+                } else if (e.type[i] == Events.CAST && e.value[i] == 5) {
+                    r.maxPurple++;
+                } else if (e.type[i] == Events.CHANT && e.kind[i] == Attack.PURPLE_MAX && e.value[i] < 0) {
+                    r.maxBroken++;
                 } else if (e.type[i] == Events.CHANT && e.kind[i] == Attack.BLUE_FIST && e.value[i] < 0) {
                     r.tpBroken++; // 瞬移或下砸苍拳的前摇被打断
                 } else if (e.type[i] == Events.CHANT && e.kind[i] != Attack.BLUE_FIST) {
@@ -173,6 +179,7 @@ public final class BalanceSim {
         long ampSum = 0, worldSum = 0;
         int fired = 0, hit = 0, started = 0, rct = 0, tp = 0, tpBroken = 0, chants = 0, chantBroken = 0, amps = 0;
         long gojoDealt = 0, mahoDealt = 0, transformHeal = 0, rctHeal = 0, mahoTaken = 0;
+        int tpPurple = 0, maxPurple = 0, maxBroken = 0;
         int agitoCast = 0, agitoTouch = 0, summonTry = 0, summonBroken = 0, summoned = 0, mahoKilled = 0, oneShot = 0, adapted = 0, transformed = 0;
         int[] mahoLife = new int[n];
         float transformHpSum = 0;
@@ -199,6 +206,9 @@ public final class BalanceSim {
             gojoDealt += r.gojoDealt;
             hit += r.worldHit;
             mahoDealt += r.mahoDealt;
+            tpPurple += r.tpPurple;
+            maxPurple += r.maxPurple;
+            maxBroken += r.maxBroken;
             rctHeal += r.heal;
             transformHeal += r.transformHeal;
             mahoTaken += r.mahoTaken;
@@ -231,8 +241,9 @@ public final class BalanceSim {
                     agitoCast / (double) n, agitoTouch / (double) n, summoned, summonTry, summonBroken, sec(mahoLife, ml), mahoKilled, oneShot, adapted,
                     transformed, transformed == 0 ? 0 : 100.0 * transformHpSum / transformed, transformed == 0 ? 0 : transformHeal / 1000.0 / transformed);
         }
-        System.out.printf("  每局：瞬移成功 %.2f、前摇被打断 %.2f；念咒 %.2f、被打断 %.2f；展延 %.2f 次%n",
-                tp / (double) n, tpBroken / (double) n, chants / (double) n, chantBroken / (double) n, amps / (double) n);
+        System.out.printf("  每局：瞬移成功 %.2f（其中瞬移·茈 %.2f）、前摇被打断 %.2f；念咒 %.2f、被打断 %.2f；茈·最大输出 %.2f（被打断 %.2f）；展延 %.2f 次%n",
+                tp / (double) n, tpPurple / (double) n, tpBroken / (double) n, chants / (double) n, chantBroken / (double) n,
+                maxPurple / (double) n, maxBroken / (double) n, amps / (double) n);
     }
 
     private static String sec(int[] a, int n) {

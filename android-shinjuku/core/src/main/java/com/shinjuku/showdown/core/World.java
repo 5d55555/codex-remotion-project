@@ -55,6 +55,16 @@ public final class World {
     public int mPunchCd, mSwordCd, mGap; // 魔虚罗两招的冷却、两次出招的间隔
     private int mDecide, mReact, mMove, mSeq = -1, mHitId = -1;
     private boolean mWasLocked;
+    // 固定动作（茈·最大输出）：全场暂停，只走这段动画。画面读这些
+    public static final int CINE_NONE = 0, CINE_PURPLE_MAX = 1;
+    public int cine, cineTick;
+    public boolean cineMaho;             // 魔虚罗在场的版本
+    public float cineSx, cineSy;         // 空中那个苍的中心（也是茈爆开的地方）
+    public float cineBlueR, cinePurpleR; // 苍的半径、茈爆开的半径
+    public float cineRedX, cineRedY;     // 赫的位置（PMAX_RED 之后）
+    private float cineRx0, cineRy0, cineGx, cineGy0, cineSx0, cineSy0, cineMx0, cineLx, cineLy;
+    private boolean cineSelf;            // 五条悟在爆炸范围里（开始时就定下来）
+
     // 统计（模拟、测试用）：每人实际掉的血（毫血，不算溢出），宿傩反转术式和变原身各回了多少
     public final long[] damageTaken = new long[Fighter.COUNT];
     public long rctHealed, transformHealed;
@@ -125,13 +135,17 @@ public final class World {
         mahoraga.py = mahoraga.y;
         agito.px = agito.x;
         agito.py = agito.y;
+        if (cine != CINE_NONE) { // 固定动作：全场暂停（冷却、领域、AI 都不走），按键不收，只走这段动画
+            stepCine();
+            return;
+        }
         latch(in);
         if (hitstop > 0) {
             hitstop--;
             return;
         }
         controlGojo(in);
-        gojo.invuln = gojo.state == Fighter.DODGE || gojo.state == Fighter.TP_BLUE || gojo.state == Fighter.TP_RED;
+        gojo.invuln = gojo.state == Fighter.DODGE || gojo.state == Fighter.TP_BLUE || gojo.state == Fighter.TP_RED || gojo.state == Fighter.TP_PURPLE;
         if (cutscene) return; // 这一 tick 按了领域展开：停在这里等过场
         if (config.sukunaAi) ai.think(this, sukunaIntent);
         controlSukuna(sukunaIntent);
@@ -267,6 +281,10 @@ public final class World {
                 move(g, in.moveX, 1f);
                 updateAim(in);
                 if (dodgeIntoTeleport(Attack.BLUE_FIST)) break; // 按着苍点闪避：瞬移
+                if (in.redHeld && maxPurpleReady()) {           // 苍和赫同时按住：茈·最大输出
+                    startMaxChant();
+                    break;
+                }
                 if (bufJump > 0 || bufMelee > 0 || bufRed > 0 || bufPurple > 0 || bufDomain > 0 || bufDodge > 0) {
                     enter(g, Fighter.FREE); // 长按确认前可以取消，不进冷却；缓冲着的那个动作下一 tick 就出
                 } else if (blueNextIsUp()) {
@@ -282,6 +300,10 @@ public final class World {
                 drive(g, 0);
                 updateAim(in);
                 if (dodgeIntoTeleport(Attack.BLUE_FIST)) break;
+                if (in.redHeld && bufRed > 0 && maxPurpleReady()) { // 念着苍又按住赫：改念茈·最大输出
+                    startMaxChant();
+                    break;
+                }
                 if (blueNextIsUp()) {
                     bluePop();
                     breakChant();
@@ -317,6 +339,10 @@ public final class World {
             case Fighter.RED_HOLD: // 赫起手：松开就放普通赫；一直按住到 RED_HOLD 就蓄成最大输出
                 drive(g, 0);
                 if (dodgeIntoTeleport(Attack.RED)) break; // 按着赫（或刚点完赫）点闪避：瞬移
+                if (in.redHeld && !redLetGo && in.blueHeld && maxPurpleReady()) { // 赫和苍同时按住：茈·最大输出
+                    startMaxChant();
+                    break;
+                }
                 if (!in.redHeld || redLetGo) redReleased = true;
                 if (!redReleased && st >= Tuning.RED_HOLD) {
                     events.emit(Events.CAST, g.x, g.centerY(), 1, Attack.RED, tick);
@@ -328,6 +354,10 @@ public final class World {
             case Fighter.RED_CHANT: // 念咒：不能动；松手或被攻击碰到就打断
                 drive(g, 0);
                 if (dodgeIntoTeleport(Attack.RED)) break;
+                if (in.redHeld && !redLetGo && in.blueHeld && blueNextIsDown() && maxPurpleReady()) { // 念着赫又按住苍
+                    startMaxChant();
+                    break;
+                }
                 if (!in.redHeld || redLetGo) {
                     breakChant();
                     break;
@@ -348,6 +378,7 @@ public final class World {
                 break;
             case Fighter.PURPLE_WINDUP: // 茈起手：松开就是普通茈；一直按住到 PURPLE_HOLD 就开始念咒
                 drive(g, 0);
+                if (dodgeIntoTeleport(Attack.PURPLE)) break; // 按着茈（或刚点完茈）点闪避：瞬移·茈
                 if (!in.purpleHeld || purpleLetGo) purpleReleased = true;
                 if (!purpleReleased && st >= Tuning.PURPLE_HOLD) {
                     startChant(Fighter.PURPLE_CHANT, Attack.PURPLE);
@@ -362,6 +393,20 @@ public final class World {
                     break;
                 }
                 if (chantStep(st, Tuning.CHANT_PHRASE, Tuning.CHANT_PHRASES)) firePurple(true);
+                break;
+            }
+            case Fighter.PURPLE_MAX_CHANT: { // 茈·最大输出：苍三段、赫三段、茈四段；松开苍或赫、被攻击碰到都会打断
+                drive(g, 0);
+                if (blueNextIsUp() || (bqSize == 0 && !in.blueHeld) || !in.redHeld || redLetGo) {
+                    breakChant();
+                    break;
+                }
+                int phase = maxChantPhase(st);
+                if (phase != chantPhase) {
+                    chantPhase = phase;
+                    events.emit(Events.CHANT, g.x, g.centerY(), phase, Attack.PURPLE_MAX, tick);
+                }
+                if (st >= Tuning.CHANT3_PHRASE * 6 + Tuning.CHANT_PHRASE * Tuning.CHANT_PHRASES) startPurpleMax();
                 break;
             }
             case Fighter.PURPLE_RECOVER:
@@ -382,22 +427,37 @@ public final class World {
                 } else if (dodgeCombo(in) && bufRed > 0 && redCd == 0 && redFailLock == 0) {
                     bufRed = 0;
                     startTeleport(Attack.RED);
+                } else if (dodgeCombo(in) && bufPurple > 0 && purpleCd == 0 && purpleFailLock == 0) {
+                    bufPurple = 0;
+                    startTeleport(Attack.PURPLE);
                 } else if (st >= Tuning.DODGE_TICKS) {
                     enter(g, Fighter.FREE);
                 }
                 break;
-            case Fighter.TP_WINDUP: // 瞬移的前摇：停住，身上聚起术式；被攻击碰到就打断
+            case Fighter.TP_WINDUP: // 瞬移的前摇：停住，身上聚起术式；被攻击碰到就打断。瞬移·茈先念完茈的四段咒词
                 drive(g, 0);
                 g.vy = 0;
                 g.gravityScale = 0;
-                if (sukuna.state == Fighter.KO) enter(g, Fighter.FREE);
-                else if (st >= Tuning.TP_WINDUP) teleportBehind();
+                if (sukuna.state == Fighter.KO) {
+                    chantPhase = -1;
+                    enter(g, Fighter.FREE);
+                } else if (tpKind == Attack.PURPLE) {
+                    if (chantStep(st, Tuning.CHANT_PHRASE, Tuning.CHANT_PHRASES)) {
+                        chantPhase = -1;
+                        teleportBehind();
+                    }
+                } else if (st >= Tuning.TP_WINDUP) {
+                    teleportBehind();
+                }
                 break;
             case Fighter.TP_BLUE:
                 scriptBlue(st);
                 break;
             case Fighter.TP_RED:
                 scriptRed(st);
+                break;
+            case Fighter.TP_PURPLE:
+                scriptPurple(st);
                 break;
             default:
                 break;
@@ -455,19 +515,24 @@ public final class World {
     /** 按着苍 / 赫（或刚点完）时点了闪避：直接接瞬移（先按哪个都行）。 */
     private boolean dodgeIntoTeleport(int kind) {
         if (bufDodge == 0 || !canTeleport()) return false;
-        if (kind == Attack.BLUE_FIST ? blueCd != 0 : redCd != 0) return false;
+        if (kind == Attack.BLUE_FIST ? blueCd != 0 : kind == Attack.RED ? redCd != 0 : purpleCd != 0 || purpleFailLock != 0) return false;
         bufDodge = 0;
         chantPhase = -1;
         startTeleport(kind);
         return true;
     }
 
-    /** 瞬移的前摇（按住闪避时点苍 / 点赫）。 */
+    /** 瞬移的前摇（按住闪避时点苍 / 点赫 / 点茈）。瞬移·茈先念茈的四段咒词。 */
     private void startTeleport(int kind) {
         tpKind = kind;
         enter(gojo, Fighter.TP_WINDUP);
         drive(gojo, 0);
         events.emit(Events.CAST, gojo.x, gojo.centerY(), 4, kind, tick);
+        if (kind == Attack.PURPLE) {
+            chantKind = Attack.PURPLE;
+            chantPhase = 0;
+            events.emit(Events.CHANT, gojo.x, gojo.centerY(), 0, Attack.PURPLE, tick);
+        }
     }
 
     /** 出现在宿傩背后（背后是墙就出现在另一边），把他定住，进入固定动作。 */
@@ -494,10 +559,12 @@ public final class World {
         s.vx = s.vy = 0;
         tpCd = Tuning.TP_COOLDOWN;
         if (tpKind == Attack.RED) redCd = redCdMax = Tuning.RED_COOLDOWN;
+        else if (tpKind == Attack.PURPLE) purpleCd = purpleCdMax = Tuning.PURPLE_200_COOLDOWN;
         else blueCd = blueCdMax = Tuning.BLUE_COOLDOWN;
         tpHits = 0;
         tpBaseY = s.y;
-        enter(g, tpKind == Attack.RED ? Fighter.TP_RED : Fighter.TP_BLUE);
+        if (tpKind == Attack.PURPLE) s.facing = tx > s.x ? -1 : 1; // 背对着五条悟（这样才拍得到肩膀）
+        enter(g, tpKind == Attack.RED ? Fighter.TP_RED : tpKind == Attack.PURPLE ? Fighter.TP_PURPLE : Fighter.TP_BLUE);
     }
 
     private void endScript() {
@@ -577,6 +644,264 @@ public final class World {
         }
     }
 
+    /** 茈：拍拍宿傩的肩膀，等他回头，贴脸一发茈把他轰飞（1900）。 */
+    private void scriptPurple(int st) {
+        Fighter g = gojo, s = sukuna;
+        if (s.state == Fighter.KO) {
+            endScript();
+            enter(g, Fighter.FREE);
+            return;
+        }
+        if (st < Tuning.TP_PURPLE_FIRE) {
+            s.vx = s.vy = 0;
+            g.vx = g.vy = 0;
+            if (st == Tuning.TP_PURPLE_TAP) events.emit(Events.CINE, (g.x + s.x) * 0.5f, s.y + Tuning.BODY_H - 18, Events.CINE_TAP, tick);
+            if (st == Tuning.TP_PURPLE_TURN) { // 回头
+                s.facing = g.x >= s.x ? 1 : -1;
+                events.emit(Events.CINE, s.x, s.centerY(), Events.CINE_TURN, tick);
+            }
+        } else if (st == Tuning.TP_PURPLE_FIRE) {
+            endScript();
+            float hx = g.x + g.facing * 24;
+            purple.start(++attackSeq, hx, g.y + 56, g.facing);
+            purple.max = true;
+            purple.hitMask = ~0; // 这一发只打宿傩（贴脸已经结算），飞出去的只是光
+            purple200 = true;
+            events.emit(Events.PURPLE_FIRE, hx, g.y + 56, g.facing, 2, tick);
+            attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.PURPLE, purple.instanceId, Tuning.TP_PURPLE_DAMAGE_MILLI,
+                    g.facing * Tuning.TP_PURPLE_IMPULSE_X, Tuning.TP_PURPLE_IMPULSE_Y, Tuning.TP_PURPLE_HITSTUN, 0);
+            apply(attack);
+            s.downTicks = Tuning.DOWN_TICKS;
+            s.pullResist = Tuning.RED_PULL_RESIST;
+            hitstop = Tuning.PURPLE_200_HITSTOP;
+        } else if (st >= Tuning.TP_PURPLE_FIRE + Tuning.TP_PURPLE_AFTER) {
+            enter(g, Fighter.FREE);
+        }
+    }
+
+    /* ---------------- 茈·最大输出 ---------------- */
+
+    /** 苍、赫、茈都好了才能放（念咒被打断的那一下也算没好）。 */
+    private boolean maxPurpleReady() {
+        return blueCd == 0 && redCd == 0 && purpleCd == 0 && blueFailLock == 0 && redFailLock == 0 && purpleFailLock == 0
+                && sukuna.state != Fighter.KO;
+    }
+
+    /** 开始念茈·最大输出的十段咒词（苍三段、赫三段、茈四段）。 */
+    private void startMaxChant() {
+        Fighter g = gojo;
+        enter(g, Fighter.PURPLE_MAX_CHANT);
+        drive(g, 0);
+        bufRed = bufPurple = bufMelee = bufJump = 0;
+        bqSize = 0; // 苍按下 / 松开的排队作废，下面直接看按没按着
+        redLetGo = false;
+        chantKind = Attack.PURPLE_MAX;
+        chantPhase = 0;
+        events.emit(Events.CHANT, g.x, g.centerY(), 0, Attack.PURPLE_MAX, tick);
+    }
+
+    /** 念到第几段（0–2 苍、3–5 赫、6–9 茈）。 */
+    static int maxChantPhase(int st) {
+        int b = Tuning.CHANT3_PHRASE * 3;
+        if (st < b) return st / Tuning.CHANT3_PHRASE;
+        if (st < 2 * b) return 3 + (st - b) / Tuning.CHANT3_PHRASE;
+        return 6 + Math.min(Tuning.CHANT_PHRASES - 1, (st - 2 * b) / Tuning.CHANT_PHRASE);
+    }
+
+    /** 念完：进入固定动作。宿傩（和魔虚罗）手上的动作作废，都被定住；场上的苍、赫、无指向茈、顎吐收掉。 */
+    private void startPurpleMax() {
+        Fighter g = gojo, s = sukuna, m = mahoraga;
+        interruptSukuna();
+        interruptMahoraga();
+        endScript();
+        cine = CINE_PURPLE_MAX;
+        cineTick = 0;
+        cineMaho = m.present;
+        cineSx = clamp(s.x, 220, Tuning.WIDTH - 220);
+        cineSy = Tuning.PMAX_SKY_Y;
+        cineGx = g.x;
+        cineGy0 = g.y;
+        cineSx0 = s.x;
+        cineSy0 = s.y;
+        cineMx0 = m.x;
+        cineSelf = Math.abs(g.x - cineSx) <= Tuning.PMAX_RADIUS;
+        cineBlueR = cinePurpleR = 0;
+        cineRedX = cineRedY = -1000;
+        for (int i = 0; i < Fighter.COUNT; i++) {
+            Fighter f = fighter(i);
+            f.scripted = true;
+            f.captured = false;
+            f.knockedAir = false;
+            f.vx = f.vy = 0;
+            f.hitstun = 0;
+        }
+        blue.phase = BlueOrb.OFF;
+        red.active = false;
+        hollow.active = false;
+        agito.active = false;
+        chantPhase = -1;
+        enter(g, Fighter.PURPLE_MAX);
+        purpleCd = purpleCdMax = Tuning.PURPLE_MAX_COOLDOWN;
+        blueCd = blueCdMax = Tuning.BLUE_COOLDOWN_CHARGED;
+        redCd = redCdMax = Tuning.RED_MAX_COOLDOWN;
+        clearInputs();
+        events.emit(Events.CAST, g.x, g.centerY(), 5, Attack.PURPLE, tick);
+    }
+
+    private static float ease(float k) {
+        k = k < 0 ? 0 : k > 1 ? 1 : k;
+        return k * k * (3 - 2 * k);
+    }
+
+    /** 固定动作的一 tick：按时间线摆好每个人、苍、赫、茈的位置；相撞后结算伤害；最后放开，大家掉回地上。 */
+    private void stepCine() {
+        int t = ++cineTick;
+        Fighter g = gojo, s = sukuna, m = mahoraga;
+        int side = cineSx >= cineGx ? 1 : -1; // 苍在五条悟的哪一边
+        g.stateTick = t;
+        // 苍：先在天上张开，追加咏唱时变大，和赫相撞后被吃掉
+        if (t <= Tuning.PMAX_RISE) cineBlueR = Tuning.PMAX_BLUE_R * ease(t / (float) Tuning.PMAX_RISE);
+        else if (t <= Tuning.PMAX_CHANT) cineBlueR = Tuning.PMAX_BLUE_R;
+        else if (t <= Tuning.PMAX_CONTACT) cineBlueR = Tuning.PMAX_BLUE_R + (Tuning.PMAX_BLUE_R_MAX - Tuning.PMAX_BLUE_R) * ease((t - Tuning.PMAX_CHANT) / 300f);
+        else cineBlueR = Math.max(0, Tuning.PMAX_BLUE_R_MAX * (1 - (t - Tuning.PMAX_CONTACT) / 30f));
+        // 五条悟：原地升到空中，一直看着苍
+        g.x = cineGx;
+        g.y = cineGy0 + (Tuning.PMAX_GOJO_Y - cineGy0) * ease(t / (float) Tuning.PMAX_RISE);
+        g.vx = g.vy = 0;
+        g.facing = side;
+        // 宿傩：被苍吸到天上 → 挣开冲向赫、斩它 → 被变大的苍吸回去
+        float px = cineSx - side * 40, py = cineSy - 90;      // 被吸着的位置（苍的下方）
+        float bx = cineSx - side * 10, by = cineSy - 50;      // 被吸回去后（更靠近苍心）
+        if (t <= Tuning.PMAX_RISE + 60) {
+            float k = ease(t / (float) (Tuning.PMAX_RISE + 60));
+            s.x = cineSx0 + (px - cineSx0) * k;
+            s.y = cineSy0 + (py - cineSy0) * k;
+        } else if (t <= Tuning.PMAX_INTERFERE) {
+            s.x = px;
+            s.y = py + (float) Math.sin(t * 0.21f) * 3;
+        } else if (t <= Tuning.PMAX_PULLBACK) {
+            if (t == Tuning.PMAX_INTERFERE + 1) { // 挣开：冲向赫和苍之间
+                cineLx = (cineRedX + cineSx) * 0.5f;
+                cineLy = Math.max(cineSy - 140, (cineRedY + cineSy) * 0.5f - 30);
+            }
+            float k = ease((t - Tuning.PMAX_INTERFERE) / 120f);
+            s.x = px + (cineLx - px) * k;
+            s.y = py + (cineLy - py) * k;
+            s.facing = cineRedX >= s.x ? 1 : -1;
+            int u = t - Tuning.PMAX_INTERFERE - 40;
+            if (u >= 0 && u % 70 == 0 && u <= 210) { // 朝赫斩过去，斩到苍的边上就被吸住（挡下）
+                float ex = cineSx - side * cineBlueR * 0.9f;
+                events.emit(Events.CINE, s.x, s.centerY(), Events.CINE_SLASH, Math.round(ex), tick);
+            }
+        } else {
+            float k = ease((t - Tuning.PMAX_PULLBACK) / (float) (Tuning.PMAX_CLOSE - Tuning.PMAX_PULLBACK));
+            float fx = cineLx, fy = cineLy;
+            s.x = fx + (bx - fx) * k;
+            s.y = fy + (by - fy) * k + (t > Tuning.PMAX_CLOSE ? (float) Math.sin(t * 0.3f) * 2 : 0);
+        }
+        s.vx = s.vy = 0;
+        // 魔虚罗（在场的版本）：两次跳起来挥剑想劈开苍和赫之间，被苍挡下、吸住
+        if (cineMaho) {
+            float mx = cineMx0;
+            float jx = cineSx - side * (cineBlueR + 20), jy = cineSy - 30;
+            if (t > 400 && t <= 520) {
+                float k = (t - 400) / 120f;
+                m.x = mx + (jx - mx) * k;
+                m.y = 4 * 120 * k * (1 - k) + jy * k * k;
+                if (t == 500) events.emit(Events.CINE, m.x, m.centerY(), Events.CINE_MAHO_SWING, tick);
+                m.facing = cineSx >= m.x ? 1 : -1;
+            } else if (t > 520 && t <= 600) {
+                float k = (t - 520) / 80f;
+                m.x = jx + (mx - jx) * k;
+                m.y = jy * (1 - k * k);
+            } else if (t > 600 && t <= Tuning.PMAX_PULLBACK) {
+                float k = (t - 600) / 120f;
+                m.x = mx + (jx - mx) * Math.min(1, k * 1.2f);
+                m.y = Math.min(jy, 4 * 160 * k * (1 - k) + jy * k);
+                if (t == 690) events.emit(Events.CINE, m.x, m.centerY(), Events.CINE_MAHO_SWING, tick);
+                m.facing = cineSx >= m.x ? 1 : -1;
+            } else if (t > Tuning.PMAX_PULLBACK) {
+                float k = ease((t - Tuning.PMAX_PULLBACK) / 180f); // 被苍吸住，挂在苍的边上
+                m.x = jx + (cineSx - side * 60 - jx) * k;
+                m.y = jy + (cineSy - 80 - jy) * k;
+            } else {
+                m.x = mx;
+                m.y = 0;
+            }
+            m.vx = m.vy = 0;
+        }
+        // 赫：从五条悟手里射上天，弧线朝苍慢慢靠过去
+        if (t == Tuning.PMAX_RED) {
+            cineRx0 = g.x + side * 20;
+            cineRy0 = g.y + 70;
+            events.emit(Events.CINE, cineRx0, cineRy0, Events.CINE_RED, tick);
+        }
+        if (t >= Tuning.PMAX_RED && t < Tuning.PMAX_CONTACT) {
+            float k = (t - Tuning.PMAX_RED) / (float) (Tuning.PMAX_CONTACT - Tuning.PMAX_RED);
+            k = k < 0.85f ? k : 0.85f + (k - 0.85f) * 1.0f;
+            float cx = cineRx0, cy = cineSy + 170, u = 1 - k;
+            float ex = cineSx - side * 4, ey = cineSy;
+            cineRedX = u * u * cineRx0 + 2 * u * k * cx + k * k * ex;
+            cineRedY = u * u * cineRy0 + 2 * u * k * cy + k * k * ey;
+        }
+        // 追加咏唱：苍变大，挡下干扰
+        int c = t - Tuning.PMAX_CHANT;
+        if (c >= 0 && c % Tuning.PMAX_CHANT_GAP == 0 && c / Tuning.PMAX_CHANT_GAP < 3) {
+            events.emit(Events.CINE, g.x, g.centerY(), Events.CINE_CHANT, c / Tuning.PMAX_CHANT_GAP, tick);
+        }
+        // 相撞 → 茈爆开 → 结算
+        if (t == Tuning.PMAX_CONTACT) {
+            cineRedX = cineRedY = -1000;
+            events.emit(Events.CINE, cineSx, cineSy, Events.CINE_CONTACT, tick);
+        }
+        if (t > Tuning.PMAX_CONTACT) {
+            cinePurpleR = Tuning.PMAX_RADIUS * ease((t - Tuning.PMAX_CONTACT) / 120f);
+            if (t > Tuning.PMAX_END - 90) cinePurpleR *= Math.max(0, (Tuning.PMAX_END - t) / 90f);
+        }
+        if (t == Tuning.PMAX_HIT) {
+            events.emit(Events.CINE, cineSx, cineSy, Events.CINE_BLAST, tick);
+            int dir = side;
+            attack.set(Fighter.GOJO, Fighter.SUKUNA, Attack.PURPLE_MAX, ++attackSeq, Tuning.PURPLE_MAX_DAMAGE_MILLI, 0, 0, Tuning.PMAX_HITSTUN, 0);
+            apply(attack);
+            if (m.present) {
+                attack.set(Fighter.GOJO, Fighter.MAHORAGA, Attack.PURPLE_MAX, attackSeq, Tuning.PURPLE_MAX_DAMAGE_MILLI, 0, 0, Tuning.PMAX_HITSTUN, 0);
+                apply(attack);
+            }
+            if (cineSelf) { // 五条悟在爆炸范围里：自己也挨（无限挡不住自己的术式）
+                attack.set(Fighter.GOJO, Fighter.GOJO, Attack.PURPLE_MAX, attackSeq, Tuning.PURPLE_MAX_SELF_DAMAGE_MILLI, 0, 0, 0, 0);
+                apply(attack);
+            }
+            hitstop = 0;
+        }
+        if (t >= Tuning.PMAX_END) endPurpleMax(side);
+    }
+
+    /** 固定动作结束：放开大家，从空中掉下来；宿傩（魔虚罗）被炸飞、落地后倒地。 */
+    private void endPurpleMax(int side) {
+        Fighter g = gojo, s = sukuna, m = mahoraga;
+        cine = CINE_NONE;
+        cineBlueR = cinePurpleR = 0;
+        for (int i = 0; i < Fighter.COUNT; i++) {
+            Fighter f = fighter(i);
+            f.scripted = false;
+            f.px = f.x;
+            f.py = f.y;
+            f.vx = f.vy = 0;
+        }
+        s.vx = side * 260;
+        s.onGround = false;
+        s.knockedAir = s.y > 0;
+        s.downTicks = Tuning.DOWN_TICKS;
+        if (m.present) {
+            m.onGround = false;
+            m.knockedAir = m.y > 0;
+        }
+        g.onGround = false;
+        enter(g, Fighter.FREE);
+        clearInputs();
+        events.emit(Events.CINE, cineSx, cineSy, Events.CINE_END, tick);
+    }
+
     /** 自由状态：走、跳、出招。缓冲着的按键在这里兑现。 */
     private void free(Fighter g, TickInput in) {
         while (blueNextIsUp()) bluePop(); // 没在蓄的时候松开：没有意义
@@ -613,6 +938,9 @@ public final class World {
             redReleased = !in.redHeld;
             redLetGo = false;
             events.emit(Events.CAST, g.x, g.centerY(), 0, Attack.RED, tick);
+        } else if (bufPurple > 0 && purpleCd == 0 && purpleFailLock == 0 && dodgeCombo(in)) {
+            bufPurple = 0;
+            startTeleport(Attack.PURPLE); // 按住闪避时点茈：瞬移·茈
         } else if (bufPurple > 0 && purpleCd == 0 && purpleFailLock == 0) {
             bufPurple = 0;
             enter(g, Fighter.PURPLE_WINDUP);
@@ -789,8 +1117,18 @@ public final class World {
                 return;
             case Fighter.TP_WINDUP:
                 enter(g, Fighter.FREE);
-                events.emit(Events.CHANT, g.x, g.centerY(), -1, Attack.BLUE_FIST, tick);
+                if (tpKind == Attack.PURPLE) { // 瞬移·茈的咒词被打断
+                    chantPhase = -1;
+                    purpleFailLock = Tuning.CHANT_BROKEN_LOCK;
+                    events.emit(Events.CHANT, g.x, g.centerY(), -1, Attack.PURPLE, tick);
+                } else {
+                    events.emit(Events.CHANT, g.x, g.centerY(), -1, Attack.BLUE_FIST, tick);
+                }
                 return;
+            case Fighter.PURPLE_MAX_CHANT:
+                kind = Attack.PURPLE_MAX;
+                blueFailLock = redFailLock = purpleFailLock = Tuning.CHANT_BROKEN_LOCK;
+                break;
             default:
                 return;
         }
@@ -809,6 +1147,8 @@ public final class World {
                 return;
             case Fighter.TP_BLUE:
             case Fighter.TP_RED:
+            case Fighter.TP_PURPLE:
+            case Fighter.PURPLE_MAX:
                 return; // 固定动作里无敌
             case Fighter.PURPLE_CHANT:
             case Fighter.PURPLE_WINDUP:
@@ -817,6 +1157,7 @@ public final class World {
             case Fighter.RED_HOLD:
             case Fighter.FIST_WINDUP:
             case Fighter.TP_WINDUP:
+            case Fighter.PURPLE_MAX_CHANT:
                 breakChant();
                 break;
             case Fighter.BLUE_HOLD:
@@ -1187,7 +1528,7 @@ public final class World {
     public boolean mahoragaCanAct() {
         Fighter m = mahoraga;
         return m.present && m.state != Fighter.M_RISE && m.hitstun == 0 && !m.captured && domainTicks == 0 && !inBlueField(m)
-                && !m.knockedAir && !tenShadowsPaused();
+                && !m.knockedAir && !m.scripted && !tenShadowsPaused();
     }
 
     /** 魔虚罗自己的 AI（各难度一样，没有随机）：每 12 tick 想一次；够得着就出拳，再远一点挥剑，否则往五条悟那边走。 */
@@ -1893,7 +2234,7 @@ public final class World {
         }
         // 宿傩自由的时候面向五条悟（出招时锁定方向）
         Fighter s = sukuna;
-        if (s.state == Fighter.FREE && s.hitstun == 0) s.facing = gojo.x >= s.x ? 1 : -1;
+        if (s.state == Fighter.FREE && s.hitstun == 0 && !s.scripted) s.facing = gojo.x >= s.x ? 1 : -1; // 固定动作里不动
     }
 
     /* ---------------- 给画面读的状态 ---------------- */
