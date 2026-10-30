@@ -9,10 +9,12 @@ public final class BattleConfig {
     /** 随机种子：同一个种子 + 同一串输入 = 完全相同的一场战斗（回放、测试用）。 */
     public long seed = 0x5EED_5EEDL;
 
-    /** 宿傩的基础血量（三轮）：按自动对战模拟定的，见 notes/宿傩平衡.md。 */
-    public static final float SUKUNA_BASE_HP = 10800f;
+    /** 宿傩的基础血量（三轮）：v0.10 按用户要求降低，10800 → 5400（按自动对战模拟在几档里选的，见 notes/宿傩平衡.md）。 */
+    public static final float SUKUNA_BASE_HP = 5400f;
 
     public float gojoMaxHp = 1000f;
+    /** 训练（测试模式）：打空血倒下，过一会儿满血站起来。其他难度打空就分胜负：宿傩打空胜、五条悟打空负（定）。 */
+    public boolean training = true;
     public float sukunaMaxHp = SUKUNA_BASE_HP;
     /** 宿傩自己的攻击伤害倍率（难度每高一档 ×1.1，定；血量的倍率直接乘在 sukunaMaxHp 上）。 */
     public float sukunaDamageMult = 1f;
@@ -37,6 +39,7 @@ public final class BattleConfig {
      */
     public void sukunaDifficulty(int level) {
         sukunaAi = true;
+        training = false;
         ai.preset(level);
         tier(level);
         boolean full = level > 0;

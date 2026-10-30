@@ -71,6 +71,12 @@ public final class World {
     private boolean adaptPending, worldLocked, worldPending;
     private int adaptLastTick = -100_000, adaptTimer;
 
+    // 胜负（测试模式以外）：分出来以后双方都不再行动，画面过一会儿弹出结算
+    public static final int OUTCOME_NONE = 0, OUTCOME_WIN = 1, OUTCOME_LOSE = 2;
+    public int outcome = OUTCOME_NONE;
+    public int outcomeTick;           // 分出胜负的那一 tick（world.tick）
+    private final TickInput idle = new TickInput();
+
     // 领域
     public boolean cutscene;          // 正在放领域展开的过场：全场暂停
     public int castId;                // 第几次展开（画面结束过场时带回来，旧的回调不算数）
@@ -139,6 +145,7 @@ public final class World {
             stepCine();
             return;
         }
+        if (outcome != OUTCOME_NONE) in = idle; // 分出胜负：双方都不再行动（倒下、飞着的照样落地）
         latch(in);
         if (hitstop > 0) {
             hitstop--;
@@ -147,7 +154,8 @@ public final class World {
         controlGojo(in);
         gojo.invuln = gojo.state == Fighter.DODGE || gojo.state == Fighter.TP_BLUE || gojo.state == Fighter.TP_RED || gojo.state == Fighter.TP_PURPLE;
         if (cutscene || cine != CINE_NONE) return; // 这一 tick 按了领域展开（停在这里等过场）或开始了固定动作（全场从这一 tick 起就暂停）
-        if (config.sukunaAi) ai.think(this, sukunaIntent);
+        if (outcome != OUTCOME_NONE) sukunaIntent.clear();
+        else if (config.sukunaAi) ai.think(this, sukunaIntent);
         controlSukuna(sukunaIntent);
         if (!config.sukunaAi) sukunaIntent.clear();
         controlMahoraga();
@@ -878,6 +886,8 @@ public final class World {
                 apply(attack);
             }
             hitstop = 0;
+            // 胜负在炸到的这一 tick 就定（倒下要等动画放完，结算也等动画放完）
+            for (int i = 0; i < 2; i++) if (fighter(i).hpMilli == 0) decide(fighter(i));
         }
         if (t >= Tuning.PMAX_END) endPurpleMax(side);
     }
@@ -909,6 +919,7 @@ public final class World {
         // 打空血的现在就结算（不然下一 tick 零血的五条悟还能先出招）
         if (m.present && m.hpMilli == 0) removeMahoraga(0);
         for (int i = 0; i < 2; i++) if (fighter(i).hpMilli == 0) knockOut(fighter(i));
+        if (outcome != OUTCOME_NONE) endFight();
     }
 
     /** 自由状态：走、跳、出招。缓冲着的按键在这里兑现。 */
@@ -918,7 +929,7 @@ public final class World {
         faceByInput(g, in.moveX);
         if (bufJump > 0 && g.onGround) {
             bufJump = 0;
-            g.vy = Tuning.JUMP_SPEED;
+            g.vy = Tuning.GOJO_JUMP_SPEED;
             g.onGround = false;
         }
         if (bufDodge > 0 && dodgeCd == 0) {
@@ -1537,7 +1548,7 @@ public final class World {
     public boolean mahoragaCanAct() {
         Fighter m = mahoraga;
         return m.present && m.state != Fighter.M_RISE && m.hitstun == 0 && !m.captured && domainTicks == 0 && !inBlueField(m)
-                && !m.knockedAir && !m.scripted && !tenShadowsPaused();
+                && !m.knockedAir && !m.scripted && !tenShadowsPaused() && outcome == OUTCOME_NONE;
     }
 
     /** 魔虚罗自己的 AI（各难度一样，没有随机）：每 12 tick 想一次；够得着就出拳，再远一点挥剑，否则往五条悟那边走。 */
@@ -1774,6 +1785,7 @@ public final class World {
     public int apply(Attack a) {
         Fighter t = fighter(a.target);
         if (t.invuln || !t.present) return 0; // 闪避、瞬移的固定动作：碰不到
+        if (outcome != OUTCOME_NONE) return 0; // 分出胜负以后什么都不再结算
         int mask = Defense.resolve(this, a);
         // 念咒、苍拳和瞬移的前摇：被攻击就打断（被无限挡住也算：攻击碰到了）
         if (t == gojo && a.source != Fighter.GOJO) breakChant();
@@ -2221,7 +2233,7 @@ public final class World {
             Fighter f = fighter(i);
             if (f.state != Fighter.KO && f.hpMilli == 0) {
                 knockOut(f);
-            } else if (f.state == Fighter.KO && --f.koTimer <= 0) {
+            } else if (f.state == Fighter.KO && config.training && --f.koTimer <= 0) { // 只有训练会站起来
                 f.state = Fighter.FREE;
                 f.stateTick = 0;
                 f.hpMilli = f.maxHpMilli;
@@ -2249,6 +2261,41 @@ public final class World {
         f.captured = false;
         f.koTimer = Tuning.KO_TICKS;
         events.emit(Events.KO, f.x, f.centerY(), 0, f.id, tick);
+        if (decide(f)) endFight();
+    }
+
+    /** 分胜负（训练不分）：宿傩打空就赢（同一 tick 两人都打空也算赢），五条悟打空就输。定下来（或改判）返回 true。 */
+    private boolean decide(Fighter f) {
+        if (config.training) return false;
+        if (f != gojo && (outcome == OUTCOME_NONE || outcomeTick == tick)) outcome = OUTCOME_WIN;
+        else if (f == gojo && outcome == OUTCOME_NONE) outcome = OUTCOME_LOSE;
+        else return false;
+        outcomeTick = tick;
+        return true;
+    }
+
+    /**
+     * 分出胜负：双方手上的招（按着的、念着的、打到一半的、反转术式、召唤……）和场上的术式全部收掉，
+     * 之后只剩倒地、落地这些；伤害和回复都不再结算（apply 直接返回）。
+     */
+    private void endFight() {
+        Fighter g = gojo, s = sukuna, m = mahoraga;
+        endScript();
+        blue.phase = BlueOrb.OFF;
+        red.active = false;
+        purple.active = false;
+        hollow.active = false;
+        agito.active = false;
+        if (ampTicks > 0) closeAmp();
+        adaptPending = worldPending = false;
+        chantPhase = -1;
+        for (int i = 0; i < Fighter.COUNT; i++) {
+            Fighter f = fighter(i);
+            f.captured = false;
+            if (f.present && f.state != Fighter.KO) enter(f, Fighter.FREE);
+        }
+        g.invuln = false;
+        clearInputs();
     }
 
     /* ---------------- 给画面读的状态 ---------------- */

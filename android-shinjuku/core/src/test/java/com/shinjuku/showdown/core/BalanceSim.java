@@ -121,7 +121,7 @@ public final class BalanceSim {
             System.out.println("== 难度：" + DIFFICULTY[diff]);
             for (int level = 0; level < 3; level++) report(level, n, seed0, c -> {
                 c.sukunaDifficulty(dl);
-                if (hp > 0) c.sukunaMaxHp = hp;
+                if (hp > 0) c.sukunaMaxHp = (float) (hp * Math.pow(1.1, dl)); // 试别的基础血量（照样按难度 ×1.1）
             });
         }
         for (int mode = 0; mode < 3; mode++) {

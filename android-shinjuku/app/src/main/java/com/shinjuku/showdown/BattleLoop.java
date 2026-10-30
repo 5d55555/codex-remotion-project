@@ -23,23 +23,28 @@ import java.util.concurrent.CountDownLatch;
  * Surface 的生死由主线程通知；surfaceGone() 会等战斗线程放开这个 Surface 才返回。
  * 领域展开的过场：World 停住（cutscene）后，这一帧剩下的 tick 不再推进，战斗帧回调也停掉（线程留着收消息），
  * 通知主线程放视频；放完 endCutscene() 回到这个线程展开领域，从下一帧重新计时（不补放视频那几秒的 tick），积压的按键全丢掉。
+ * 分出胜负（测试模式以外）后再走 RESULT_DELAY 个 tick（倒下的动作放完；茈·最大输出炸死的等固定动作放完），通知主线程弹出结算。
  */
 final class BattleLoop implements Choreographer.FrameCallback {
-    interface CutsceneHost {
+    interface Host {
         /** 要放领域展开的过场了（主线程）。 */
         void startCutscene(int castId);
+
+        /** 分出胜负了：World.OUTCOME_WIN / OUTCOME_LOSE（主线程，只通知一次）。 */
+        void battleOver(int outcome);
     }
 
     private static final String TAG = "BattleLoop";
     private static final long TICK_NS = 1_000_000_000L / Tuning.HZ;
     private static final int MAX_STEPS = 8;
+    private static final int RESULT_DELAY = 150; // 分出胜负后 1.25 秒再弹结算
 
     private final World world;
     private final Controls controls;
     private final PixelScene scene;
     private final GlTarget gl;
     private final CanvasTarget canvasTarget;
-    private final CutsceneHost cutsceneHost;
+    private final Host host;
     private final Handler mainHandler = new Handler(android.os.Looper.getMainLooper());
     private final TickInput input = new TickInput();
     private final HandlerThread thread = new HandlerThread("battle");
@@ -56,17 +61,18 @@ final class BattleLoop implements Choreographer.FrameCallback {
     private int surfaceW, surfaceH;
     private boolean resumed, hasSurface, scheduled, useCanvas, needAttach;
     private boolean cutscenePaused; // 在放过场：不推进、不画
+    private boolean resultPosted;
     private long lastFrameNs, accNs, simNs; // simNs：最近一个 tick 对应的时刻（和触摸事件同一个时钟）
     private float renderTime;               // 画面时钟（秒），暂停期间不走
     private float tickMsAvg, drawMsAvg;
 
-    BattleLoop(World world, Controls controls, PixelScene scene, GlTarget gl, CanvasTarget canvasTarget, CutsceneHost cutsceneHost) {
+    BattleLoop(World world, Controls controls, PixelScene scene, GlTarget gl, CanvasTarget canvasTarget, Host host) {
         this.world = world;
         this.controls = controls;
         this.scene = scene;
         this.gl = gl;
         this.canvasTarget = canvasTarget;
-        this.cutsceneHost = cutsceneHost;
+        this.host = host;
         thread.start();
         handler = new Handler(thread.getLooper());
         handler.post(() -> {
@@ -211,7 +217,12 @@ final class BattleLoop implements Choreographer.FrameCallback {
             cutscenePaused = true;
             accNs = 0;
             int id = world.castId;
-            mainHandler.post(() -> cutsceneHost.startCutscene(id));
+            mainHandler.post(() -> host.startCutscene(id));
+        }
+        if (!resultPosted && world.outcome != World.OUTCOME_NONE && world.cine == World.CINE_NONE && world.tick - world.outcomeTick >= RESULT_DELAY) {
+            resultPosted = true;
+            int outcome = world.outcome;
+            mainHandler.post(() -> host.battleOver(outcome));
         }
         long t1 = System.nanoTime();
         draw(accNs / (float) TICK_NS);

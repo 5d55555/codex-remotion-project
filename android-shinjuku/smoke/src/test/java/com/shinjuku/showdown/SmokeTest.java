@@ -9,7 +9,10 @@ import static org.robolectric.Shadows.shadowOf;
 import android.content.Intent;
 import android.media.MediaPlayer;
 import android.os.Looper;
+import android.view.View;
 import android.widget.LinearLayout;
+
+import com.shinjuku.showdown.core.World;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -23,6 +26,8 @@ import org.robolectric.shadows.ShadowMediaPlayer;
 
 import java.lang.reflect.Field;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 整条路径：主页 → 点开始游戏 → 选难度 → 点每一张卡 → 战斗 → 暂停、恢复、退出。
@@ -131,6 +136,46 @@ public class SmokeTest {
         assertFalse("首帧超时后应该自己结束", cutscene.isPlaying());
         battle.pause().stop().destroy();
         idle();
+    }
+
+    /** 分出胜负：盖上结算（胜利 / 失败），“再来一局”用同一难度重开，“返回”回到选难度。 */
+    @Test
+    public void resultOffersRematchAndBack() {
+        Intent i = new Intent().putExtra(BattleActivity.EXTRA_DIFFICULTY, Difficulty.YOROZU.name());
+        ActivityController<BattleActivity> battle = Robolectric.buildActivity(BattleActivity.class, i).setup();
+        idle();
+        battle.get().battleOver(World.OUTCOME_WIN);
+        battle.get().battleOver(World.OUTCOME_WIN); // 只盖一次
+        idle();
+        View root = battle.get().getWindow().getDecorView();
+        assertEquals(1, find(root, "胜利").size());
+        assertTrue(find(root, "再来一局").get(0).performClick());
+        idle();
+        Intent again = shadowOf(battle.get()).getNextStartedActivity();
+        assertNotNull(again);
+        assertEquals(BattleActivity.class.getName(), again.getComponent().getClassName());
+        assertEquals(Difficulty.YOROZU.name(), again.getStringExtra(BattleActivity.EXTRA_DIFFICULTY));
+        assertTrue(battle.get().isFinishing());
+        battle.pause().stop().destroy();
+        idle();
+
+        ActivityController<BattleActivity> lost = Robolectric.buildActivity(BattleActivity.class, i).setup();
+        idle();
+        lost.get().battleOver(World.OUTCOME_LOSE);
+        idle();
+        View lr = lost.get().getWindow().getDecorView();
+        assertEquals(1, find(lr, "失败").size());
+        assertTrue(find(lr, "返回").get(0).performClick());
+        assertTrue(lost.get().isFinishing());
+        assertEquals(null, shadowOf(lost.get()).getNextStartedActivity());
+        lost.pause().stop().destroy();
+        idle();
+    }
+
+    private static List<View> find(View root, String text) {
+        ArrayList<View> out = new ArrayList<>();
+        root.findViewsWithText(out, text, View.FIND_VIEWS_WITH_TEXT);
+        return out;
     }
 
     @Test

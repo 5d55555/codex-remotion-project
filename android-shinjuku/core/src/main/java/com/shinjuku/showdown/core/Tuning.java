@@ -18,8 +18,9 @@ public final class Tuning {
     public static final float GRAVITY = 1800f;     // 占位
     public static final float BODY_HALF_W = 22f;
     public static final float BODY_H = 100f;
-    public static final float MOVE_SPEED = 300f;   // 占位
-    public static final float JUMP_SPEED = 600f;   // 占位
+    public static final float MOVE_SPEED = 420f;   // 占位：五条悟（v0.10 起 300 → 420，比宿傩的 330 快）
+    public static final float JUMP_SPEED = 600f;   // 占位：宿傩
+    public static final float GOJO_JUMP_SPEED = 720f; // 占位：五条悟（v0.10 起跳得更高，最高点 100 → 144）
     public static final float GROUND_FRICTION = 2400f; // 被打飞后在地上滑行减速
     public static final int INPUT_BUFFER = 14;     // 提前按下的体术/赫/跳跃保留约 0.12 秒，动作一结束就接上
     // 连段衰减：轻拳（双方的体术）在同一串连击里打到第 3 下以后不再造成硬直；1 秒没挨打就重新算（防止贴身连打锁死对手）
@@ -61,7 +62,7 @@ public final class Tuning {
 
     // 闪避（定）：默认往面朝的方向，推着摇杆就往摇杆的方向；闪避期间无敌；冷却 0.5 秒
     public static final int DODGE_TICKS = 18, DODGE_COOLDOWN = 60; // 占位：闪 0.15 秒
-    public static final float DODGE_SPEED = 1000f;                 // 占位：闪 150 的距离
+    public static final float DODGE_SPEED = 1400f;                 // 占位：闪 210 的距离（v0.10 起，原来 150）
 
     // 瞬移（闪避 + 苍 / 赫，先按哪个都行，定）：按住闪避时点苍 / 点赫，或者按住苍 / 赫时点闪避；刚点过闪避（TP_LENIENCY 内）再点苍 / 赫也算。
     // 前摇可被打断（被宿傩的攻击碰到就断）；之后出现在宿傩背后，放固定动作，镜头拉近
@@ -172,7 +173,7 @@ public final class Tuning {
 
     // 宿傩（新宿决战的技能组，Luna 查证、Astra 定的首轮数值，见 notes/宿傩平衡.md）。
     // 体术 75、解 90 是定的；无限挡住一切，只有领域展延下的体术和世界斩能打到五条悟。
-    public static final float SUKUNA_SPEED = 330f;   // 比五条悟（300）快一点，追得上后撤
+    public static final float SUKUNA_SPEED = 330f;   // v0.9 以前比五条悟（300）快一点；v0.10 起五条悟 420，走着就能拉开
     public static final long S_MELEE_DAMAGE_MILLI = 75_000;
     public static final int S_MELEE_STARTUP = 8, S_MELEE_ACTIVE = 4, S_MELEE_RECOVERY = 14; // 占位
     public static final float S_MELEE_REACH = 100f, S_MELEE_LUNGE = 180f, S_MELEE_IMPULSE = 160f;

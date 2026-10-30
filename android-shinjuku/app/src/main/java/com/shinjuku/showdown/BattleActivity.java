@@ -1,7 +1,9 @@
 package com.shinjuku.showdown;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
@@ -10,25 +12,28 @@ import com.shinjuku.showdown.core.World;
 
 /**
  * 战斗：横屏、全屏、常亮。难度从选择界面带过来，先调用它的 configure() 再建世界。
- * 界面是一层 FrameLayout：战斗画面在下，领域展开的过场视频（和它的黑边幕布）在上。
+ * 界面是一层 FrameLayout：战斗画面在下，领域展开的过场视频（和它的黑边幕布）在上，分出胜负后最上面盖一层结算。
  */
-public class BattleActivity extends Activity implements Controls.Actions, BattleLoop.CutsceneHost, CutscenePlayer.Host {
+public class BattleActivity extends Activity implements Controls.Actions, BattleLoop.Host, CutscenePlayer.Host {
     static final String EXTRA_DIFFICULTY = "difficulty";
 
+    private Difficulty difficulty;
+    private FrameLayout root;
     private BattleView view;
     private CutscenePlayer cutscene;
     private Bgm bgm;
+    private View result;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        Difficulty d = parse(getIntent().getStringExtra(EXTRA_DIFFICULTY));
+        Difficulty d = difficulty = parse(getIntent().getStringExtra(EXTRA_DIFFICULTY));
         BattleConfig config = new BattleConfig();
         config.difficulty = d.ordinal();
         d.configure(config);
         bgm = Bgm.get(this);
-        FrameLayout root = new FrameLayout(this);
+        root = new FrameLayout(this);
         view = new BattleView(this, new World(config), d, this, bgm, this);
         root.addView(view, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         cutscene = new CutscenePlayer(this, root, this); // 进战斗就开始准备视频
@@ -85,6 +90,24 @@ public class BattleActivity extends Activity implements Controls.Actions, Battle
         view.endCutscene(castId, () -> {
             if (!isDestroyed()) view.setInputBlocked(false); // 战斗线程已经丢掉旧按键、接着打了
         });
+    }
+
+    /* ---------------- 结算（主线程） ---------------- */
+
+    @Override
+    public void battleOver(int outcome) {
+        if (isFinishing() || isDestroyed() || result != null) return;
+        view.setInputBlocked(true);
+        result = ResultPanel.build(this, outcome == World.OUTCOME_WIN, difficulty, v -> again(), v -> finish());
+        result.setAlpha(0f);
+        root.addView(result, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        result.animate().alpha(1f).setDuration(350L).start();
+    }
+
+    /** 再来一局：同一难度重新开一场（新的 Activity，世界、过场、按键都从头来）。 */
+    private void again() {
+        startActivity(new Intent(this, BattleActivity.class).putExtra(EXTRA_DIFFICULTY, difficulty.name()));
+        finish();
     }
 
     /* ---------------- 顶部按钮（主线程） ---------------- */

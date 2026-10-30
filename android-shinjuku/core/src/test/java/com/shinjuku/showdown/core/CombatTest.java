@@ -1292,9 +1292,11 @@ public class CombatTest {
         for (int seed = 0; seed < 20; seed++) {
             BattleConfig c = new BattleConfig();
             c.sukunaAi = true;
+            c.sukunaMaxHp = 10800; // v0.9 的血量：这里看的是 AI 两边都能赢，不是平衡
             BalanceSim.Result a = BalanceSim.play(GojoBot.STANDARD, seed, c);
             BattleConfig c2 = new BattleConfig();
             c2.sukunaAi = true;
+            c2.sukunaMaxHp = 10800;
             BalanceSim.Result b = BalanceSim.play(GojoBot.STANDARD, seed, c2);
             assertEquals("可复现", a.ticks, b.ticks);
             assertEquals(a.winner, b.winner);

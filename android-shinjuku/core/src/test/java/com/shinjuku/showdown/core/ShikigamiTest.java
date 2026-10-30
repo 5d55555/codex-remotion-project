@@ -44,7 +44,7 @@ public class ShikigamiTest {
     /** 每高一档 ×1.1：史上最强的宿傩血量 ×1.331，展延下的体术 75 → 99.825；魔虚罗的伤害不吃倍率。 */
     @Test
     public void difficultyTiersScaleSukunaDamageAndHp() {
-        float[] hp = {10800f, 11880f, 13068f, 14374.8f};
+        float[] hp = {5400f, 5940f, 6534f, 7187.4f};
         for (int level = 0; level < 4; level++) {
             BattleConfig c = new BattleConfig();
             c.sukunaDifficulty(level);
@@ -52,7 +52,7 @@ public class ShikigamiTest {
             assertEquals(Math.pow(1.1, level), c.sukunaDamageMult, 1e-6);
         }
         World w = world(c -> c.sukunaDifficulty(3));
-        assertEquals(14_374_800, w.sukuna.maxHpMilli);
+        assertEquals(7_187_400, w.sukuna.maxHpMilli);
         TickInput in = new TickInput();
         w.sukuna.x = w.gojo.x + 80;
         w.sukunaIntent.amp = true;
@@ -353,12 +353,17 @@ public class ShikigamiTest {
             for (long seed = 0; seed < 40; seed++) {
                 BattleConfig c = cfg(level), c2 = cfg(level);
                 c.gojoMaxHp = c2.gojoMaxHp = 3000; // 打久一点：高难度的宿傩往往在跌到变身血线之前就赢了
+                c.sukunaMaxHp = c2.sukunaMaxHp = 2 * c.sukunaMaxHp; // v0.10 宿傩血量减半后：这里看的是 AI 会不会用这些招，不是平衡
                 BalanceSim.Result r = BalanceSim.play(GojoBot.STANDARD, seed, c);
                 BalanceSim.Result r2 = BalanceSim.play(GojoBot.STANDARD, seed, c2);
                 assertEquals(r.ticks, r2.ticks);
                 assertEquals(r.winner, r2.winner);
-                agito += BalanceSim.play(GojoBot.BASIC, seed, cfg(level)).agitoCast;
-                if (r.summonTick >= 0) summons++;
+                BattleConfig cb = cfg(level);
+                cb.sukunaMaxHp *= 2;
+                BalanceSim.Result b = BalanceSim.play(GojoBot.BASIC, seed, cb);
+                agito += b.agitoCast;
+                // 标准脚本开局就放茈·最大输出，宿傩常常直接跌到变身血线（变原身以后不能召唤）：两档脚本合起来看
+                if (r.summonTick >= 0 || b.summonTick >= 0) summons++;
                 if (r.transformTick >= 0) transforms++;
             }
             assertTrue("level " + level + " 顎吐", agito > 0);

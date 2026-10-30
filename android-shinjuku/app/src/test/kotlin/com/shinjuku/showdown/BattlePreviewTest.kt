@@ -680,4 +680,27 @@ class BattlePreviewTest {
             while (n < 400 && !(world.gojo.state == com.shinjuku.showdown.core.Fighter.TP_PURPLE && world.gojo.stateTick >= com.shinjuku.showdown.core.Tuning.TP_PURPLE_FIRE + 4)) { steps(1); n++ }
         })
     }
+
+    /** 结算：战斗画面上盖一层“胜利”/“失败”（倒下的动作放完 1.25 秒后弹出）。 */
+    private fun result(won: Boolean, d: Difficulty): android.widget.FrameLayout {
+        val ctx = paparazzi.context
+        val root = android.widget.FrameLayout(ctx)
+        root.addView(Scene(ctx, d) {
+            steps(30)
+            if (won) world.sukuna.hpMilli = 0 else world.gojo.hpMilli = 0
+            steps(150)
+        })
+        root.addView(ResultPanel.build(ctx, won, d, {}, {}))
+        return root
+    }
+
+    @Test
+    fun resultWin() {
+        paparazzi.snapshot(result(true, Difficulty.URAUME))
+    }
+
+    @Test
+    fun resultLose() {
+        paparazzi.snapshot(result(false, Difficulty.STRONGEST))
+    }
 }

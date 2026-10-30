@@ -29,7 +29,7 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
     private final BattleLoop loop;
     private float safeL, safeT, safeR, safeB;
 
-    BattleView(Context context, World world, Difficulty difficulty, Controls.Actions actions, Bgm bgm, BattleLoop.CutsceneHost cutsceneHost) {
+    BattleView(Context context, World world, Difficulty difficulty, Controls.Actions actions, Bgm bgm, BattleLoop.Host host) {
         super(context);
         controls = new Controls(actions);
         Atlas atlas = new Atlas();
@@ -39,7 +39,7 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
         Bitmap voidBg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_void_px, o);
         scene = new PixelScene(atlas, bg, voidBg, difficulty, controls, bgm);
         loop = new BattleLoop(world, controls, scene, new GlTarget(new AndroidGl(), atlas.bitmap, bg, voidBg),
-                new CanvasTarget(atlas.bitmap, bg, voidBg), cutsceneHost);
+                new CanvasTarget(atlas.bitmap, bg, voidBg), host);
         getHolder().setFormat(PixelFormat.OPAQUE);
         getHolder().addCallback(this);
         setFocusable(true);
