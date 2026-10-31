@@ -214,6 +214,16 @@ public final class Tuning {
     public static final int SPACE_WINDUP = 120, SPACE_LOCK = 60, SPACE_EXHAUST = 360, SPACE_MIN_TICKS = 20 * HZ;
     public static final float SPACE_RANGE = 960f, SPACE_HEIGHT = 50f, SPACE_HALF_THICKNESS = 10f;
 
+    // 伏魔御厨子（v0.13，里梅以上；Astra 的方案，占位）：结印 1 秒（挨到任何伤害就断，僵 0.5 秒、10 秒后才能再结），
+    // 过场（用户给的视频，全场暂停）后展开 6 秒，每 0.5 秒一轮必中斩击（25，吃难度倍率；无限挡不住，闪避、瞬移的无敌躲得开），
+    // 每轮提前 0.3 秒预警。一局成功展开一次。宿傩被击倒在地、抓进瞬移连段时领域崩解（普通的击飞、被苍吸住、挨打都不算；
+    // 挨打硬直的时候那一轮斩击作废）。
+    // 五条悟在里面开无量空处：对撞 2 秒（双方必中抵消），拆掉御厨子就无量空处接着生效，拆不掉五条悟的结界被外面击碎（冷却 40 秒）。
+    // 领域结束后术式烧断 4 秒（解、世界斩、空间斩不能用）。
+    public static final int SHRINE_SIGN = 120, SHRINE_BREAK_LOCK = 60, SHRINE_RETRY = 1200, SHRINE_DURATION = 720,
+            SHRINE_ROUND = 60, SHRINE_WARN = 36, SHRINE_CLASH = 240, SHRINE_BURNOUT = 480;
+    public static final long SHRINE_DAMAGE_MILLI = 25_000;
+
     // 宿傩的恐惧（v0.11，Astra 的方案，占位）：0–100 存成万分制。每 1 秒一个窗口：开头按局势估这一秒大概会挨多少，
     // 结尾和实际挨到的比，多挨了就涨、少挨了就降（各难度的系数在 BattleConfig.AiTuning）。
     public static final int FEAR_MAX = 10000, FEAR_START = 2000, FEAR_WINDOW = 120;
@@ -260,6 +270,7 @@ public final class Tuning {
     // 占位：覆盖范围半径（和苍一样大）。苍放得近，五条悟自己会被卷进去；苍放远、让赫飞到射程末端再相遇，就能躲开
     public static final float HOLLOW_RADIUS = 0.18f * WIDTH;
     public static final int HOLLOW_GROW = 16, HOLLOW_LIFE = 54; // 占位：扩张用时、总时长
+    public static final int HOLLOW_FORM_HITSTOP = 30;            // 苍赫相撞的那一刻全场定格 0.25 秒（v0.13，给冲击帧）
     public static final float HOLLOW_IMPULSE_X = 800f, HOLLOW_IMPULSE_Y = 420f;
     public static final int HOLLOW_HITSTUN = 60;
     public static final float HOLLOW_SELF_IMPULSE_X = 380f, HOLLOW_SELF_IMPULSE_Y = 260f;

@@ -6,7 +6,7 @@ package com.shinjuku.showdown;
  * 一帧分两层：先是低分辨率的像素层（坐标是虚拟像素），present() 放大铺满屏幕后，是屏幕分辨率的文字层（hud）。
  */
 interface PixelTarget {
-    int TEX_ATLAS = 0, TEX_BG = 1, TEX_VOID = 2; // 图集、新宿背景、无量空处背景
+    int TEX_ATLAS = 0, TEX_BG = 1, TEX_VOID = 2, TEX_SHRINE = 3; // 图集、新宿背景、无量空处背景、伏魔御厨子背景
 
     /** 开始一帧。像素层 vw×vh 虚拟像素，屏幕 sw×sh 像素，每个虚拟像素 scale 个屏幕像素。 */
     void begin(int vw, int vh, int sw, int sh, float scale);

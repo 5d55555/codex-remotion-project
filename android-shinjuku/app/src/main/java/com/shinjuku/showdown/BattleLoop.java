@@ -27,8 +27,8 @@ import java.util.concurrent.CountDownLatch;
  */
 final class BattleLoop implements Choreographer.FrameCallback {
     interface Host {
-        /** 要放领域展开的过场了（主线程）。 */
-        void startCutscene(int castId);
+        /** 要放领域展开的过场了（主线程）：kind 是 World.CUTSCENE_VOID（无量空处）或 CUTSCENE_SHRINE（伏魔御厨子）。 */
+        void startCutscene(int castId, int kind);
 
         /** 分出胜负了：World.OUTCOME_WIN / OUTCOME_LOSE（主线程，只通知一次）。 */
         void battleOver(int outcome);
@@ -216,8 +216,8 @@ final class BattleLoop implements Choreographer.FrameCallback {
             // 按了领域展开：世界停住，这一帧剩下的时间不要了；画面停在这一帧，主线程盖上视频
             cutscenePaused = true;
             accNs = 0;
-            int id = world.castId;
-            mainHandler.post(() -> host.startCutscene(id));
+            int id = world.castId, kind = world.cutsceneKind;
+            mainHandler.post(() -> host.startCutscene(id, kind));
         }
         if (!resultPosted && world.outcome != World.OUTCOME_NONE && world.cine == World.CINE_NONE && world.tick - world.outcomeTick >= RESULT_DELAY) {
             resultPosted = true;

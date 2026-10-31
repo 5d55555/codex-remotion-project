@@ -7,9 +7,10 @@ public final class SukunaIntent {
     public boolean amp, ampOff, world, rct; // 开 / 关领域展延、世界斩、反转术式
     public boolean agito, summon, transform; // 顎吐、召唤魔虚罗、变原身
     public boolean space;                    // 空间斩
+    public boolean shrine;                   // 领域展开「伏魔御厨子」（结印）
 
     void clear() {
         moveX = 0;
-        jump = melee = dismantle = amp = ampOff = world = rct = agito = summon = transform = space = false;
+        jump = melee = dismantle = amp = ampOff = world = rct = agito = summon = transform = space = shrine = false;
     }
 }

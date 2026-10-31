@@ -37,7 +37,8 @@ final class SukunaAi {
     private float moveIntent;
     private boolean wantMelee, wantDismantle, wantJump, wantAmp, wantAmpOff, wantWorld, wantRct, wantAgito, wantSummon, wantTransform;
     private int transformWaitFrom = -1; // 血量第一次跌破变原身血线的时刻（回血也不重置）
-    private boolean wantSpace;
+    private boolean wantSpace, wantShrine;
+    private int shrineThinkAt = -100_000; // 上次认真考虑伏魔御厨子的时刻
 
     // ---- 恐惧（四个难度都有）----
     private int fear = Tuning.FEAR_START;     // 0–10000
@@ -181,6 +182,11 @@ final class SukunaAi {
             emit(s, toward, out);
             return;
         }
+        if (wantsShrine(w, s, g, d, threat)) { // 领域展开「伏魔御厨子」
+            wantShrine = true;
+            emit(s, toward, out);
+            return;
+        }
         if (summonRefuse == 0 && wantsSummon(w, s, d, threat, amp)) { // 召唤魔虚罗（只在估计他来不及打断时；怕了就先不召）
             if (rng.nextUnitDouble() < 1 - 0.7f * f()) {
                 wantSummon = true;
@@ -210,7 +216,7 @@ final class SukunaAi {
             }
             if (rctTime) {
                 wantRct = true;
-            } else if (w.config.shrine && w.worldUnlocked && w.worldCd == 0 && !amp && w.ampLock == 0 && s.onGround && worldRefuse == 0
+            } else if (w.config.shrine && w.worldUnlocked && w.worldCd == 0 && w.shrineTicks == 0 && w.shrineBurn == 0 && !amp && w.ampLock == 0 && s.onGround && worldRefuse == 0
                     && d >= t.worldMin && d <= t.worldMax && (t.tacticLevel == 0 ? worldFear() && rng.nextUnitDouble() < t.worldChance : worldChance(w, d, threat))) {
                 wantWorld = true;
             } else if (!amp && w.ampCd == 0 && s.onGround && d <= t.ampMax && (approachMode || d < t.ampMin) && ampRefuse == 0) {
@@ -224,7 +230,7 @@ final class SukunaAi {
                 if (heal && w.rctCd == 0) {
                     lo = t.rctDistance;
                     hi = Tuning.WIDTH;
-                } else if (w.config.shrine && w.worldUnlocked && w.worldCd == 0 && !amp && worldRefuse == 0) { // 世界斩能放、也愿意放：拉到中距离
+                } else if (w.config.shrine && w.worldUnlocked && w.worldCd == 0 && w.shrineTicks == 0 && w.shrineBurn == 0 && !amp && worldRefuse == 0) { // 世界斩能放、也愿意放：拉到中距离
                     lo = t.worldMin + 60;
                     hi = t.worldMin + 400;
                 } else if (amp) {
@@ -287,6 +293,7 @@ final class SukunaAi {
         out.summon = wantSummon;
         out.transform = wantTransform;
         out.space = wantSpace;
+        out.shrine = wantShrine;
         // 出手、跳只发一次（执行器当 tick 不收也就算了，下一次决策再说）
         clearWants();
     }
@@ -298,7 +305,7 @@ final class SukunaAi {
     }
 
     private void clearWants() {
-        wantJump = wantMelee = wantDismantle = wantAmp = wantAmpOff = wantWorld = wantRct = wantAgito = wantSummon = wantTransform = wantSpace = false;
+        wantJump = wantMelee = wantDismantle = wantAmp = wantAmpOff = wantWorld = wantRct = wantAgito = wantSummon = wantTransform = wantSpace = wantShrine = false;
     }
 
     /* ---------------- 十种影法术与原身 ---------------- */
@@ -676,7 +683,7 @@ final class SukunaAi {
         Fighter g = w.gojo, s = w.sukuna;
         if (g.state == Fighter.KO) return 0;
         float d = Math.abs(g.x - s.x);
-        boolean stuck = w.domainTicks > 0 || w.spaceExhaust > 0 || s.captured || s.scripted || s.knockedAir; // 躲不开
+        boolean stuck = w.voidControl() || w.spaceExhaust > 0 || s.captured || s.scripted || s.knockedAir; // 躲不开
         float hit = stuck ? 1f : 0.45f, done = stuck ? 0.95f : 0.6f;
         boolean facing = (s.x - g.x) * g.facing >= 0;
         float e = 0;
@@ -811,7 +818,7 @@ final class SukunaAi {
     private boolean wantsSpace(World w, Fighter s, Fighter g, float d, int threat) {
         if (!w.config.spaceSlash || w.spaceUsed || fear >= Tuning.SPACE_FEAR_GATE) return false;
         if (w.fightTicks < Tuning.SPACE_MIN_TICKS || s.hpMilli == 0 || s.hpMilli * 4 > s.maxHpMilli) return false;
-        if (w.ampTicks > 0 || w.ampLock > 0 || !s.onGround || w.sAttackGap > 0 || w.domainTicks > 0) return false;
+        if (w.ampTicks > 0 || w.ampLock > 0 || !s.onGround || w.sAttackGap > 0 || w.voidControl() || w.shrineTicks > 0 || w.shrineBurn > 0) return false;
         if (threat >= 0 || d < 260 || d > 850 || g.y > 40 || gojoWindingUp(g) || g.state != Fighter.FREE && g.state != Fighter.MELEE_RECOVER) return false;
         if (aiClock - spaceThinkAt < 360) return false;
         spaceThinks++;
@@ -822,6 +829,40 @@ final class SukunaAi {
         spaceThinkFear = fear;
         // 越怕越不愿意：按离门槛还有多远线性打折（Astra 给的是平方，恐惧 20 时只剩 1.5%，几乎放不出来）
         return rng.nextUnitDouble() < t.spaceChance * (1 - fear / (float) Tuning.SPACE_FEAR_GATE);
+    }
+
+    /**
+     * 伏魔御厨子（里梅以上，一局成功一次）：打了够久，血量 75% 以下、离得开（260–850）；或者他在念还要 1 秒以上的长咒（不贴身就行），
+     * 他手上没在起近身的招，没有招飞过来，没在惊惧后撤；每 2 秒最多抽一次签，越怕越不愿意开（攒着）。不判断必成：
+     * 结印 1 秒，五条悟看到了照样能冲过来打断、抢先开无量空处。
+     */
+    private boolean wantsShrine(World w, Fighter s, Fighter g, float d, int threat) {
+        if (!w.config.sukunaDomain || w.shrineUsed || w.shrineRetry > 0 || w.shrineBurn > 0 || w.shrineTicks > 0 || w.domainTicks > 0) return false;
+        if (w.fightTicks < t.domainMinTicks || w.ampTicks > 0 || w.ampLock > 0 || w.agito.active || !s.onGround || w.sAttackGap > 0) return false;
+        if (threat >= 0 || d > 850 || panic) return false;
+        int chant = longChantLeft(g);
+        boolean chanting = chant >= Tuning.SHRINE_SIGN; // 他在念长咒：去打断就得放弃咒，趁这时候结印（不贴身就行）
+        if (d < (chanting ? 120 : 260)) return false;
+        if (!chanting && (s.hpMilli > s.maxHpMilli * 0.75f || gojoWindingUp(g))) return false;
+        if (aiClock - shrineThinkAt < 240) return false;
+        shrineThinkAt = aiClock;
+        float fk = 1 - f();
+        return rng.nextUnitDouble() < t.domainChance * fk * fk;
+    }
+
+    /** 五条悟在念的长咒还要念多久（没在念就是 0）。 */
+    private static int longChantLeft(Fighter g) {
+        switch (g.state) {
+            case Fighter.PURPLE_CHANT:
+                return Tuning.CHANT_PHRASE * Tuning.CHANT_PHRASES - g.stateTick;
+            case Fighter.PURPLE_MAX_CHANT:
+                return MAX_CHANT_TICKS - g.stateTick;
+            case Fighter.BLUE_CHANT:
+            case Fighter.RED_CHANT:
+                return Tuning.CHANT3_PHRASE * Tuning.CHANT3_PHRASES - g.stateTick;
+            default:
+                return 0;
+        }
     }
 
     /** 里梅以上的世界斩：估计五条悟最快多久能打断（按看到过的招推算冷却，没看到就当能用），来得及才抽一次签。 */

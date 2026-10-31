@@ -89,7 +89,18 @@ public final class World {
     // 领域
     public boolean cutscene;          // 正在放领域展开的过场：全场暂停
     public int castId;                // 第几次展开（画面结束过场时带回来，旧的回调不算数）
-    public int domainTicks;           // 无量空处还剩多久（>0 时宿傩无法主动行动）
+    public static final int CUTSCENE_VOID = 0, CUTSCENE_SHRINE = 1;
+    public int cutsceneKind;          // 这次的过场是谁的领域：无量空处、伏魔御厨子
+    public int domainTicks;           // 无量空处还剩多久（>0 且没在对撞时宿傩无法主动行动，见 voidControl）
+    // 伏魔御厨子（里梅以上，一局成功展开一次）
+    public boolean shrineUsed;
+    public int shrineTicks;           // 还剩多久（>0 就是展开着）
+    public int shrineNext;            // 离下一轮斩击还有多久
+    public int shrineRetry;           // 结印被打断后多久才能再结
+    public int shrineBurn;            // 领域结束后的术式烧断还剩多久（解、世界斩、空间斩不能用）
+    public int clashTicks;            // 领域对撞还剩多久（>0 时双方必中抵消）
+    public long shrineDealt;          // 斩击一共打掉五条悟多少（毫血，统计用）
+    private boolean shrinePending;
 
     // 招式状态（画面也读）
     public int chantPhase = -1;       // 念到第几段（200% 茈、出力最大的苍、最大输出的赫）
@@ -179,6 +190,8 @@ public final class World {
         applyBlue();
         resolveWorldSlash();
         resolveSpaceSlash();
+        resolveShrineSign();
+        updateShrine();
         integrate(gojo);
         integrate(sukuna);
         if (mahoraga.present) integrate(mahoraga);
@@ -1207,6 +1220,7 @@ public final class World {
         enter(gojo, Fighter.DOMAIN_CAST);
         drive(gojo, 0);
         cutscene = true;
+        cutsceneKind = CUTSCENE_VOID;
         castId++;
         clearInputs();
         events.emit(Events.DOMAIN_CUTSCENE, gojo.x, gojo.centerY(), castId, tick);
@@ -1216,23 +1230,51 @@ public final class World {
     public void endCutscene(int id) {
         if (!cutscene || id != castId) return;
         cutscene = false;
-        enter(gojo, Fighter.FREE);
         clearInputs();
+        if (outcome != OUTCOME_NONE) return; // 已经分出胜负：什么都不展开
+        if (cutsceneKind == CUTSCENE_SHRINE) {
+            openShrine();
+            return;
+        }
+        enter(gojo, Fighter.FREE);
         domainTicks = Tuning.DOMAIN_DURATION;
-        domains.sureHit[Fighter.GOJO][Fighter.SUKUNA] = true;
-        domains.sureHit[Fighter.GOJO][Fighter.MAHORAGA] = true;
+        events.emit(Events.DOMAIN_OPEN, gojo.x, gojo.centerY(), Tuning.DOMAIN_DURATION, tick);
+        if (shrineTicks > 0) { // 伏魔御厨子开着：领域对撞，双方必中抵消（宿傩照样能动），2 秒内拆掉御厨子就赢
+            clashTicks = Tuning.SHRINE_CLASH;
+            refreshSureHit();
+            events.emit(Events.SHRINE, gojo.x, gojo.centerY(), Events.SHRINE_CLASH, tick);
+            return;
+        }
+        voidTakesControl();
+    }
+
+    /** 无量空处困住宿傩一方：必中生效，宿傩、魔虚罗手上的动作作废，展延被迫关闭。 */
+    private void voidTakesControl() {
+        refreshSureHit();
         interruptSukuna();
         interruptMahoraga(); // 魔虚罗在场也一样被困住
         if (ampTicks > 0) closeAmp(); // 无量空处生效：展延被迫关闭
-        events.emit(Events.DOMAIN_OPEN, gojo.x, gojo.centerY(), Tuning.DOMAIN_DURATION, tick);
     }
 
     /* ---------------- 宿傩：动作执行 ---------------- */
 
-    /** 宿傩现在能不能主动行动（倒地、硬直、被苍吸住/抓住、被领域困住时不能）。 */
+    /** 无量空处正在困住宿傩一方（展开着、没在和伏魔御厨子对撞）。 */
+    public boolean voidControl() {
+        return domainTicks > 0 && clashTicks == 0;
+    }
+
+    /** 必中按两边领域的状态重算（对撞时双方都抵消）。 */
+    private void refreshSureHit() {
+        boolean v = voidControl(), sh = shrineTicks > 0 && clashTicks == 0;
+        domains.sureHit[Fighter.GOJO][Fighter.SUKUNA] = v;
+        domains.sureHit[Fighter.GOJO][Fighter.MAHORAGA] = v;
+        domains.sureHit[Fighter.SUKUNA][Fighter.GOJO] = sh;
+    }
+
+    /** 宿傩现在能不能主动行动（倒地、硬直、被苍吸住/抓住、被领域困住、力竭时不能）。 */
     public boolean sukunaCanAct() {
         Fighter s = sukuna;
-        return s.state != Fighter.KO && s.hitstun == 0 && !s.captured && domainTicks == 0 && !inBlueField(s) && !s.knockedAir
+        return s.state != Fighter.KO && s.hitstun == 0 && !s.captured && !voidControl() && !inBlueField(s) && !s.knockedAir
                 && !s.scripted && s.downTicks == 0 && spaceExhaust == 0;
     }
 
@@ -1257,7 +1299,7 @@ public final class World {
         if (s.state == Fighter.KO) return;
         if (!sukunaCanAct()) {
             // 反转术式、变原身不可打断：被控住也照样走完（变身在无量空处里计时暂停）
-            if (s.state == Fighter.S_TRANSFORM && domainTicks > 0) return;
+            if (s.state == Fighter.S_TRANSFORM && voidControl()) return;
             if (s.state != Fighter.S_RCT && s.state != Fighter.S_TRANSFORM) {
                 interruptSukuna(); // 被控住：手上的动作作废；击飞、吸引的速度不去动它
                 return;
@@ -1272,7 +1314,7 @@ public final class World {
                     return;
                 }
                 if (!config.sukunaAi && i.moveX == 0 && !i.melee && !i.dismantle && !i.jump && !i.amp && !i.ampOff && !i.world && !i.rct
-                        && !i.agito && !i.summon && !i.transform && !i.space) return; // 活靶子：什么都不做
+                        && !i.agito && !i.summon && !i.transform && !i.space && !i.shrine) return; // 活靶子：什么都不做
                 drive(s, i.moveX * Tuning.SUKUNA_SPEED);
                 if (i.jump && s.onGround) {
                     s.vy = Tuning.JUMP_SPEED;
@@ -1283,9 +1325,13 @@ public final class World {
                 if (i.ampOff && amp) {
                     closeAmp();
                 } else if (i.transform && config.trueForm && !sukunaTrueForm && s.hpMilli > 0) {
+                    if (shrineTicks > 0) endShrine(false); // 变原身前先收掉领域
                     startTransform();
                 } else if (i.space && technique && config.spaceSlash && !spaceUsed && sAttackGap == 0 && s.onGround && spaceAllowed()) {
                     startSpace();
+                } else if (i.shrine && technique && config.sukunaDomain && !shrineUsed && shrineRetry == 0 && shrineBurn == 0 && shrineTicks == 0
+                        && domainTicks == 0 && sAttackGap == 0 && s.onGround && !agito.active) {
+                    startShrineSign();
                 } else if (sAttackGap == 0 && i.melee && sMeleeCd == 0) {
                     enter(s, Fighter.S_MELEE);
                     drive(s, 0);
@@ -1294,25 +1340,25 @@ public final class World {
                     attackSeq++;
                     sMeleeHitId = -1;
                     sMeleeSeq = attackSeq;
-                } else if (technique && config.shrine && sAttackGap == 0 && i.dismantle && dismantleCd == 0) {
+                } else if (technique && config.shrine && shrineBurn == 0 && sAttackGap == 0 && i.dismantle && dismantleCd == 0) {
                     enter(s, Fighter.S_DISMANTLE);
                     drive(s, 0);
                     dismantleCd = Tuning.DISMANTLE_COOLDOWN;
                     sAttackGap = Tuning.S_ATTACK_GAP;
                     adaptPending = false;
-                } else if (tenShadows && config.agito && sAttackGap == 0 && i.agito && agitoCd == 0 && !agito.active) {
+                } else if (tenShadows && shrineTicks == 0 && config.agito && sAttackGap == 0 && i.agito && agitoCd == 0 && !agito.active) {
                     enter(s, Fighter.S_AGITO);
                     drive(s, 0);
                     agitoCd = Tuning.AGITO_COOLDOWN; // 从起手算，被打断不退
                     sAttackGap = Tuning.S_ATTACK_GAP;
-                } else if (tenShadows && config.mahoraga && i.summon && !mahoragaUsed && summonCd == 0 && s.onGround) {
+                } else if (tenShadows && shrineTicks == 0 && config.mahoraga && i.summon && !mahoragaUsed && summonCd == 0 && s.onGround) {
                     enter(s, Fighter.S_SUMMON);
                     drive(s, 0);
                     events.emit(Events.SUMMON, s.x, s.centerY(), 0, tick);
                 } else if (i.amp && !amp && ampCd == 0 && s.onGround && !agito.active) { // 顎吐还在飞：不能开展延（十种影法术和展延不能同时用）
                     enter(s, Fighter.S_AMP_START);
                     drive(s, 0);
-                } else if (technique && config.shrine && i.world && worldUnlocked && worldCd == 0 && s.onGround) {
+                } else if (technique && config.shrine && i.world && worldUnlocked && worldCd == 0 && s.onGround && shrineTicks == 0 && shrineBurn == 0) {
                     startWorldSlash();
                 } else if (technique && i.rct && rctUses < Tuning.S_RCT_MAX_USES && rctCd == 0 && s.onGround && s.hpMilli < s.maxHpMilli) {
                     enter(s, Fighter.S_RCT);
@@ -1361,6 +1407,10 @@ public final class World {
             case Fighter.S_WORLD_RECOVER:
                 drive(s, 0);
                 if (st >= Tuning.S_WORLD_RECOVERY) enter(s, Fighter.FREE);
+                break;
+            case Fighter.S_DOMAIN_SIGN: // 结印：站着不动，满 1 秒（这一 tick 结束前没被打断）就展开
+                drive(s, 0);
+                if (st >= Tuning.SHRINE_SIGN) shrinePending = true;
                 break;
             case Fighter.S_SPACE:
                 drive(s, 0);
@@ -1422,6 +1472,12 @@ public final class World {
             case Fighter.S_RCT:
             case Fighter.S_TRANSFORM:
                 return; // 反转术式（定）、变原身不可打断
+            case Fighter.S_DOMAIN_SIGN: // 结印被打断：不算用掉，僵 0.5 秒，10 秒后才能再结
+                sStagger = Tuning.SHRINE_BREAK_LOCK;
+                shrineRetry = Tuning.SHRINE_RETRY;
+                shrinePending = false;
+                events.emit(Events.SHRINE, s.x, s.centerY(), Events.SHRINE_SIGN_BROKEN, tick);
+                break;
             case Fighter.S_SPACE: // 空间斩的起手被打断：没斩到，一样力竭
                 events.emit(Events.SPACE, s.x, s.centerY(), -1, spaceDir, tick);
                 exhaustSukuna();
@@ -1576,13 +1632,14 @@ public final class World {
 
     /** 宿傩开着领域展延（从开始起手到关闭后的术式锁定结束）：十种影法术暂停，魔虚罗不动、不出手（原作第 228 话）。 */
     public boolean tenShadowsPaused() {
-        return ampTicks > 0 || ampLock > 0 || sukuna.state == Fighter.S_AMP_START;
+        return ampTicks > 0 || ampLock > 0 || sukuna.state == Fighter.S_AMP_START
+                || shrineTicks > 0 || sukuna.state == Fighter.S_DOMAIN_SIGN; // 伏魔御厨子的结印、展开期间也停
     }
 
     /** 魔虚罗现在能不能行动（显现中、被控住、宿傩开着展延时不能）。 */
     public boolean mahoragaCanAct() {
         Fighter m = mahoraga;
-        return m.present && m.state != Fighter.M_RISE && m.hitstun == 0 && !m.captured && domainTicks == 0 && !inBlueField(m)
+        return m.present && m.state != Fighter.M_RISE && m.hitstun == 0 && !m.captured && !voidControl() && !inBlueField(m)
                 && !m.knockedAir && !m.scripted && !tenShadowsPaused() && outcome == OUTCOME_NONE && spaceExhaust == 0; // 宿傩力竭：和无量空处里一样站住
     }
 
@@ -1598,7 +1655,7 @@ public final class World {
         }
         if (!mahoragaCanAct()) {
             interruptMahoraga(); // 起手被控住：作废（冷却不退）
-            boolean controlled = m.hitstun > 0 || m.captured || m.knockedAir || domainTicks > 0 || inBlueField(m);
+            boolean controlled = m.hitstun > 0 || m.captured || m.knockedAir || voidControl() || inBlueField(m);
             if (!controlled) drive(m, 0); // 展延暂停：站住
             mWasLocked = true;
             return;
@@ -1734,7 +1791,8 @@ public final class World {
     /** 空间斩能不能起手（硬条件，定）：打了 20 秒以上、血量 25% 以下（还活着）、不在无量空处里。恐惧由 AI 自己看。 */
     private boolean spaceAllowed() {
         Fighter s = sukuna;
-        return fightTicks >= Tuning.SPACE_MIN_TICKS && s.hpMilli > 0 && s.hpMilli * 4 <= s.maxHpMilli && domainTicks == 0;
+        return fightTicks >= Tuning.SPACE_MIN_TICKS && s.hpMilli > 0 && s.hpMilli * 4 <= s.maxHpMilli && !voidControl()
+                && shrineTicks == 0 && shrineBurn == 0; // 伏魔御厨子开着、术式烧断时不能放
     }
 
     private void startSpace() {
@@ -1786,6 +1844,90 @@ public final class World {
         if (ampTicks > 0) closeAmp();
         interruptMahoraga();
         events.emit(Events.SPACE, s.x, s.centerY(), 4, spaceDir, tick);
+    }
+
+    /* ---------------- 伏魔御厨子 ---------------- */
+
+    private void startShrineSign() {
+        Fighter s = sukuna;
+        enter(s, Fighter.S_DOMAIN_SIGN);
+        drive(s, 0);
+        sAttackGap = Tuning.S_ATTACK_GAP;
+        events.emit(Events.SHRINE, s.x, s.centerY(), Events.SHRINE_SIGN, tick);
+    }
+
+    /** 结印满了、这一 tick 也没被打断：全场停住，放伏魔御厨子的过场（画面放完调 endCutscene）。 */
+    private void resolveShrineSign() {
+        if (!shrinePending) return;
+        shrinePending = false;
+        Fighter s = sukuna;
+        // 两边都还站着才放（这一 tick 里谁被打空了，下面的 timers 就要分胜负，不能先停下来放 13 秒视频）
+        if (s.state != Fighter.S_DOMAIN_SIGN || s.hpMilli == 0 || gojo.hpMilli == 0 || outcome != OUTCOME_NONE || domainTicks > 0) return;
+        enter(s, Fighter.FREE);
+        shrineUsed = true; // 进了过场就算用掉
+        cutscene = true;
+        cutsceneKind = CUTSCENE_SHRINE;
+        castId++;
+        clearInputs();
+        events.emit(Events.DOMAIN_CUTSCENE, s.x, s.centerY(), castId, tick);
+    }
+
+    /** 过场放完：伏魔御厨子展开（第一轮斩击在 0.5 秒后）。 */
+    private void openShrine() {
+        shrineTicks = Tuning.SHRINE_DURATION;
+        shrineNext = Tuning.SHRINE_ROUND;
+        refreshSureHit();
+        interruptMahoraga();
+        events.emit(Events.SHRINE, sukuna.x, sukuna.centerY(), Events.SHRINE_OPEN, tick);
+    }
+
+    /**
+     * 伏魔御厨子开着的每一 tick（五条悟的攻击都结算完以后）：先看崩解（宿傩被击倒在地、抓进瞬移连段），
+     * 再看对撞到期（没拆掉：无量空处的结界从外面被击碎），再按节奏斩（对撞时不斩；宿傩在硬直里这一轮作废），最后计时。
+     */
+    private void updateShrine() {
+        if (shrineTicks == 0) return;
+        Fighter s = sukuna, g = gojo;
+        // 维持不住才崩：真的被击倒在地、被抓进瞬移连段（普通的击飞、被苍吸住、挨打都不算；挨打硬直时那一轮作废）
+        if (s.downTicks > 0 && s.onGround || s.scripted) {
+            endShrine(true);
+            return;
+        }
+        if (clashTicks > 0 && --clashTicks == 0) {
+            domainTicks = 0;
+            domainCd = Tuning.DOMAIN_COOLDOWN;
+            shrineNext = Tuning.SHRINE_ROUND; // 重新给一轮的预警
+            refreshSureHit();
+            events.emit(Events.SHRINE, g.x, g.centerY(), Events.SHRINE_VOID_BROKEN, tick);
+            events.emit(Events.DOMAIN_CLOSE, g.x, g.centerY(), 0, tick);
+        }
+        if (clashTicks == 0) {
+            if (--shrineNext == Tuning.SHRINE_WARN) events.emit(Events.SHRINE, g.x, g.centerY(), Events.SHRINE_WARN, tick);
+            if (shrineNext <= 0) {
+                shrineNext = Tuning.SHRINE_ROUND;
+                int how = 2;
+                if (s.hitstun == 0 && g.state != Fighter.KO) {
+                    long before = g.hpMilli;
+                    attack.set(Fighter.SUKUNA, Fighter.GOJO, Attack.SHRINE_SLASH, ++attackSeq, Tuning.SHRINE_DAMAGE_MILLI, 0, 0, 0, Attack.SURE_HIT);
+                    how = (apply(attack) & Defense.ALLOW_DAMAGE) != 0 ? 1 : 0;
+                    shrineDealt += before - g.hpMilli;
+                }
+                events.emit(Events.SHRINE, g.x, g.centerY(), Events.SHRINE_SLASH, how, tick);
+            }
+        }
+        if (--shrineTicks == 0) endShrine(false);
+    }
+
+    /** 领域结束（broken：被拆掉）：术式烧断 4 秒；对撞中结束的话无量空处赢了，接着困住宿傩。 */
+    private void endShrine(boolean broken) {
+        shrineTicks = 0;
+        shrineBurn = Tuning.SHRINE_BURNOUT;
+        events.emit(Events.SHRINE, sukuna.x, sukuna.centerY(), broken ? Events.SHRINE_BROKEN : Events.SHRINE_END, tick);
+        if (clashTicks > 0) {
+            clashTicks = 0;
+            if (domainTicks > 0) voidTakesControl();
+        }
+        refreshSureHit();
     }
 
     private int sMeleeSeq = -1;
@@ -1897,7 +2039,8 @@ public final class World {
             if (t == gojo && a.source != Fighter.GOJO) gojoHurtByFoes += dealt; // 五条悟自己的茈不算
             t.hpMilli = Math.max(0, t.hpMilli - dmg);
             if (a.kind != Attack.BLUE_FIELD) events.emit(Events.DAMAGE, t.x, t.y + t.height + 10, dmg / 1000f, a.kind, tick);
-            if (t == sukuna && t.state == Fighter.S_SPACE) interruptSukuna(); // 空间斩起手时挨到任何伤害（苍的持续伤害、不再硬直的轻拳也算）就断
+            // 空间斩的起手、领域的结印：挨到任何伤害（苍的持续伤害、不再硬直的轻拳也算）就断
+            if (t == sukuna && (t.state == Fighter.S_SPACE || t.state == Fighter.S_DOMAIN_SIGN)) interruptSukuna();
         }
         if ((mask & Defense.ALLOW_IMPULSE) != 0 && (a.impulseX != 0 || a.impulseY != 0)) {
             t.vx = clamp(t.vx + a.impulseX, -Tuning.MAX_VX, Tuning.MAX_VX);
@@ -2046,6 +2189,7 @@ public final class World {
         blue.phase = BlueOrb.OFF;      // 苍和赫都被吃掉了
         sukuna.captured = false;
         mahoraga.captured = false;
+        hitstop = Math.max(hitstop, Tuning.HOLLOW_FORM_HITSTOP); // 相撞的那一刻全场定格（画面放冲击帧）
         events.emit(Events.HOLLOW_FORM, x, y, Tuning.HOLLOW_RADIUS, Attack.HOLLOW, tick);
     }
 
@@ -2259,6 +2403,8 @@ public final class World {
     /* ---------------- 计时器、领域、倒地与复活 ---------------- */
 
     private void timers() {
+        if (shrineRetry > 0) shrineRetry--;
+        if (shrineBurn > 0 && --shrineBurn == 0) events.emit(Events.SHRINE, sukuna.x, sukuna.centerY(), Events.SHRINE_BURN_END, tick);
         if (spaceExhaust > 0 && --spaceExhaust == 0) { // 力竭过去了（被控住的话接着等控制结束）
             if (sukuna.state == Fighter.S_EXHAUSTED) enter(sukuna, Fighter.FREE);
             events.emit(Events.SPACE, sukuna.x, sukuna.centerY(), 5, spaceDir, tick);
@@ -2302,8 +2448,11 @@ public final class World {
             events.emit(Events.ADAPT, sukuna.x, sukuna.centerY() + 70, adaptPoints, 1, tick);
         }
         if (domainTicks > 0 && --domainTicks == 0) {
-            domains.sureHit[Fighter.GOJO][Fighter.SUKUNA] = false;
-            domains.sureHit[Fighter.GOJO][Fighter.MAHORAGA] = false;
+            if (clashTicks > 0) { // 对撞中无量空处自己到时间了：伏魔御厨子接着斩
+                clashTicks = 0;
+                shrineNext = Tuning.SHRINE_ROUND;
+            }
+            refreshSureHit();
             domainCd = Tuning.DOMAIN_COOLDOWN;
             events.emit(Events.DOMAIN_CLOSE, gojo.x, gojo.centerY(), 0, tick);
         } else if (domainTicks == 0 && domainCd > 0) {
@@ -2363,6 +2512,8 @@ public final class World {
         if (f == sukuna) {
             spaceExhaust = 0;
             spacePending = false;
+            shrinePending = false;
+            if (shrineTicks > 0) endShrine(false);
         }
         events.emit(Events.KO, f.x, f.centerY(), 0, f.id, tick);
         if (decide(f)) endFight();
@@ -2391,8 +2542,12 @@ public final class World {
         hollow.active = false;
         agito.active = false;
         if (ampTicks > 0) closeAmp();
-        adaptPending = worldPending = spacePending = false;
+        adaptPending = worldPending = spacePending = shrinePending = false;
+        cutscene = false; // 万一停在过场上：不再等它（旧的回调对不上 castId，也会被忽略）
+        castId++;
         spaceExhaust = 0;
+        shrineTicks = clashTicks = 0;
+        refreshSureHit();
         chantPhase = -1;
         for (int i = 0; i < Fighter.COUNT; i++) {
             Fighter f = fighter(i);

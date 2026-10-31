@@ -52,10 +52,11 @@ class GlParityTest {
             val ca = Controls(noActions).also { it.layout = Controls.Layout(W.toFloat(), H.toFloat(), dp, 0f, 0f, 0f, 0f) }
             val cb = Controls(noActions).also { it.layout = ca.layout }
             val voidBg = BitmapFactory.decodeResource(ctx.resources, R.drawable.bg_void_px, BitmapFactory.Options().apply { inScaled = false })
-            val sc = PixelScene(atlas, bg, voidBg, Difficulty.TEST, ca, null)
-            val sg = PixelScene(atlas, bg, voidBg, Difficulty.TEST, cb, null)
-            val ct = CanvasTarget(atlas.bitmap, bg, voidBg)
-            val gt = GlTarget(LwjglGl(), atlas.bitmap, bg, voidBg)
+            val shrineBg = BitmapFactory.decodeResource(ctx.resources, R.drawable.bg_shrine_px, BitmapFactory.Options().apply { inScaled = false })
+            val sc = PixelScene(atlas, bg, voidBg, shrineBg, Difficulty.TEST, ca, null)
+            val sg = PixelScene(atlas, bg, voidBg, shrineBg, Difficulty.TEST, cb, null)
+            val ct = CanvasTarget(atlas.bitmap, bg, voidBg, shrineBg)
+            val gt = GlTarget(LwjglGl(), atlas.bitmap, bg, voidBg, shrineBg)
             gt.initForTest()
             sc.layout(W, H)
             sg.layout(W, H)

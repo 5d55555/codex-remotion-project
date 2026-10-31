@@ -24,6 +24,8 @@ final class GojoBot {
     private boolean domainUsed;
     private int spaceSeenAt = -1, spaceReactAt;
     private boolean spaceKnown;
+    private int signSeenAt = -1, signReactAt, roundDecided = -1, roundDodgeAt;
+    private boolean roundDodge;
 
     GojoBot(int level, long seed) {
         this.level = level;
@@ -70,6 +72,70 @@ final class GojoBot {
             }
         } else {
             spaceSeenAt = -1;
+        }
+
+        // 伏魔御厨子的结印（标准、熟练）：过了反应时间，贴着就打、射程内放赫、领域好了就抢先开无量空处、不然丢苍去碰他
+        if (level != BASIC && s.state == Fighter.S_DOMAIN_SIGN) {
+            if (signSeenAt < 0) {
+                signSeenAt = w.tick;
+                signReactAt = w.tick + range(reactMin, reactMax);
+            }
+            if (w.tick >= signReactAt) {
+                maxHold = purpleHold = redHold = 0; // 在念的咒、按着的蓄力先放掉（念咒就此作废），能动了再应对
+                if (!free) return;
+                if (d <= Tuning.MELEE_REACH && w.meleeCd == 0) {
+                    in.melee = true;
+                } else if (w.redCd == 0 && g.facing == toward && d < Tuning.RED_REACH) {
+                    in.red = true;
+                } else if (!domainUsed && w.domainCd == 0 && w.domainTicks == 0) {
+                    in.domain = true;
+                    domainUsed = true;
+                } else if (w.blueCd == 0 && w.blueFailLock == 0 && d < 380) {
+                    in.blueDown = in.blueUp = true;
+                } else {
+                    in.moveX = toward;
+                }
+                return;
+            }
+        } else {
+            signSeenAt = -1;
+        }
+        // 伏魔御厨子开着（标准、熟练）：每一轮看到预警抽一次签（标准五成、熟练九成），掐着时间闪避（标准误差 ±6 tick、熟练 ±3）；
+        // 标准领域好了就开无量空处对撞，熟练先看赫能不能直接把他打飞拆掉领域
+        if (level != BASIC && w.shrineTicks > 0 && w.clashTicks == 0) {
+            if (w.shrineNext <= Tuning.SHRINE_WARN && roundDecided != w.shrineTicks / Tuning.SHRINE_ROUND) {
+                roundDecided = w.shrineTicks / Tuning.SHRINE_ROUND;
+                roundDodge = rng.nextUnitDouble() < (level == SKILLED ? 0.9 : 0.5);
+                int err = level == SKILLED ? 3 : 6;
+                roundDodgeAt = 8 + range(-err, err);
+            }
+            if (roundDodge && !free && w.shrineNext <= roundDodgeAt + 4) { // 要闪的时候还在念咒、蓄力：先放掉
+                maxHold = purpleHold = redHold = 0;
+                return;
+            }
+            if (roundDodge && free && g.onGround && w.dodgeCd == 0 && w.shrineNext == roundDodgeAt) {
+                maxHold = purpleHold = redHold = 0;
+                in.dodge = true;
+                in.moveX = d > 300 ? toward : -toward;
+                roundDodge = false;
+                return;
+            }
+            if (free) {
+                boolean redBreak = w.redCd == 0 && g.facing == toward && d < Tuning.RED_REACH;
+                if (level == SKILLED && redBreak) {
+                    in.red = true;
+                    return;
+                }
+                if (!domainUsed && w.domainCd == 0 && w.domainTicks == 0) {
+                    in.domain = true;
+                    domainUsed = true;
+                    return;
+                }
+                if (redBreak) {
+                    in.red = true;
+                    return;
+                }
+            }
         }
 
         // 按住着的招：茈·最大输出（苍和赫一起按着）、茈（念咒）、赫（最大输出）
@@ -178,7 +244,7 @@ final class GojoBot {
 
         // 瞬移连段：标准、熟练好了就用（茈好了就按住闪避点茈；不然点苍；苍在冷却就点赫）
         if (!saving && level != BASIC && w.tpCd == 0 && !sukunaStuck && s.state != Fighter.KO) {
-            if (w.purpleCd == 0 && w.purpleFailLock == 0 && purpleSafe(w) && !(w.domainTicks > 0 && maxReady(w))) {
+            if (w.purpleCd == 0 && w.purpleFailLock == 0 && purpleSafe(w) && !(w.voidControl() && maxReady(w))) {
                 in.dodgeHeld = true;
                 in.purple = true;
                 return;
@@ -222,14 +288,14 @@ final class GojoBot {
             return;
         }
         // 茈·最大输出：领域里苍、赫、茈都好了就念（宿傩动不了，十段咒词念得完）
-        if (level != BASIC && w.domainTicks > 500 && maxReady(w)) {
+        if (level != BASIC && w.voidControl() && w.domainTicks > 500 && maxReady(w)) {
             in.blueDown = in.blueHeld = true;
             in.red = in.redHeld = true;
             maxHold = 1;
             return;
         }
         // 200% 茈：标准在领域里念；熟练只在宿傩被控时念（魔虚罗在场时先用普通茈打它）
-        boolean chantOk = level != BASIC && w.domainTicks > 300 && !maho;
+        boolean chantOk = level != BASIC && w.voidControl() && w.domainTicks > 300 && !maho;
         if (chantOk && w.purpleCd == 0 && w.purpleFailLock == 0) {
             in.purple = in.purpleHeld = true;
             purpleHold = 1;

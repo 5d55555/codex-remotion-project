@@ -52,6 +52,7 @@ def pixel_background(name, sky_shift=(-34, -30, -6), mirror=False):
 
 pixel_background('bg_battle_px')
 pixel_background('bg_void_px', mirror=True)  # 无量空处：上面接的是镜像的星空
+pixel_background('bg_shrine_px', sky_shift=(-40, -6, -6))  # 伏魔御厨子：上面接更深的血红
 
 for name, (edge, alpha) in JOBS.items():
     src = os.path.join(ART, name)

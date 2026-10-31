@@ -37,9 +37,10 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
         o.inScaled = false; // 像素背景必须 1:1
         Bitmap bg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_battle_px, o);
         Bitmap voidBg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_void_px, o);
-        scene = new PixelScene(atlas, bg, voidBg, difficulty, controls, bgm);
-        loop = new BattleLoop(world, controls, scene, new GlTarget(new AndroidGl(), atlas.bitmap, bg, voidBg),
-                new CanvasTarget(atlas.bitmap, bg, voidBg), host);
+        Bitmap shrineBg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_shrine_px, o);
+        scene = new PixelScene(atlas, bg, voidBg, shrineBg, difficulty, controls, bgm);
+        loop = new BattleLoop(world, controls, scene, new GlTarget(new AndroidGl(), atlas.bitmap, bg, voidBg, shrineBg),
+                new CanvasTarget(atlas.bitmap, bg, voidBg, shrineBg), host);
         getHolder().setFormat(PixelFormat.OPAQUE);
         getHolder().addCallback(this);
         setFocusable(true);

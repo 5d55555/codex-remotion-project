@@ -119,7 +119,7 @@ public class SmokeTest {
         Field cf = BattleActivity.class.getDeclaredField("cutscene");
         cf.setAccessible(true);
         CutscenePlayer cutscene = (CutscenePlayer) cf.get(battle.get());
-        battle.get().startCutscene(1);
+        battle.get().startCutscene(1, com.shinjuku.showdown.core.World.CUTSCENE_VOID);
         assertTrue(cutscene.isPlaying());
         // 后台：不计时
         battle.pause();

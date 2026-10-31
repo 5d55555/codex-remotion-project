@@ -21,11 +21,12 @@ import android.widget.FrameLayout;
 import java.util.concurrent.CountDownLatch;
 
 /**
- * 领域展开前的过场视频（res/raw/domain_void.mp4，用户给的原片，原样打包）。
+ * 领域展开前的过场视频（用户给的原片，原样打包）：五条悟的无量空处 res/raw/domain_void.mp4、宿傩的伏魔御厨子 res/raw/domain_shrine.mp4。
+ * 一个播放器，进战斗先准备无量空处；要放的不是准备好的那个就当场换片子再准备（本地文件，几百毫秒，算在首帧超时里）。
  * - 画面：第二个 SurfaceView（setZOrderMediaOverlay：在战斗画面上面、窗口下面），按视频比例完整显示，两边黑边，不裁不拉伸；
  *   上面盖一层“幕布”：第一帧出来之前全黑（不露出战斗画面），之后只挡黑边。放的时候战斗收不到触摸。
  * - 进战斗就 prepareAsync，按下领域时直接开播。MediaPlayer 的所有调用都在专用线程上（和 Bgm 一样，不碰主线程）。
- * - 结束（播完、出错、准备或首帧超过 2 秒、前台累计超过 10 秒）都走同一个入口，同一次只算一次；结束后回调 Host.cutsceneDone。
+ * - 结束（播完、出错、准备或首帧超过 2 秒、前台累计超过视频长度 + 2.5 秒）都走同一个入口，同一次只算一次；结束后回调 Host.cutsceneDone。
  * - 切后台：视频暂停、不计时；回前台接着播。背景音乐不动（原样继续，视频的声音和它混在一起）。
  *
  * 带 “m” 前缀的字段只在 cutscene 线程上读写。
@@ -39,7 +40,9 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
     }
 
     private static final String TAG = "Cutscene";
-    private static final long FIRST_FRAME_TIMEOUT_MS = 2000, TOTAL_TIMEOUT_MS = 10_000;
+    private static final long FIRST_FRAME_TIMEOUT_MS = 2000, TOTAL_SLACK_MS = 2500, TOTAL_FALLBACK_MS = 16_000;
+    static final int VOID = 0, SHRINE = 1; // 哪一段：无量空处、伏魔御厨子
+    private static final int[] RAW = {R.raw.domain_void, R.raw.domain_shrine};
 
     private final Context app;
     private final Host host;
@@ -56,7 +59,10 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
 
     // cutscene 线程
     private MediaPlayer mPlayer;
-    private boolean mPrepared, mFailed, mStarted, mRendering, mForeground = true;
+    private boolean mPrepared, mStarted, mRendering, mForeground = true;
+    private final boolean[] mFailed = new boolean[RAW.length]; // 这一段坏了：以后直接跳过
+    private int mLoaded = -1, mWant = VOID;  // 播放器里装的是哪一段；这次要放哪一段
+    private long mDurationMs;              // 装着的这一段多长（准备好以后才知道）
     private SurfaceHolder mSurface;
     private int mSession = -1;           // 正在放的 castId，-1 没在放
     private long mPlayedMs, mResumedAt;  // 前台累计播放时间（超时用）
@@ -82,8 +88,8 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
 
     /* ---------------- 主线程 ---------------- */
 
-    /** 开始放（主线程）。 */
-    void play(int castId) {
+    /** 开始放（主线程）：kind 是 VOID 或 SHRINE。 */
+    void play(int castId, int kind) {
         if (released) return;
         showing = castId;
         curtain.open = false;
@@ -95,12 +101,14 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
             mSession = castId;
             mRendering = false;
             mPlayedMs = 0;
-            if (mFailed) {
+            mWant = kind;
+            if (mFailed[kind]) {
                 finish("视频不可用");
                 return;
             }
             if (mForeground) armTimeouts();
-            maybeStart();
+            if (mLoaded != kind) load(kind); // 装的不是这一段：换片子（准备好了 onPrepared 再开播）
+            else maybeStart();
         });
     }
 
@@ -252,13 +260,34 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
             p.setOnCompletionListener(this);
             p.setOnErrorListener(this);
             p.setOnInfoListener(this);
-            try (AssetFileDescriptor fd = app.getResources().openRawResourceFd(R.raw.domain_void)) {
-                p.setDataSource(fd.getFileDescriptor(), fd.getStartOffset(), fd.getLength());
+        } catch (Exception e) {
+            Log.w(TAG, "create", e);
+            java.util.Arrays.fill(mFailed, true);
+            return;
+        }
+        load(mSession >= 0 ? mWant : VOID);
+    }
+
+    /** 把这一段装进播放器（异步准备）。 */
+    private void load(int kind) {
+        if (mPlayer == null) {
+            mFailed[kind] = true;
+            if (mSession >= 0) finish("没有播放器");
+            return;
+        }
+        mLoaded = kind;
+        mPrepared = false;
+        mStarted = false;
+        mDurationMs = 0;
+        try {
+            mPlayer.reset();
+            try (AssetFileDescriptor fd = app.getResources().openRawResourceFd(RAW[kind])) {
+                mPlayer.setDataSource(fd.getFileDescriptor(), fd.getStartOffset(), fd.getLength());
             }
-            p.prepareAsync();
-        } catch (Exception e) { // IOException、IllegalStateException……都当作没有过场
+            mPlayer.prepareAsync();
+        } catch (Exception e) { // IOException、IllegalStateException……都当作没有这段过场
             Log.w(TAG, "prepare", e);
-            mFailed = true;
+            mFailed[kind] = true;
             if (mSession >= 0) finish("准备失败");
         }
     }
@@ -266,6 +295,12 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
     @Override
     public void onPrepared(MediaPlayer mp) {
         mPrepared = true;
+        try {
+            mDurationMs = Math.max(0, mp.getDuration());
+        } catch (RuntimeException e) {
+            mDurationMs = 0;
+        }
+        if (mSession >= 0 && mForeground) armTotal(); // 知道了片长：只重排总时长保护（首帧超时从开始放算，准备的时间也算在里面）
         int w = mp.getVideoWidth(), h = mp.getVideoHeight();
         if (w > 0 && h > 0) {
             float aspect = w / (float) h;
@@ -286,7 +321,7 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
     }
 
     private void maybeStart() {
-        if (mSession < 0 || mStarted || !mPrepared || mSurface == null || !mForeground) return;
+        if (mSession < 0 || mStarted || !mPrepared || mLoaded != mWant || mSurface == null || !mForeground) return;
         try {
             mPlayer.seekTo(0);
             mPlayer.start();
@@ -299,9 +334,14 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
 
     private void armTimeouts() {
         media.removeCallbacks(mFirstFrameTimeout);
-        media.removeCallbacks(mTotalTimeout);
         if (!mRendering) media.postDelayed(mFirstFrameTimeout, FIRST_FRAME_TIMEOUT_MS);
-        media.postDelayed(mTotalTimeout, Math.max(0, TOTAL_TIMEOUT_MS - mPlayedMs));
+        armTotal();
+    }
+
+    private void armTotal() {
+        media.removeCallbacks(mTotalTimeout);
+        long total = mPrepared && mLoaded == mWant && mDurationMs > 0 ? mDurationMs + TOTAL_SLACK_MS : TOTAL_FALLBACK_MS;
+        media.postDelayed(mTotalTimeout, Math.max(0, total - mPlayedMs));
     }
 
     @Override
@@ -326,8 +366,9 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
     @Override
     public boolean onError(MediaPlayer mp, int what, int extra) {
         Log.w(TAG, "error " + what + "/" + extra);
-        mFailed = true; // 坏了就不再用它：以后的领域展开直接跳过过场
+        if (mLoaded >= 0) mFailed[mLoaded] = true; // 这一段坏了就不再用它：以后的这种领域展开直接跳过过场
         mPrepared = false;
+        mLoaded = -1; // 下次要放就重新装（reset 以后才能再用）
         finish("播放出错");
         return true;
     }
@@ -340,7 +381,7 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
         mSession = -1;
         media.removeCallbacks(mFirstFrameTimeout);
         media.removeCallbacks(mTotalTimeout);
-        if (mStarted && !mFailed) {
+        if (mStarted && mLoaded >= 0 && !mFailed[mLoaded]) {
             try {
                 mPlayer.pause();
                 mPlayer.seekTo(0);

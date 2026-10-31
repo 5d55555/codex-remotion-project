@@ -31,6 +31,7 @@ final class PixelScene {
     // 宿傩：领域展延的灰白轮廓、魔虚罗法阵的金色、世界斩的红、反转术式的白
     private static final int AMP_LIGHT = 0xFFE9EAF2, AMP_DARK = 0xFF7D8294, WHEEL = 0xFFE0B25A, WHEEL_LIT = 0xFFFFF0B8,
             CUT_RED = 0xFFB0101E, WORLD_RED = 0xFFFF3A4A, RCT_LIGHT = 0xFFE6FFF0,
+            SHRINE_RED = 0xFFFF3042, SHRINE_DARK = 0xFF2A0508, SHRINE_BONE = 0xFFF0E6DA, // 伏魔御厨子
             SPACE_DARK = 0xFF14061E, SPACE_VIOLET = 0xFF9A5CFF, SPACE_LIGHT = 0xFFE9DDFF; // 空间斩：紫黑的裂缝
     // 十种影法术的影子、魔虚罗的白、顎吐的电、原身的暗红
     private static final int SHADOW = 0xFF120A1E, SHADOW_EDGE = 0xFF4A2E6E, MAHO_LIGHT = 0xFFF3EFE6, MAHO_DARK = 0xFF8C8577,
@@ -39,6 +40,7 @@ final class PixelScene {
     private final Atlas atlas;
     private final int bgW, bgH, skyColor;
     private final int voidW, voidH, voidSky; // 无量空处的背景（和新宿同高，脚底在同一行）
+    private final int shrineW, shrineH, shrineSky; // 伏魔御厨子的背景（同上）
     private final Controls controls;
     private final Difficulty difficulty;
     private final Bgm bgm;
@@ -84,6 +86,9 @@ final class PixelScene {
 
     // 无量空处：voidK 从 0（新宿）过渡到 1（无量空处），以展开的位置为圆心一圈圈铺开
     private float voidK, voidCx, voidCy;
+    // 伏魔御厨子：shrineK 同上，以宿傩为圆心铺开；对撞时宿傩那半边是神龛、五条悟那半边是星空
+    private float shrineK, shrineCx, shrineCy, shrineWarnT0 = -99, shrineSlashT0 = -99, signT0 = -99, noticeT0 = -99;
+    private int shrineSlashKind, noticeId;
     private boolean purple200; // 最近一发茈是不是 200%（命中时的特效用）
     // 解：一道一闪而过的细白线，宿傩头上一个“解”字
     private float slashT0 = -99, slashX0, slashY0, slashX1, dismantleT0 = -99;
@@ -92,6 +97,9 @@ final class PixelScene {
     private float worldT0 = -99, worldX0, worldY0, worldX1;
     private boolean worldSpace;          // 这一道斩带是空间斩（紫黑）还是世界斩（红白）
     private float spaceT0 = -99, exhaustT0 = -99;
+    private float hollowT0 = -99, hollowX, hollowY, hollowR; // 无指向茈的演出：相撞的时刻、位置、最终半径（像素层）
+    private boolean silhouette;                               // 冲击帧：人物画成纯色剪影
+    private int silhouetteColor;
     // 十种影法术、原身：顎吐出手、魔虚罗适应无限、变原身的时刻；魔虚罗这一帧的位置
     private float agitoT0 = -99, mahoAdaptT0 = -99, trueT0 = -99, mahoSX, mahoSY;
     // 茈·最大输出的固定动作：画用的苍和茈（不在场上，只拿来画）、宿傩的「穿血」（最近四道）、拍肩的时刻
@@ -107,7 +115,7 @@ final class PixelScene {
     private long rng = 0x2545F4914F6CDD1DL;
     private float fpsAvg = 60, tickMs, drawMs;
 
-    PixelScene(Atlas atlas, Bitmap bg, Bitmap voidBg, Difficulty difficulty, Controls controls, Bgm bgm) {
+    PixelScene(Atlas atlas, Bitmap bg, Bitmap voidBg, Bitmap shrineBg, Difficulty difficulty, Controls controls, Bgm bgm) {
         this.atlas = atlas;
         bgW = bg.getWidth();
         bgH = bg.getHeight();
@@ -115,6 +123,9 @@ final class PixelScene {
         voidW = voidBg.getWidth();
         voidH = voidBg.getHeight();
         voidSky = voidBg.getPixel(0, 0);
+        shrineW = shrineBg.getWidth();
+        shrineH = shrineBg.getHeight();
+        shrineSky = shrineBg.getPixel(0, 0);
         this.difficulty = difficulty;
         this.controls = controls;
         this.bgm = bgm;
@@ -170,11 +181,14 @@ final class PixelScene {
             sy = Math.round((float) Math.cos(st * 73) * a * 0.6f);
         }
         voidK = w.domainTicks > 0 ? Math.min(1, voidK + dt / 0.7f) : Math.max(0, voidK - dt / 0.5f);
-        if (voidK < 1) {
+        shrineK = w.shrineTicks > 0 ? Math.min(1, shrineK + dt / 0.6f) : Math.max(0, shrineK - dt / 0.5f);
+        boolean clash = w.clashTicks > 0;
+        if (voidK < 1 && (shrineK < 1 || clash)) {
             if (bgY > 0) t.rect(0, 0, VW, bgY + 1, skyColor);
             t.sprite(PixelTarget.TEX_BG, 0, 0, bgW, bgH, Math.round((VW - bgW) * 0.5f) + sx, bgY + sy, 0, 0, 0, 1, 1, 0xFFFFFFFF, 0);
         }
         if (voidK > 0) drawVoid(t, time, sx, sy);
+        if (shrineK > 0) drawShrine(t, w, time, sx, sy, alpha);
 
         Fighter g = w.gojo, k = w.sukuna;
         float gx = X(lerp(g.px, g.x, alpha)) + sx, gy = Y(lerp(g.py, g.y, alpha)) + sy;
@@ -208,14 +222,14 @@ final class PixelScene {
         if (k.state != Fighter.KO) sukunaBack(t, w, kx, ky, time);
         figure(t, w.sukunaTrueForm ? TRUE_RIG : SUKUNA_RIG, kx, ky);
         if (k.state != Fighter.KO) sukunaFront(t, w, kx, ky, time, dt, sx, sy);
-        if (w.domainTicks > 0 && k.state != Fighter.KO) overload(t, kx, ky, time);
+        if (w.voidControl() && k.state != Fighter.KO) overload(t, kx, ky, time);
         if (m.present) {
             poseMahoraga(w, time);
             if (m.state == Fighter.M_RISE) ghost = withAlpha(0xFF2A2236, 0.35f + 0.65f * Math.min(1, m.stateTick / (float) Tuning.MAHORAGA_RISE)); // 从影子里浮出来
             figure(t, MAHO_RIG, mx, my);
             ghost = 0;
             mahoragaFront(t, w, mx, my, time);
-            if (w.domainTicks > 0) overload(t, mx, my - 20, time);
+            if (w.voidControl()) overload(t, mx, my - 20, time);
         }
         if (w.wheelOn == World.WHEEL_SUKUNA && k.state != Fighter.KO) wheel(t, w, kx, ky - 64, w.worldUnlocked, w.ampTicks > 0, time, dt);
         else if (w.wheelOn == World.WHEEL_MAHORAGA) wheel(t, w, mx, my - 76, w.mahoragaAdapted, w.tenShadowsPaused(), time, dt);
@@ -246,6 +260,8 @@ final class PixelScene {
         drawEffects(t, time, sx, sy);
         drawParticles(t, sx, sy);
         drawNumbers(t, time, sx, sy);
+        shrineSlashes(t, time);
+        hollowBurst(t, w, time, gx, gy, kx, ky, mx, my);
 
         // 全屏闪
         float ft = time - flashT0;
@@ -257,12 +273,19 @@ final class PixelScene {
         // 镜头：瞬移的固定动作拉近（像素层裁一块放大），上下加黑边，界面先收起来
         boolean close = g.state == Fighter.TP_BLUE || g.state == Fighter.TP_RED && g.stateTick <= Tuning.TP_RED_CHARGE + 4
                 || g.state == Fighter.TP_PURPLE && g.stateTick <= Tuning.TP_PURPLE_FIRE + 6;
-        float zt = close ? 1.6f : 1f;
+        boolean punch = !close && !cine && time - hollowT0 < 0.45f; // 苍赫相撞：镜头猛地推到茈上
+        float zt = close ? 1.6f : punch ? 1.35f : 1f;
+        if (close) zoomOnHollow = false;
+        else if (punch) zoomOnHollow = true; // 记住这次拉近是谁的：退回去的时候焦点不跳
         zoom += (zt - zoom) * Math.min(1, dt * 7);
         if (Math.abs(zoom - zt) < 0.01f) zoom = zt;
         if (zoom > 1.01f) {
             int cw = Math.round(VW / zoom), ch = Math.round(vh / zoom);
             float fx = (gx + kx) * 0.5f, fy = (gy + ky) * 0.5f - 30;
+            if (zoomOnHollow) { // 茈的镜头：盯着相撞的地方（偏向五条悟一点）
+                fx = hollowX * 0.75f + gx * 0.25f;
+                fy = hollowY;
+            }
             int cx = Math.max(0, Math.min(VW - cw, Math.round(fx - cw * 0.5f))), cy = Math.max(0, Math.min(vh - ch, Math.round(fy - ch * 0.55f)));
             int bar = Math.round(ch * 0.1f * Math.min(1, (zoom - 1) / 0.5f));
             t.rect(cx, cy, cw, bar, 0xFF000000);
@@ -293,6 +316,7 @@ final class PixelScene {
     }
 
     private float zoom = 1;
+    private boolean zoomOnHollow;
 
     /* ---------------- 台词气泡 ---------------- */
 
@@ -361,7 +385,8 @@ final class PixelScene {
             case Fighter.S_SUMMON:
             case Fighter.S_SPACE:
             case Fighter.S_EXHAUSTED:
-                return false; // 头上在显示咒词（空间斩、力竭的字）
+            case Fighter.S_DOMAIN_SIGN:
+                return false; // 头上在显示咒词（空间斩、力竭、领域展开的字）
             default:
                 return true;
         }
@@ -507,11 +532,20 @@ final class PixelScene {
                         shake(3, time);
                     }
                     break;
-                case Events.HOLLOW_FORM:
-                    flash(0xCCF2C7FF, time);
-                    shake(7, time);
-                    fx(FX_RING, x, y, 0.5f, 2, ev.value[i] * PPU * 1.2f, PURPLE_CORE, PURPLE_LIGHT);
-                    sparks(x, y, 40, PURPLE_LIGHT, PURPLE_HOT, 240);
+                case Events.HOLLOW_FORM: // 苍赫相撞：白闪 → 冲击帧（全场定格）→ 炸开（见 hollowBurst）
+                    hollowT0 = time;
+                    hollowX = x;
+                    hollowY = y;
+                    hollowR = ev.value[i] * PPU;
+                    shake(12, time); // 闪白就是冲击帧的第一帧（不另外叠全屏闪，不然冲击帧被冲成灰的）
+                    fx(FX_RING, x, y, 0.5f, 2, hollowR * 1.2f, PURPLE_CORE, PURPLE_LIGHT);
+                    fx(FX_RING, x, y, 0.9f, 4, hollowR * 2.2f, PURPLE_LIGHT, PURPLE);
+                    sparks(x, y, 60, PURPLE_LIGHT, PURPLE_HOT, 300);
+                    for (int k = 0; k < 22; k++) { // 被削起来的碎石
+                        float a = -0.2f - 2.74f * rnd(), v = 120 + 200 * rnd();
+                        emit(x + (rnd() - 0.5f) * hollowR, groundY - 1, (float) Math.cos(a) * v, (float) Math.sin(a) * v, 0.7f + 0.5f * rnd(),
+                                rnd() < 0.5f ? 0xFF6E6A78 : 0xFF4A4552, rnd() < 0.4f ? 3 : 2, 420, 0.6f, 0);
+                    }
                     banner(Atlas.BIG_PURPLE, HudText.SUB_HOLLOW, 0xFFE3B0FF, time);
                     break;
                 case Events.HOLLOW_END:
@@ -589,6 +623,64 @@ final class PixelScene {
                         dismantleT0 = time;
                     }
                     break;
+                case Events.SHRINE: {
+                    int v = Math.round(ev.value[i]);
+                    switch (v) {
+                        case Events.SHRINE_SIGN:
+                            signT0 = time;
+                            fx(FX_RING_IN, x, y, 0.6f, 2, 34, SHRINE_RED, 0);
+                            break;
+                        case Events.SHRINE_SIGN_BROKEN:
+                            sparks(x, y, 18, SHRINE_RED, 0xFF8A8FA0, 90);
+                            fx(FX_RING, x, y, 0.3f, 14, 4, 0xFF8A8FA0, SHRINE_DARK);
+                            break;
+                        case Events.SHRINE_OPEN: // 过场放完：以宿傩为圆心铺开
+                            shrineCx = x;
+                            shrineCy = y;
+                            flash(0xCC6A0A12, time);
+                            shake(8, time);
+                            fx(FX_RING, x, y, 0.8f, 6, 170, SHRINE_RED, SHRINE_DARK);
+                            banner(Atlas.BIG_SHRINE, HudText.SUB_DOMAIN, SHRINE_RED, time);
+                            break;
+                        case Events.SHRINE_WARN:
+                            shrineWarnT0 = time;
+                            break;
+                        case Events.SHRINE_SLASH:
+                            shrineSlashT0 = time;
+                            shrineSlashKind = kind;
+                            if (kind == 1) {
+                                sparks(x, y, 14, 0xFFFFFFFF, SHRINE_RED, 150);
+                                shake(2.5f, time);
+                            }
+                            break;
+                        case Events.SHRINE_CLASH: // 领域对撞
+                            notice(HudText.CLASH, time);
+                            flash(0xAAFFFFFF, time);
+                            shake(6, time);
+                            break;
+                        case Events.SHRINE_BROKEN: // 伏魔御厨子崩解：神龛碎成红黑的碎片
+                            notice(HudText.SHRINE_BROKEN, time);
+                            flash(0x99FF3042, time);
+                            shake(6, time);
+                            for (int k = 0; k < 30; k++) {
+                                emit(rnd() * VW, groundY - rnd() * 160, (rnd() - 0.5f) * 80, -40 - 60 * rnd(), 0.6f + 0.5f * rnd(),
+                                        rnd() < 0.5f ? SHRINE_RED : SHRINE_DARK, rnd() < 0.4f ? 3 : 2, 300, 1, 0);
+                            }
+                            break;
+                        case Events.SHRINE_VOID_BROKEN: // 无量空处的结界被外面击碎
+                            notice(HudText.VOID_BROKEN, time);
+                            flash(0xAAE6F0FF, time);
+                            shake(7, time);
+                            for (int k = 0; k < 30; k++) {
+                                emit(rnd() * VW, rnd() * groundY, (rnd() - 0.5f) * 120, -30 - 50 * rnd(), 0.5f + 0.5f * rnd(),
+                                        rnd() < 0.5f ? VOID_LIGHT : 0xFFFFFFFF, rnd() < 0.4f ? 3 : 2, 300, 1, 0);
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
+                }
                 case Events.SPACE: {
                     int v = Math.round(ev.value[i]);
                     if (v == 0) {          // 起手：空间一暗，横幅
@@ -1378,33 +1470,126 @@ final class PixelScene {
     }
 
     /** 无量空处：以展开的位置为圆心，按行把宇宙背景铺开（每行一条贴图，像素对齐，两种后端结果一样）；铺满后星星一闪一闪。 */
-    private void drawVoid(PixelTarget t, float time, int sx, int sy) {
-        int left = Math.round((VW - voidW) * 0.5f) + sx, top = Math.round(bgY) + sy;
-        if (voidK >= 1) {
-            if (top > 0) t.rect(0, 0, VW, top + 1, voidSky);
-            t.sprite(PixelTarget.TEX_VOID, 0, 0, voidW, voidH, left, top, 0, 0, 0, 1, 1, 0xFFFFFFFF, 0);
-        } else {
-            float e = voidK * voidK * (3 - 2 * voidK);
-            float cx = Math.round(voidCx) + sx, cy = Math.round(voidCy) + sy;
-            float fx = Math.max(cx, VW - cx), fy = Math.max(cy, vh - cy);
-            float R = e * (float) Math.sqrt(fx * fx + fy * fy);
-            int y0 = Math.max(0, (int) Math.floor(cy - R)), y1 = Math.min(vh, (int) Math.ceil(cy + R));
-            for (int y = y0; y < y1; y++) {
-                float dy = y + 0.5f - cy, hw2 = R * R - dy * dy;
-                if (hw2 <= 0) continue;
-                float hw = (float) Math.sqrt(hw2);
-                int xa = Math.max(Math.max(0, left), Math.round(cx - hw)), xb = Math.min(Math.min(VW, left + voidW), Math.round(cx + hw));
-                if (xb <= xa) continue;
-                int ty = y - top;
-                if (ty < 0) t.rect(xa, y, xb - xa, 1, voidSky);
-                else if (ty < voidH) t.sprite(PixelTarget.TEX_VOID, xa - left, ty, xb - xa, 1, xa, y, 0, 0, 0, 1, 1, 0xFFFFFFFF, 0);
-            }
-            // 铺开的边缘：一圈亮环
+    /**
+     * 领域背景以 (cx, cy) 为圆心一圈圈铺开（k 从 0 到 1；1 就是整张贴上），只画 [clipL, clipR) 这一段；铺开的边缘一圈亮环。
+     * 无量空处、伏魔御厨子共用。
+     */
+    private void reveal(PixelTarget t, int tex, int tw, int th, int sky, float k, float cx, float cy, int clipL, int clipR,
+                        int sx, int sy, int ring1, int ring2) {
+        int left = Math.round((VW - tw) * 0.5f) + sx, top = Math.round(bgY) + sy;
+        int l = Math.max(Math.max(0, left), clipL), r = Math.min(Math.min(VW, left + tw), clipR);
+        if (r <= l) return;
+        if (k >= 1) {
+            if (top > 0) t.rect(l, 0, r - l, top + 1, sky);
+            t.sprite(tex, l - left, 0, r - l, th, l, top, 0, 0, 0, 1, 1, 0xFFFFFFFF, 0);
+            return;
+        }
+        float e = k * k * (3 - 2 * k);
+        cx = Math.round(cx) + sx;
+        cy = Math.round(cy) + sy;
+        float fx = Math.max(cx, VW - cx), fy = Math.max(cy, vh - cy);
+        float R = e * (float) Math.sqrt(fx * fx + fy * fy);
+        int y0 = Math.max(0, (int) Math.floor(cy - R)), y1 = Math.min(vh, (int) Math.ceil(cy + R));
+        for (int y = y0; y < y1; y++) {
+            float dy = y + 0.5f - cy, hw2 = R * R - dy * dy;
+            if (hw2 <= 0) continue;
+            float hw = (float) Math.sqrt(hw2);
+            int xa = Math.max(l, Math.round(cx - hw)), xb = Math.min(r, Math.round(cx + hw));
+            if (xb <= xa) continue;
+            int ty = y - top;
+            if (ty < 0) t.rect(xa, y, xb - xa, 1, sky);
+            else if (ty < th) t.sprite(tex, xa - left, ty, xb - xa, 1, xa, y, 0, 0, 0, 1, 1, 0xFFFFFFFF, 0);
+        }
+        t.additive(true);
+        t.shape(cx, cy, R + 3, R, 0, 7, withAlpha(ring1, 0.85f * (1 - e * 0.6f)));
+        t.shape(cx, cy, R + 7, R + 3, 0, 7, withAlpha(ring2, 0.5f * (1 - e * 0.6f)));
+        t.additive(false);
+    }
+
+    /**
+     * 伏魔御厨子的背景：以宿傩为圆心铺开血红的神龛；天上一闪一闪的细斩痕。对撞时只画宿傩那半边（另一半是无量空处的星空），
+     * 中间一道结界的裂缝。
+     */
+    private void drawShrine(PixelTarget t, World w, float time, int sx, int sy, float alpha) {
+        int clipL = 0, clipR = VW, border = -1;
+        if (w.clashTicks > 0) {
+            float gxs = X(lerp(w.gojo.px, w.gojo.x, alpha)) + sx, kxs = X(lerp(w.sukuna.px, w.sukuna.x, alpha)) + sx;
+            border = Math.round((gxs + kxs) * 0.5f);
+            if (kxs >= gxs) clipL = border;
+            else clipR = border;
+        }
+        reveal(t, PixelTarget.TEX_SHRINE, shrineW, shrineH, shrineSky, shrineK, shrineCx, shrineCy, clipL, clipR, sx, sy, SHRINE_RED, SHRINE_DARK);
+        // 天上的斩痕：每 0.12 秒换一批，只在神龛那一边
+        t.additive(true);
+        long z = 0xB10D5L + (long) (time / 0.12f);
+        float sky = groundY - 40;
+        for (int i = 0; i < 6; i++) {
+            z = mix(z);
+            float x0 = (float) unit(z) * VW;
+            z = mix(z);
+            float y0 = (float) unit(z) * sky * 0.8f;
+            z = mix(z);
+            float len = 20 + 40 * (float) unit(z), ang = 0.9f + 0.6f * (float) unit(mix(z));
+            if (x0 < clipL || x0 >= clipR) continue;
+            t.line(Math.round(x0), Math.round(y0), Math.round(x0 + (float) Math.cos(ang) * len), Math.round(y0 + (float) Math.sin(ang) * len), 1,
+                    withAlpha(i % 2 == 0 ? 0xFFFFFFFF : SHRINE_RED, 0.55f * shrineK));
+        }
+        t.additive(false);
+        if (border >= 0) { // 结界的裂缝：一道锯齿竖线
             t.additive(true);
-            t.shape(cx, cy, R + 3, R, 0, 7, withAlpha(VOID_LIGHT, 0.85f * (1 - e * 0.6f)));
-            t.shape(cx, cy, R + 7, R + 3, 0, 7, withAlpha(VOID_RING, 0.5f * (1 - e * 0.6f)));
+            long q = 0xC1A54L + (long) (time / 0.06f);
+            int px = border, py = 0;
+            for (int y = 8; y <= Math.round(groundY); y += 8) {
+                q = mix(q);
+                int nx = border + (int) ((unit(q) - 0.5f) * 8);
+                t.line(px, py, nx, y, 2, withAlpha(0xFFFFFFFF, 0.85f));
+                t.line(px + 1, py, nx + 1, y, 1, withAlpha(VOID_LIGHT, 0.6f));
+                px = nx;
+                py = y;
+            }
             t.additive(false);
         }
+    }
+
+    /** 伏魔御厨子的一轮：预警（细切线往五条悟身上收拢），斩下去（白红交叉的斩痕；被闪开就是擦过的虚影）。 */
+    private void shrineSlashes(PixelTarget t, float time) {
+        float wt = time - shrineWarnT0, st = time - shrineSlashT0;
+        float x = Math.round(gojoSX), y = Math.round(gojoSY - 20);
+        if (wt >= 0 && wt < 0.3f) {
+            float k = wt / 0.3f;
+            t.additive(true);
+            long z = 0x5A1L + (long) (shrineWarnT0 * 100);
+            for (int i = 0; i < 5; i++) {
+                z = mix(z);
+                double a = unit(z) * Math.PI * 2;
+                float r0 = 50 - 34 * k, r1 = r0 - 8;
+                t.line(Math.round(x + (float) Math.cos(a) * r0), Math.round(y + (float) Math.sin(a) * r0),
+                        Math.round(x + (float) Math.cos(a) * r1), Math.round(y + (float) Math.sin(a) * r1), 1, withAlpha(SHRINE_RED, 0.4f + 0.5f * k));
+            }
+            t.additive(false);
+        }
+        if (st >= 0 && st < 0.12f && shrineSlashKind != 2) {
+            float a = 1 - st / 0.12f, ghostA = shrineSlashKind == 1 ? 1f : 0.35f;
+            t.additive(true);
+            long z = 0x5C1L + (long) (shrineSlashT0 * 100);
+            for (int i = 0; i < 3; i++) {
+                z = mix(z);
+                double ang = unit(z) * Math.PI;
+                float cx = (float) Math.cos(ang) * 30, cy = (float) Math.sin(ang) * 30;
+                t.line(Math.round(x - cx), Math.round(y - cy), Math.round(x + cx), Math.round(y + cy), 2, withAlpha(SHRINE_RED, 0.6f * a * ghostA));
+                t.line(Math.round(x - cx), Math.round(y - cy), Math.round(x + cx), Math.round(y + cy), 1, withAlpha(0xFFFFFFFF, a * ghostA));
+            }
+            t.additive(false);
+        }
+    }
+
+    private void notice(int id, float time) {
+        noticeId = id;
+        noticeT0 = time;
+    }
+
+    private void drawVoid(PixelTarget t, float time, int sx, int sy) {
+        reveal(t, PixelTarget.TEX_VOID, voidW, voidH, voidSky, voidK, voidCx, voidCy, 0, VW, sx, sy, VOID_LIGHT, VOID_RING);
         // 星星：固定的位置，各自按自己的节奏闪
         t.additive(true);
         float horizon = groundY - 50;
@@ -1499,6 +1684,14 @@ final class PixelScene {
                     emit(kx + (rnd() - 0.5f) * 30, ky - rnd() * 50, (rnd() - 0.5f) * 30, -20 - 40 * rnd(), 0.6f, rnd() < 0.6f ? TRUE_DARK : TRUE_RED, rnd() < 0.3f ? 2 : 1, -10, 1, 0);
                 }
             }
+        }
+        if (s.state == Fighter.S_DOMAIN_SIGN) { // 结印：手上一团暗红越聚越大，脚下的影子往外渗血红
+            float k = Math.min(1, s.stateTick / (float) Tuning.SHRINE_SIGN);
+            t.additive(true);
+            t.shape(Math.round(handX), Math.round(handY), 3 + 6 * k, 0, 0, 7, withAlpha(SHRINE_RED, 0.55f + 0.3f * k));
+            t.shape(Math.round(kx), Math.round(ky) - 26, 18 + 14 * k, 0, 0, 7, withAlpha(SHRINE_RED, 0.18f * k));
+            t.additive(false);
+            t.shape(Math.round(handX), Math.round(handY), 1.5f + 2.5f * k, 0, 0, 7, withAlpha(SHRINE_DARK, 0.9f));
         }
         if (s.state == Fighter.S_SPACE) {
             // 空间斩的预警：手前一团紫黑，斩带上空间一段段裂开；跟着五条悟转的时候是虚线，锁定以后是实线、一闪一闪
@@ -1808,6 +2001,17 @@ final class PixelScene {
         }
         if (g.state == Fighter.PURPLE_MAX) {
             cinePoseGojo(p, st);
+            return;
+        }
+        float hs = time - hollowT0;
+        if (hs >= 0 && hs < 0.9f && !air && hollowPoseOk(g.state)) { // 苍赫相撞：前手张开对着茈，后手高高举起，身子往后一仰
+            float k = Math.min(1, hs / 0.08f), out = hs < 0.6f ? 1 : 1 - (hs - 0.6f) / 0.3f;
+            p.armFront = 95 * k * out + 8 * (1 - out);
+            p.armBack = (160 * k) * out - 8 * (1 - out);
+            p.lean = -10 * k * out;
+            p.legFront = 26 * out;
+            p.legBack = -24 * out;
+            p.bob = 0;
             return;
         }
         if (g.state == Fighter.TP_PURPLE) {
@@ -2175,7 +2379,7 @@ final class PixelScene {
             }
             return;
         }
-        if (w.domainTicks > 0 && !air) { // 无量空处：信息塞满了脑子，僵在原地，偶尔抽一下
+        if (w.voidControl() && !air) { // 无量空处：信息塞满了脑子，僵在原地，偶尔抽一下
             p.lean = -5;
             p.armFront = 22;
             p.armBack = -18;
@@ -2248,6 +2452,14 @@ final class PixelScene {
                 p.legBack = -18 * k;
                 return;
             }
+            case Fighter.S_DOMAIN_SIGN: // 伏魔御厨子的结印：两手在胸前交叠结印，微微低头，身子一沉一沉
+                p.armFront = 148;
+                p.armBack = 138;
+                p.lean = 4;
+                p.legFront = 18;
+                p.legBack = -18;
+                p.bob = ((st / 15) & 1) == 0 ? -1 : 0;
+                return;
             case Fighter.S_SPACE: { // 空间斩：前一半蓄力（前手收在胸前），锁定以后前手横着指出去
                 boolean pointing = st > Tuning.SPACE_LOCK;
                 p.armFront = pointing ? 90 : 150;
@@ -2764,6 +2976,110 @@ final class PixelScene {
     private Rig rig = GOJO_RIG;
 
     /** 画一个角色：脚底在 (fx, fy)。头和身体不转（只按前倾平移整数像素，保持像素干净），手脚绕关节转。 */
+    /** 五条悟这些动作里可以摆茈的姿势（站着、走着、刚放完招）。 */
+    private static boolean hollowPoseOk(int state) {
+        switch (state) {
+            case Fighter.FREE:
+            case Fighter.RED_ACTIVE:
+            case Fighter.RED_RECOVER:
+            case Fighter.BLUE_RECOVER:
+            case Fighter.MELEE_RECOVER:
+            case Fighter.PURPLE_RECOVER:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * 无指向茈的夸张演出（苍赫相撞后的 0.9 秒）：
+     * 0.03–0.25 秒（全场定格）冲击帧——黑底白剪影和白底黑剪影两帧一换，满屏集中线射向相撞点；
+     * 0–0.3 秒蓝圈、红圈从两边往中心收拢；0.25 秒起紫色冲击波一圈圈推开、放射光线转着散开，地上被削出一道沟。
+     */
+    private void hollowBurst(PixelTarget t, World w, float time, float gx, float gy, float kx, float ky, float mx, float my) {
+        float s = time - hollowT0;
+        if (s < 0 || s > 4f) return;
+        float x = Math.round(hollowX), y = Math.round(hollowY), R = Math.max(12, hollowR);
+        // 地上的沟：茈削掉的那一块，慢慢淡掉
+        float carve = Math.min(1, Math.max(0, (s - 0.25f) / 0.25f)) * (s < 3f ? 1 : 1 - (s - 3f));
+        if (carve > 0) {
+            float cw = R * 1.7f * carve;
+            t.rect(Math.round(x - cw), Math.round(groundY), Math.round(cw * 2), 3, withAlpha(0xFF0A0610, 0.85f * carve));
+            t.additive(true);
+            t.rect(Math.round(x - cw), Math.round(groundY) - 1, Math.round(cw * 2), 1, withAlpha(PURPLE, 0.6f * carve));
+            t.additive(false);
+        }
+        if (s > 0.9f) return;
+        // 红蓝两圈收拢
+        if (s < 0.3f) {
+            float k = 1 - s / 0.3f, rr = R * 1.4f * k;
+            t.additive(true);
+            t.shape(x - 6 * k, y, rr + 2, rr, 0, 7, withAlpha(BLUE_LIGHT, 0.9f * k));
+            t.shape(x + 6 * k, y, rr * 0.92f + 2, rr * 0.92f, 0, 7, withAlpha(RED_LIGHT, 0.9f * k));
+            t.additive(false);
+        }
+        // 冲击波和放射光线
+        if (s >= 0.25f) {
+            float k = (s - 0.25f) / 0.65f, e = 1 - (1 - k) * (1 - k), a = 1 - k;
+            t.additive(true);
+            for (int i = 0; i < 3; i++) {
+                float ki = Math.max(0, Math.min(1, (s - 0.25f - i * 0.09f) / 0.5f));
+                if (ki <= 0 || ki >= 1) continue;
+                float r = R * (1.1f + 2.6f * (1 - (1 - ki) * (1 - ki)));
+                t.shape(x, y, r + 3, r, 0, 7, withAlpha(i == 0 ? PURPLE_CORE : PURPLE_LIGHT, 0.8f * (1 - ki)));
+            }
+            long z = 0x5EEDL + (long) (hollowT0 * 1000);
+            for (int i = 0; i < 18; i++) {
+                z = mix(z);
+                double ang = unit(z) * Math.PI * 2 + s * 0.8;
+                float r0 = R * (0.6f + 0.4f * e), r1 = r0 + R * (1.4f + 2.2f * e) * (0.6f + 0.4f * (float) unit(mix(z)));
+                t.line(Math.round(x + (float) Math.cos(ang) * r0), Math.round(y + (float) Math.sin(ang) * r0),
+                        Math.round(x + (float) Math.cos(ang) * r1), Math.round(y + (float) Math.sin(ang) * r1), 1,
+                        withAlpha(i % 3 == 0 ? 0xFFFFFFFF : PURPLE_LIGHT, 0.75f * a));
+            }
+            t.additive(false);
+        }
+        // 冲击帧（全场定格的那 0.25 秒里）：第一帧纯白，之后黑底白剪影、白底黑剪影两帧一换
+        if (s < 0.25f) {
+            int frame = (int) (s / 0.045f);
+            if (frame == 0) {
+                t.rect(0, 0, VW, vh, 0xFFFFFFFF);
+                return;
+            }
+            boolean dark = (frame & 1) == 1;
+            int bg = dark ? 0xFF0B0612 : 0xFFF4EEFF, fg = dark ? 0xFFF4EEFF : 0xFF0B0612;
+            t.rect(0, 0, VW, vh, bg);
+            // 集中线：从画面四周射向相撞点
+            long z = 0xC0FFEEL + (long) (s / 0.045f);
+            for (int i = 0; i < 40; i++) {
+                z = mix(z);
+                double ang = unit(z) * Math.PI * 2;
+                z = mix(z);
+                float r0 = R * (1.2f + 0.8f * (float) unit(z)), r1 = VW;
+                float cx = (float) Math.cos(ang), cy = (float) Math.sin(ang);
+                t.line(Math.round(x + cx * r0), Math.round(y + cy * r0), Math.round(x + cx * r1), Math.round(y + cy * r1), i % 4 == 0 ? 2 : 1, withAlpha(fg, 0.85f));
+            }
+            // 剪影：人物、相撞的那一点
+            silhouette = true;
+            silhouetteColor = fg & 0x00FFFFFF | 0xFF000000;
+            Fighter k = w.sukuna, m = w.mahoraga;
+            if (k.state != Fighter.KO) {
+                poseSukuna(w, time);
+                figure(t, w.sukunaTrueForm ? TRUE_RIG : SUKUNA_RIG, kx, ky);
+            }
+            if (m.present) {
+                poseMahoraga(w, time);
+                figure(t, MAHO_RIG, mx, my);
+            }
+            poseGojo(w, time);
+            figure(t, GOJO_RIG, gx, gy);
+            silhouette = false;
+            t.shape(x, y, R * 0.3f, 0, 0, 7, fg);
+            t.shape(x, y, R * 0.3f + 3, R * 0.3f + 1, 0, 7, dark ? PURPLE_LIGHT : PURPLE);
+            t.shape(x, y, R * 0.12f, 0, 0, 7, bg);
+        }
+    }
+
     private void figure(PixelTarget t, Rig r, float fx, float fy) {
         Pose p = pose;
         rig = r;
@@ -2775,6 +3091,10 @@ final class PixelScene {
         figSin = (float) Math.sin(sp);
         int add = p.hurt > 0 ? gray(Math.round(p.hurt * 4) * 48) : 0;
         int back = ghost != 0 ? ghost : 0xFFB4B4BC, front = ghost != 0 ? ghost : 0xFFFFFFFF;
+        if (silhouette) { // 冲击帧：乘黑再加色 = 纯色剪影
+            back = front = 0xFF000000;
+            add = silhouetteColor;
+        }
         float lean = p.lean;
         int dTorso = Math.round(lean * 0.12f), dHead = Math.round(lean * 0.2f), dShoulder = Math.round(lean * 0.16f);
         float sx = r.shoulderX;
@@ -3046,6 +3366,12 @@ final class PixelScene {
         hudAt(t, HudText.SUKUNA, barR2 * s, barTop * s - 2 * dp, true, 0xFFEFF2FF);
         hudCenter(t, HudText.DIFF_TITLE, VW * 0.5f * s, l.hudTop + 1 * dp, difficulty.accent);
         hudCenter(t, HudText.DIFF_TIER, VW * 0.5f * s, l.hudTop + 19 * dp, 0xCCEFF2FF);
+        float nt = time - noticeT0; // 领域对撞、崩解、结界破裂：屏幕上方居中一行字，1.4 秒
+        if (nt >= 0 && nt < 1.4f) {
+            float a = Math.min(1, nt / 0.1f) * Math.min(1, (1.4f - nt) / 0.3f);
+            int c = noticeId == HudText.VOID_BROKEN ? 0xFFE6F0FF : noticeId == HudText.CLASH ? 0xFFF2E6FF : 0xFFFFD6D6;
+            hudCenter(t, noticeId, VW * 0.5f * s, l.hudTop + 118 * dp, withAlpha(c, a)); // 放在招式横幅下面
+        }
         for (int i = 0; i < Controls.BUTTONS; i++) {
             if (cooldown(w, i) > 0) continue;
             int id = HudText.BTN_MELEE + i;
@@ -3094,12 +3420,17 @@ final class PixelScene {
         if (k.state == Fighter.S_SUMMON && k.stateTick <= Tuning.SUMMON_CHANT) { // 「布瑠部由良由良」：一个字一个字亮起来的感觉用透明度代替
             float local = k.stateTick / (float) Tuning.SUMMON_CHANT;
             hudCenter(t, HudText.SUMMON_CHANT, kcx, ktop - ht.h[HudText.SUMMON_CHANT], withAlpha(0xFFE8E0FF, 0.45f + 0.55f * Math.min(1, local * 3)));
+        } else if (k.state == Fighter.S_DOMAIN_SIGN) { // 结印：「领域展开」越来越亮
+            float local = k.stateTick / (float) Tuning.SHRINE_SIGN;
+            hudCenter(t, HudText.SUB_DOMAIN, kcx, ktop - ht.h[HudText.SUB_DOMAIN], withAlpha(0xFFFFD6D6, 0.45f + 0.55f * local));
         } else if (k.state == Fighter.S_SPACE) { // 「空间斩」：越来越亮
             float local = k.stateTick / (float) Tuning.SPACE_WINDUP;
             hudCenter(t, HudText.SPACE_SLASH, kcx, ktop - ht.h[HudText.SPACE_SLASH], withAlpha(0xFFE9DDFF, 0.5f + 0.5f * local));
         } else if (w.spaceExhaust > 0 && k.state != Fighter.KO) { // 「力竭」
             float a = 0.5f + 0.5f * (float) Math.sin((time - exhaustT0) * 6); // 颜色在灰紫和白之间喘，字一直清楚
             hudCenter(t, HudText.EXHAUSTED, kcx, ktop - ht.h[HudText.EXHAUSTED], lerpColor(0xFFB8A8D8, 0xFFFFFFFF, a));
+        } else if (w.shrineBurn > 0 && w.shrineBurn > Tuning.SHRINE_BURNOUT - 150 && k.state != Fighter.KO) { // 刚结束：「术式烧断」（只显示一会儿）
+            hudCenter(t, HudText.BURNOUT, kcx, ktop - ht.h[HudText.BURNOUT], withAlpha(0xFFE0B8B8, 0.9f));
         } else if (k.state == Fighter.S_WORLD && w.worldWindup == Tuning.S_WORLD_WINDUP) {
             int tt = k.stateTick - Tuning.S_WORLD_SIGN;
             if (tt >= 0) {

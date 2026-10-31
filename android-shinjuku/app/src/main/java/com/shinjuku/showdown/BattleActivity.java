@@ -78,10 +78,10 @@ public class BattleActivity extends Activity implements Controls.Actions, Battle
     /* ---------------- 领域展开的过场（主线程） ---------------- */
 
     @Override
-    public void startCutscene(int castId) {
+    public void startCutscene(int castId, int kind) {
         if (isFinishing() || isDestroyed()) return;
         view.setInputBlocked(true);
-        cutscene.play(castId);
+        cutscene.play(castId, kind == World.CUTSCENE_SHRINE ? CutscenePlayer.SHRINE : CutscenePlayer.VOID);
     }
 
     @Override

@@ -16,7 +16,7 @@ import android.util.LongSparseArray;
  * 截图测试用它（和游戏里的 GL 画同一个场景）；GL 初始化失败时也用它兜底。
  */
 final class CanvasTarget implements PixelTarget {
-    private final Bitmap[] tex = new Bitmap[3];
+    private final Bitmap[] tex = new Bitmap[4];
     private Bitmap hudBitmap;
     private Canvas dest;
     private Bitmap lo;
@@ -32,10 +32,11 @@ final class CanvasTarget implements PixelTarget {
     private final LongSparseArray<ColorFilter> filters = new LongSparseArray<>();
     private final PorterDuffXfermode add = new PorterDuffXfermode(PorterDuff.Mode.ADD);
 
-    CanvasTarget(Bitmap atlas, Bitmap bg, Bitmap voidBg) {
+    CanvasTarget(Bitmap atlas, Bitmap bg, Bitmap voidBg, Bitmap shrineBg) {
         tex[TEX_ATLAS] = atlas;
         tex[TEX_BG] = bg;
         tex[TEX_VOID] = voidBg;
+        tex[TEX_SHRINE] = shrineBg;
         sp.setFilterBitmap(false);
         sp.setAntiAlias(false);
         shp.setAntiAlias(false);

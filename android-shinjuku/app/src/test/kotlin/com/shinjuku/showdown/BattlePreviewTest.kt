@@ -39,8 +39,9 @@ class BattlePreviewTest {
         private val atlas = Atlas()
         private val bg = BitmapFactory.decodeResource(ctx.resources, R.drawable.bg_battle_px, BitmapFactory.Options().apply { inScaled = false })
         private val voidBg = BitmapFactory.decodeResource(ctx.resources, R.drawable.bg_void_px, BitmapFactory.Options().apply { inScaled = false })
-        internal val scene = PixelScene(atlas, bg, voidBg, d, controls, null)
-        private val target = CanvasTarget(atlas.bitmap, bg, voidBg)
+        private val shrineBg = BitmapFactory.decodeResource(ctx.resources, R.drawable.bg_shrine_px, BitmapFactory.Options().apply { inScaled = false })
+        internal val scene = PixelScene(atlas, bg, voidBg, shrineBg, d, controls, null)
+        private val target = CanvasTarget(atlas.bitmap, bg, voidBg, shrineBg)
         private val scratch = Canvas(android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888))
         val input = TickInput()
         private val dm = ctx.resources.displayMetrics
@@ -158,20 +159,28 @@ class BattlePreviewTest {
 
     @Test
     fun hollowPurple() {
-        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.STRONGEST) {
-            world.gojo.x = 300f
-            world.sukuna.x = 500f
-            steps(10)
-            input.blueDown = true; input.blueHeld = true; input.blueUp = true
-            input.blueHeld = false
-            steps(12 + 18 + 50)
-            input.red = true
-            var formed = false
-            for (i in 0 until 40) {
-                steps(1)
-                if (world.hollow.active && !formed) { formed = true; steps(9); break }
-            }
-        })
+        paparazzi.snapshot(hollow(8)) // 相撞后 0.07 秒：全场定格里的冲击帧
+    }
+
+    /** 无指向茈炸开：镜头推近、紫色冲击波和放射光线、五条悟一手对着茈。 */
+    @Test
+    fun hollowPurpleBurst() {
+        paparazzi.snapshot(hollow(50))
+    }
+
+    /** 丢苍、再朝它放赫，相撞（无指向茈）以后再推进 after 个 tick。 */
+    private fun hollow(after: Int) = Scene(paparazzi.context, Difficulty.STRONGEST) {
+        world.gojo.x = 300f
+        world.sukuna.x = 500f
+        steps(10)
+        input.blueDown = true; input.blueHeld = true; input.blueUp = true
+        input.blueHeld = false
+        steps(12 + 18 + 50)
+        input.red = true
+        for (i in 0 until 40) {
+            steps(1)
+            if (world.hollow.active) { steps(after); break }
+        }
     }
 
     @Test
@@ -678,6 +687,48 @@ class BattlePreviewTest {
             input.dodgeHeld = false
             var n = 0
             while (n < 400 && !(world.gojo.state == com.shinjuku.showdown.core.Fighter.TP_PURPLE && world.gojo.stateTick >= com.shinjuku.showdown.core.Tuning.TP_PURPLE_FIRE + 4)) { steps(1); n++ }
+        })
+    }
+
+    /** 伏魔御厨子：宿傩（不开 AI）结印；script 里接着推进。 */
+    private fun shrine(script: Scene.() -> Unit) = Scene(paparazzi.context, Difficulty.URAUME, { it.sukunaAi = false }) {
+        world.gojo.x = 380f
+        world.sukuna.x = 860f
+        steps(10)
+        world.sukunaIntent.shrine = true
+        steps(1)
+        script()
+    }
+
+    /** 过场放完（截图里没有视频）：伏魔御厨子展开。 */
+    private fun Scene.openShrine() {
+        steps(com.shinjuku.showdown.core.Tuning.SHRINE_SIGN + 2)
+        world.endCutscene(world.castId)
+    }
+
+    /** 结印：两手交叠，手上暗红，头上「领域展开」。 */
+    @Test
+    fun shrineSign() {
+        paparazzi.snapshot(shrine { steps(90) })
+    }
+
+    /** 展开以后第一轮斩击：血红的神龛铺满，五条悟身上交叉的斩痕。 */
+    @Test
+    fun shrineSlash() {
+        paparazzi.snapshot(shrine {
+            openShrine()
+            steps(com.shinjuku.showdown.core.Tuning.SHRINE_ROUND + 2)
+        })
+    }
+
+    /** 领域对撞：五条悟在里面开无量空处，五条悟这边星空、宿傩那边神龛，中间结界的裂缝。 */
+    @Test
+    fun shrineClash() {
+        paparazzi.snapshot(shrine {
+            openShrine()
+            steps(90)
+            openDomain()
+            steps(70)
         })
     }
 

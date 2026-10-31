@@ -25,6 +25,7 @@ public final class BattleConfig {
     public boolean mahoraga = false;  // 十种影法术：魔虚罗（里梅以上，定；一局只能召唤一次，定）
     public boolean trueForm = false;  // 原身（里梅以上，定；回满血，之后不能用十种影法术，定）
     public boolean spaceSlash = false; // 空间斩（里梅以上：要御厨子，三轮的十影宿傩没有）
+    public boolean sukunaDomain = false; // 领域展开「伏魔御厨子」（里梅以上，定：三轮不能用领域）
 
     /** 难度的数值档：第 n 档（三轮 0）宿傩伤害、血量都 ×1.1 的 n 次方（定）。 */
     public void tier(int n) {
@@ -36,7 +37,7 @@ public final class BattleConfig {
     /**
      * 宿傩的难度（应用的四个难度和自动对战模拟共用）：0 三轮、1 里梅、2 万、3 史上最强。
      * 三轮是十影宿傩：没有御厨子（解、世界斩）、没有法阵和魔虚罗、不能变原身，十种影法术只有顎吐（定）。
-     * 里梅以上：御厨子 + 十种影法术（顎吐、魔虚罗）+ 法阵 + 原身（定）。都没有领域（还没给素材）。
+     * 里梅以上：御厨子 + 十种影法术（顎吐、魔虚罗）+ 法阵 + 原身（定）。里梅以上还有领域展开「伏魔御厨子」（v0.13；三轮不能用领域，定）。
      */
     public void sukunaDifficulty(int level) {
         sukunaAi = true;
@@ -50,6 +51,7 @@ public final class BattleConfig {
         mahoraga = full;
         trueForm = full;
         spaceSlash = full;
+        sukunaDomain = full;
     }
     /** 宿傩有没有 AI。测试模式没有（活靶子）。 */
     public boolean sukunaAi = false;
@@ -98,6 +100,9 @@ public final class BattleConfig {
         // 恐惧（v0.11）：多挨 100 血涨几点、少挨 100 血降几点、安全时每秒自然回落几点；空间斩的基础使用率
         // 奖励（v0.12）：打掉五条悟 100 血降几点（惧怕损失：同样多的血，挨打涨的是打人降的两倍）
         public float fearUp, fearDown, fearCalm, spaceChance, fearReward;
+        // 伏魔御厨子（v0.13）：合格机会的基础采用率、最早多久开始考虑
+        public float domainChance;
+        public int domainMinTicks;
 
         public AiTuning() {
             reset();
@@ -163,6 +168,8 @@ public final class BattleConfig {
             fearCalm = 0.5f;
             spaceChance = 0;
             fearReward = fearUp / 2;
+            domainChance = 0;
+            domainMinTicks = 12 * Tuning.HZ;
         }
 
         /** 各难度的参数：0 三轮（就是 reset() 的默认值）、1 里梅、2 万、3 史上最强。越高越聪明（不加血、不加攻）。 */
@@ -227,6 +234,8 @@ public final class BattleConfig {
             fearCalm = level == 1 ? 0.7f : level == 2 ? 0.9f : 1.1f;
             spaceChance = level == 1 ? 0.55f : level == 2 ? 0.65f : 0.75f;
             fearReward = fearUp / 2;
+            domainChance = level == 1 ? 0.55f : level == 2 ? 0.65f : 0.75f;
+            domainMinTicks = (level == 1 ? 12 : level == 2 ? 10 : 8) * Tuning.HZ;
         }
     }
 }

@@ -755,7 +755,7 @@ public class CombatTest {
         assertFalse(w.blue.active());
         assertFalse(w.red.active);
         assertFalse(w.sukuna.captured);
-        run(w, in, Tuning.HOLLOW_GROW + 2);
+        run(w, in, Tuning.HOLLOW_FORM_HITSTOP + Tuning.HOLLOW_GROW + 2); // 相撞后先定格 0.25 秒
         long dealt = sBefore - w.sukuna.hpMilli; // 850，加上赫前摇那 0.12 秒里苍的持续伤害（核心每秒 100）
         assertTrue("宿傩挨了 850：" + dealt, dealt >= Tuning.HOLLOW_DAMAGE_MILLI && dealt <= Tuning.HOLLOW_DAMAGE_MILLI + 20_000);
         assertEquals("五条悟挨了一半", Tuning.HOLLOW_SELF_DAMAGE_MILLI, gBefore - w.gojo.hpMilli);
@@ -778,7 +778,7 @@ public class CombatTest {
         assertTrue(w.sukuna.captured);
         long sBefore = w.sukuna.hpMilli;
         in.red = true;
-        run(w, in, Tuning.RED_WINDUP + Tuning.RED_TRAVEL + Tuning.HOLLOW_LIFE + 4);
+        run(w, in, Tuning.RED_WINDUP + Tuning.RED_TRAVEL + Tuning.HOLLOW_FORM_HITSTOP + Tuning.HOLLOW_LIFE + 4);
         assertTrue("宿傩挨了无指向茈", sBefore - w.sukuna.hpMilli >= Tuning.HOLLOW_DAMAGE_MILLI);
         assertEquals("五条悟不在范围内，没受伤", w.gojo.maxHpMilli, w.gojo.hpMilli);
     }
@@ -883,7 +883,7 @@ public class CombatTest {
         run(w, in, Tuning.BLUE_WINDUP + Tuning.BLUE_FLY + 60);
         in.blueHeld = false;
         in.red = true;
-        run(w, in, Tuning.RED_WINDUP + Tuning.RED_TRAVEL + Tuning.HOLLOW_GROW + 4);
+        run(w, in, Tuning.RED_WINDUP + Tuning.RED_TRAVEL + Tuning.HOLLOW_FORM_HITSTOP + Tuning.HOLLOW_GROW + 4);
         assertEquals(Fighter.KO, w.gojo.state);
         run(w, in, Tuning.KO_TICKS + 2);
         assertEquals(Fighter.FREE, w.gojo.state);

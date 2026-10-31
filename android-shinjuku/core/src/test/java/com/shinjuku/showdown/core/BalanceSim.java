@@ -21,6 +21,9 @@ public final class BalanceSim {
         long fearSum;                       // 按有效 tick 累加的恐惧（万分制）
         int fearTicks, fearHigh, fearPeak;  // 有效 tick 数、恐惧 60 以上的 tick 数、最高值
         int spaceStart, spaceKill, spaceBroken, spaceReady, spaceThinks; // 空间斩：起手、斩死、起手被打断；三个硬条件同时满足过（0/1）；认真考虑过几次
+        int signs, signBroken, shrineOpen, clashes, clashWon, voidBroken, shrineBroken, shrineEnd; // 伏魔御厨子
+        long shrineDealt;
+        boolean clashOn;
         boolean mahoKilled, mahoOneShot;
         float transformHp;
     }
@@ -50,8 +53,8 @@ public final class BalanceSim {
                         && fear < Tuning.SPACE_FEAR_GATE) r.spaceReady = 1;
             }
             if (w.cutscene) {
+                if (w.cutsceneKind == World.CUTSCENE_VOID) r.domainUsed++;
                 w.endCutscene(w.castId); // 模拟里过场直接放完
-                r.domainUsed++;
             }
             Events e = w.events;
             for (; seen < e.written; seen++) {
@@ -101,6 +104,23 @@ public final class BalanceSim {
                     else if (e.value[i] < 0) r.chantBroken++;
                 } else if (e.type[i] == Events.AMP && e.value[i] > 0) {
                     r.amps++;
+                } else if (e.type[i] == Events.SHRINE) {
+                    int v = Math.round(e.value[i]);
+                    if (v == Events.SHRINE_SIGN) r.signs++;
+                    else if (v == Events.SHRINE_SIGN_BROKEN) r.signBroken++;
+                    else if (v == Events.SHRINE_OPEN) r.shrineOpen++;
+                    else if (v == Events.SHRINE_CLASH) {
+                        r.clashes++;
+                        r.clashOn = true;
+                    } else if (v == Events.SHRINE_VOID_BROKEN) {
+                        r.voidBroken++;
+                        r.clashOn = false;
+                    } else if (v == Events.SHRINE_BROKEN || v == Events.SHRINE_END) {
+                        if (v == Events.SHRINE_BROKEN) r.shrineBroken++;
+                        else r.shrineEnd++;
+                        if (r.clashOn) r.clashWon++;
+                        r.clashOn = false;
+                    }
                 } else if (e.type[i] == Events.SPACE) {
                     if (e.value[i] == 0) r.spaceStart++;
                     else if (e.value[i] == 3) r.spaceKill++;
@@ -121,6 +141,7 @@ public final class BalanceSim {
         }
         r.ticks = w.fightTicks;
         r.spaceThinks = w.ai().spaceThinks;
+        r.shrineDealt = w.shrineDealt;
         if (r.summonTick >= 0 && r.mahoGoneTick < 0) r.mahoGoneTick = w.fightTicks; // 打完还在场
         r.gojoDealt = w.damageTaken[Fighter.SUKUNA];
         r.mahoTaken = w.damageTaken[Fighter.MAHORAGA];
@@ -202,6 +223,8 @@ public final class BalanceSim {
         long fearSum = 0, fearTicks = 0, fearHigh = 0;
         int[] fearPeak = new int[n];
         int spaceStart = 0, spaceKill = 0, spaceBroken = 0, spaceReady = 0, spaceThinks = 0;
+        int signs = 0, signBroken = 0, shrineOpen = 0, clashes = 0, clashWon = 0, voidBroken = 0, shrineBroken = 0, shrineEnd = 0;
+        long shrineDealt = 0;
         int agitoCast = 0, agitoTouch = 0, summonTry = 0, summonBroken = 0, summoned = 0, mahoKilled = 0, oneShot = 0, adapted = 0, transformed = 0;
         int[] mahoLife = new int[n];
         float transformHpSum = 0;
@@ -240,6 +263,15 @@ public final class BalanceSim {
             spaceBroken += r.spaceBroken;
             spaceReady += r.spaceReady;
             spaceThinks += r.spaceThinks;
+            signs += r.signs;
+            signBroken += r.signBroken;
+            shrineOpen += r.shrineOpen;
+            clashes += r.clashes;
+            clashWon += r.clashWon;
+            voidBroken += r.voidBroken;
+            shrineBroken += r.shrineBroken;
+            shrineEnd += r.shrineEnd;
+            shrineDealt += r.shrineDealt;
             rctHeal += r.heal;
             transformHeal += r.transformHeal;
             mahoTaken += r.mahoTaken;
@@ -279,6 +311,10 @@ public final class BalanceSim {
         System.out.printf("  恐惧：平均 %.1f，60 以上占 %.1f%% 的时间，每局最高值的中位数 %.0f；空间斩：%d 局满足过硬条件，考虑 %d 次，起手 %d 次（被打断 %d）、斩死 %d 次%n",
                 fearTicks == 0 ? 0 : fearSum / 100.0 / fearTicks, fearTicks == 0 ? 0 : 100.0 * fearHigh / fearTicks, fearPeak[n / 2] / 100.0,
                 spaceReady, spaceThinks, spaceStart, spaceBroken, spaceKill);
+        if (signs > 0) {
+            System.out.printf("  伏魔御厨子：结印 %d 次（被打断 %d）、展开 %d 局，对撞 %d 次（五条悟拆掉 %d、结界被击碎 %d），被拆 %d 次、放满 %d 次；平均每次展开斩掉五条悟 %.0f%n",
+                    signs, signBroken, shrineOpen, clashes, clashWon, voidBroken, shrineBroken, shrineEnd, shrineOpen == 0 ? 0 : shrineDealt / 1000.0 / shrineOpen);
+        }
     }
 
     private static String sec(int[] a, int n) {
