@@ -167,7 +167,7 @@ const shots = seq(
           maho(st, mp, mx);
           actor(st, {rig: RIG.gojo, pose: gp, x: gx, y: gy, face: 1, shadow: 0, opts: {sil: '#000'}});
           st.flush();
-          fx.blackFlash(st, 405, -60, 140, 0.15, 11);
+          fx.blackFlash(st, 405, -60, 90, 0.15, 11);
           st.post.bloom = 0.2;
           st.post.vignette = 0;
         } else {
@@ -179,7 +179,7 @@ const shots = seq(
           const [wx, wy] = wheelAt(mx);
           fx.wheel(st, wx, wy, 19, 315, {a: 1, lit: 0.15});
           fx.slashLine(st, 470, -40, 200, -36, T, swing, {w: 2.4, life: 0.3});
-          fx.blackFlash(st, 405, -60, 140, flash, 11);
+          fx.blackFlash(st, 405, -60, 90, flash, 11);
           gojoEyes(st, gi, 1);
           winterNear(st, T);
           gradeAdapt(st);

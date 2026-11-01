@@ -291,7 +291,7 @@ export function blackFlash(st: Stage, X: number, Y: number, R: number, k: number
     g.globalCompositeOperation = pass ? 'lighter' : 'source-over';
     g.strokeStyle = pass ? '#f23b4b' : '#060208';
     g.lineJoin = 'miter';
-    g.lineWidth = Math.max(2, st.s(R * (pass ? 0.035 : 0.09)) * (0.6 + f));
+    g.lineWidth = (pass ? 2.5 : 7) * (0.5 + f) * Math.min(1.6, Math.max(0.7, st.cam.z / 3));
     g.globalAlpha = pass ? f : Math.min(1, f * 1.6);
     for (let i = 0; i < n; i++) {
       const ang = hash(i, seed) * TAU;

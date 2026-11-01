@@ -196,7 +196,7 @@ const shots = seq(
       id: '77-south', at: B(108, 3),
       draw: (st, t, T) => {
         airport(st, T, {z: 3.2, cx: 34, cy: -30, turn: kf(T, [[B(109), 0], [B(109, 3), 3]]), eyes: kf(T, [[B(109, 2), 0.8], [B(110), 0]])});
-        st.text({kind: 'inner', jp: '南へ', cn: '向南', age: T - B(109), dur: B(110) - B(109) + 0.2, x: 0.7, y: 0.42, size: 110, color: '#ffffff'});
+        st.text({kind: 'inner', jp: '南へ', cn: '向南', age: T - B(109), dur: B(110) - B(109) + 0.2, x: 0.7, y: 0.36, size: 110, dark: true});
       },
     },
     // 78 回到巨坑：宿傩站着——天晴れだ 五条悟

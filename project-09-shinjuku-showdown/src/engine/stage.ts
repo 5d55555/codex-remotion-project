@@ -19,6 +19,7 @@ export type TextItem = {
   size?: number;
   align?: 'left' | 'center' | 'right';
   vertical?: boolean;
+  dark?: boolean;   // 亮背景上用深色字
 };
 
 export type PostOpts = {

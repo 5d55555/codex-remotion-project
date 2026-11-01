@@ -109,11 +109,12 @@ const Quote: React.FC<{it: TextItem}> = ({it}) => {
 const Inner: React.FC<{it: TextItem}> = ({it}) => {
   const a = fadeIO(it, 0.5, 0.4);
   const k = out3(it.age / 1.5);
-  const color = it.color ?? '#ffffff';
+  const color = it.color ?? (it.dark ? '#18203a' : '#ffffff');
+  const glow = it.dark ? '0 0 24px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.9)' : `0 0 30px ${color}55`;
   return (
     <div style={{position: 'absolute', left: (it.x ?? 0.5) * 1920, top: (it.y ?? 0.5) * 1080, transform: 'translate(-50%,-50%)', textAlign: 'center', opacity: a}}>
-      <div style={{fontFamily: JP, fontWeight: 600, fontSize: it.size ?? 96, color, letterSpacing: 40 - 16 * k, whiteSpace: 'nowrap', textShadow: `0 0 30px ${color}55`}}>{it.jp}</div>
-      {it.cn && <div style={{fontFamily: SC, fontWeight: 700, fontSize: 34, color: '#e4e8f0', letterSpacing: 12, marginTop: 18, opacity: clamp((it.age - 0.12) / 0.3), textShadow: '0 0 8px #000'}}>{it.cn}</div>}
+      <div style={{fontFamily: JP, fontWeight: 600, fontSize: it.size ?? 96, color, letterSpacing: 40 - 16 * k, whiteSpace: 'nowrap', textShadow: glow}}>{it.jp}</div>
+      {it.cn && <div style={{fontFamily: SC, fontWeight: 700, fontSize: 34, color: it.dark ? '#2a3350' : '#e4e8f0', letterSpacing: 12, marginTop: 18, opacity: clamp((it.age - 0.12) / 0.3), textShadow: it.dark ? '0 0 10px rgba(255,255,255,0.9)' : '0 0 8px #000'}}>{it.cn}</div>}
     </div>
   );
 };
