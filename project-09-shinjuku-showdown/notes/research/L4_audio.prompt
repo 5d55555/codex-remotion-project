@@ -1,0 +1,8 @@
+用中文回答，要详细、可操作（给参数）。我在做一部约 3 分钟的像素风战斗短片（五条悟 vs 宿傩），音乐用一首已有的电子乐（很满、约 -10 dBFS RMS），要在上面叠程序化合成的音效（Python + numpy 生成 WAV），最后用 ffmpeg 混音、用 Remotion 4（Chromium 渲染 + ffmpeg 编码）出 1920×1080 60fps 的 mp4。请联网查资料回答，附来源链接：
+
+1. 动漫风战斗音效怎么用合成的方式做（给 numpy 能实现的配方：振荡器、噪声、包络、滤波、失真、混响的参数）：重拳命中、斩击（解：细而尖的“咻”）、能量蓄力（苍、赫、茈）、大爆炸（茈）、冲击波、玻璃/结界碎裂、领域展开的低频轰鸣、超低频的“砰”（sub drop）、风声/呼啸、电流噼啪（黑闪）、心跳、钟声（咒词出现时）。每个给时长、频段、包络、叠哪几层。
+2. 音效和音乐一起混的规矩：响度（网络视频 -14 LUFS 积分、真峰值 -1 dBTP）、音乐在音效时的侧链/压低（ducking）多少 dB、多快、低频冲突怎么处理、立体声声像；用 ffmpeg 的哪些滤镜（sidechaincompress、loudnorm 两遍、alimiter）怎么写。
+3. Remotion 4 出最高画质 mp4 的设置：codec、crf、x264 preset（veryslow？）、pixel format（yuv420p vs yuvj420p 的颜色范围问题）、色彩空间 bt709、60fps、音频码率；渲染并发（4 核 15GB 内存的机器）、用 `--image-format=png` 还是 jpeg、`<Img>` 和 `<OffthreadVideo>` 用于几千张 PNG 帧序列的性能和注意事项；像素图在 Chromium 里用 `image-rendering: pixelated` 放大的坑。
+4. 把 2 分 30 秒到 3 分钟的 1080p60 视频压到又清晰又不太大（比如 150–300 MB）的建议码率/crf，以及给手机播放的兼容性（H.264 High profile level 4.2？）。
+
+最后列来源链接。
