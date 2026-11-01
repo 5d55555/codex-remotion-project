@@ -48,6 +48,13 @@
 Luna 联网查的：`L1_plot.md`（逐话剧情与台词）、`L2_visual.md`（造型与术式视觉）、`L3_film.md`（打戏演出与 HD-2D 后期）、`L4_audio.md`（音效配方、混音、编码参数）。
 Sol 审片：`S1_review.md`。台词与咏唱的出处另见 `android-shinjuku/notes/招式名称考证.md`。
 
+## 成片
+
+- `out/新宿決戦.mp4`：1920×1080、60fps、H.264 High（CRF 16 / preset slow，约 30 Mbps）、BT.709、AAC 320k；音频 -14 LUFS、真峰值约 -2.5 dBFS。
+- `out/新宿決戦_分享版.mp4`：同一母版两遍编码到约 19.5 Mbps（约 470 MiB），用于发送（对话里上传上限 500 MiB）。
+- 闪光检查（`python3 scripts/flashcheck.py out/silent.mp4`）：全片相邻帧亮度跳变 ≥20% 的有 31 处，任意 1 秒内最多 1 次来回闪，低于 WCAG 每秒 3 次的上限。
+- 分幕渲染约 4–5 帧/秒（4 核），全片约 45 分钟。
+
 ## 已知取舍
 
 - 原作的世界斩前并没有当场咏唱；这里为了让观众看懂，先切开画面，再用宿傩插镜补上「龍鱗 · 反発 · 番いの流星」。

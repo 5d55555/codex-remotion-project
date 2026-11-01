@@ -394,7 +394,7 @@ const shots = seq(
         fx.embers(st, T, {n: 60, color: '#ffb070', a: 0.7});
         st.post.bloom = 0.45;
         st.post.vignette = 0.45;
-        st.text({kind: 'inner', jp: '五条の勝ちだ', cn: '——五条，赢了。', age: T - B(97, 3), dur: B(98) - B(97, 3) + 0.1, x: 0.28, y: 0.5, size: 84});
+        st.text({kind: 'inner', jp: '五条の勝ちだ', cn: '——五条，赢了。', age: T - B(97, 3), dur: B(98) - B(97, 3) + 0.1, x: 0.21, y: 0.5, size: 76});
       },
       cues: [[0, 'heartbeat', -6]],
     },

@@ -110,8 +110,9 @@ const shots = seq(
         gojoEyes(st, gi, 1, 2);
         sukunaEyes(st, si, 1, 2);
         gradeVoid(st);
-        st.text({kind: 'tech', jp: '領域展開', cn: '领域展开', age: T - B(48, 3), dur: B(49, 3) - B(48, 3), x: 0.5, y: 0.2, size: 140, color: '#ffffff'});
-        st.text({kind: 'tech', jp: '無量空処', cn: '无量空处', age: T - B(49, 2), dur: B(50) - B(49, 2), x: 0.07, y: 0.2, size: 130, color: '#9fd0ff', align: 'left'});
+        // 「領域展開」在「無量空処」出来的那一拍收掉，避免两行大字撞在一起
+        st.text({kind: 'tech', jp: '領域展開', cn: '领域展开', age: T - B(48, 3), dur: B(49, 2) - B(48, 3), x: 0.5, y: 0.2, size: 140, color: '#ffffff'});
+        st.text({kind: 'tech', jp: '無量空処', cn: '无量空处', age: T - B(49, 2), dur: B(50) - B(49, 2), x: 0.07, y: 0.22, size: 130, color: '#9fd0ff', align: 'left'});
       },
       cues: [[0, 'domain_void', -2]],
     },
