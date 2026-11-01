@@ -25,7 +25,7 @@ final class Controls {
         final float safeL, safeT, safeR, safeB;
         final float stickX, stickY, stickR, knobR;   // 摇杆默认位置
         final float[] bx = new float[BUTTONS], by = new float[BUTTONS], br = new float[BUTTONS];
-        final float backX, backY, musicX, musicY, smallR;
+        final float backX, backY, musicX, musicY, sfxX, sfxY, smallR;
         final float hudTop, barH, gojoBarL, gojoBarR, sukunaBarL, sukunaBarR;
 
         Layout(float w, float h, float dp, float sl, float st, float sr, float sb) {
@@ -54,12 +54,14 @@ final class Controls {
             backY = st + 12 * dp + smallR;
             musicX = w - sr - 14 * dp - smallR;
             musicY = backY;
+            sfxX = musicX - 2 * smallR - 10 * dp; // 音效开关（v0.15）在音乐左边
+            sfxY = backY;
             hudTop = st + 12 * dp;
             barH = 13 * dp;
             gojoBarL = backX + smallR + 14 * dp;
             gojoBarR = w * 0.5f - 64 * dp;
             sukunaBarL = w * 0.5f + 64 * dp;
-            sukunaBarR = musicX - smallR - 14 * dp;
+            sukunaBarR = sfxX - smallR - 14 * dp;
         }
 
         private void arc(int i, float cx, float cy, float dist, float deg, float r) {
@@ -78,6 +80,10 @@ final class Controls {
         void back();
 
         void toggleMusic();
+
+        /** 技能音效开 / 关（v0.15）。 */
+        default void toggleSfx() {
+        }
 
         void toggleStats();
     }
@@ -99,7 +105,7 @@ final class Controls {
     private volatile boolean overflow;
     // 主线程“改按住状态 + 入队”在这把锁里一起做；战斗线程只在溢出恢复时拿它（平时不加锁）
     private final Object ringLock = new Object();
-    volatile int hudPressed = -1;              // 0 返回，1 音乐，2 难度标签（长按开帧率面板）
+    volatile int hudPressed = -1;              // 0 返回，1 音乐，2 难度标签（长按开帧率面板），3 音效
 
     // ---- 只在主线程 ----
     private static final float DEADZONE = 0.12f;
@@ -318,6 +324,7 @@ final class Controls {
             if (cancel || hudAt(l, x, y) != target) return;
             if (target == 0) actions.back();
             else if (target == 1) actions.toggleMusic();
+            else if (target == 3) actions.toggleSfx();
             else if (target == 2 && t - hudDownAt >= 500) actions.toggleStats();
         }
     }
@@ -335,6 +342,7 @@ final class Controls {
         float r = l.smallR * 1.5f;
         if (sq(x - l.backX) + sq(y - l.backY) <= r * r) return 0;
         if (sq(x - l.musicX) + sq(y - l.musicY) <= r * r) return 1;
+        if (sq(x - l.sfxX) + sq(y - l.sfxY) <= r * r) return 3;
         if (Math.abs(x - l.w * 0.5f) < 60 * l.dp && y < l.hudTop + 40 * l.dp) return 2;
         return -1;
     }

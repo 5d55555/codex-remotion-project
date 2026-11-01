@@ -595,6 +595,19 @@ final class PixelArt {
             "...W.....",
     };
 
+    // 音效开关（v0.15）：小喇叭 + 两道声波
+    static final String[] ICON_SFX = {
+            "....W....",
+            "...WW..W.",
+            "WWWWW...W",
+            "WWWWW.W.W",
+            "WWWWW.W.W",
+            "WWWWW.W.W",
+            "WWWWW...W",
+            "...WW..W.",
+            "....W....",
+    };
+
     static final int ICON_NOTE_PX = 0, ICON_NOTE_PY = 0;
     static final String ICON_NOTE_PAL = "font";
     static final String[] ICON_NOTE = {

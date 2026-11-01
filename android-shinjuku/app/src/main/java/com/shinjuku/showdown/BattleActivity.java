@@ -16,6 +16,8 @@ import com.shinjuku.showdown.core.World;
  */
 public class BattleActivity extends Activity implements Controls.Actions, BattleLoop.Host, CutscenePlayer.Host {
     static final String EXTRA_DIFFICULTY = "difficulty";
+    private static final String PREFS = "settings", KEY_SFX = "sfx_enabled"; // 技能音效开关（v0.15），默认开
+    private boolean sfxOn = true;
 
     private Difficulty difficulty;
     private FrameLayout root;
@@ -35,6 +37,8 @@ public class BattleActivity extends Activity implements Controls.Actions, Battle
         bgm = Bgm.get(this);
         root = new FrameLayout(this);
         view = new BattleView(this, new World(config), d, this, bgm, this);
+        sfxOn = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_SFX, true);
+        view.setSfxEnabled(sfxOn);
         root.addView(view, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         cutscene = new CutscenePlayer(this, root, this); // 进战斗就开始准备视频
         setContentView(root);
@@ -66,6 +70,7 @@ public class BattleActivity extends Activity implements Controls.Actions, Battle
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) SystemUi.immersive(this); // 从边缘划出来的系统栏收回去
+        view.setFocused(hasFocus); // 失焦（系统窗口挡住）：技能音效静音
     }
 
     @Override
@@ -120,6 +125,13 @@ public class BattleActivity extends Activity implements Controls.Actions, Battle
     @Override
     public void toggleMusic() {
         bgm.setMuted(!bgm.isMuted());
+    }
+
+    @Override
+    public void toggleSfx() {
+        sfxOn = !sfxOn;
+        view.setSfxEnabled(sfxOn);
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_SFX, sfxOn).apply();
     }
 
     @Override

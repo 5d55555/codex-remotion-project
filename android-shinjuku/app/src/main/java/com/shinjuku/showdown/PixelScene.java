@@ -142,6 +142,9 @@ final class PixelScene {
         drawMs = drawMsAvg;
     }
 
+    /** 技能音效开着吗（主线程切换，战斗线程画按钮时读）。 */
+    volatile boolean sfxOn = true;
+
     /** 提前做文字图集（v0.14：战斗线程一启动就做，不压在第一帧上）；之后 layout() 看到同样的 dp 就直接用。只在战斗线程调用。 */
     void prepareHud(float dp) {
         if (hud == null || hud.dp != dp) hud = new HudText(dp, difficulty);
@@ -3158,17 +3161,21 @@ final class PixelScene {
 
         // 返回、音乐
         float bx = l.backX / s, by = l.backY / s, mx = l.musicX / s, my = l.musicY / s, br = l.smallR / s;
+        float fxX = l.sfxX / s, fxY = l.sfxY / s;
         pixelButton(t, bx, by, br, controls.hudPressed == 0, 0xFFEFF2FF);
         icon(t, Atlas.ICON_BACK, bx, by, 0xFFEFF2FF);
         boolean muted = bgm != null && bgm.isMuted();
         pixelButton(t, mx, my, br, controls.hudPressed == 1, 0xFFEFF2FF);
         icon(t, Atlas.ICON_NOTE, mx, my, muted ? 0xFF7A7E8C : 0xFFEFF2FF);
         if (muted) t.line(mx - br * 0.6f, my + br * 0.6f, mx + br * 0.6f, my - br * 0.6f, 2, 0xFFFF5A6A);
+        pixelButton(t, fxX, fxY, br, controls.hudPressed == 3, 0xFFEFF2FF); // 音效开关（v0.15）
+        icon(t, Atlas.ICON_SFX, fxX, fxY, sfxOn ? 0xFFEFF2FF : 0xFF7A7E8C);
+        if (!sfxOn) t.line(fxX - br * 0.6f, fxY + br * 0.6f, fxX + br * 0.6f, fxY - br * 0.6f, 2, 0xFFFF5A6A);
 
         // 头像框 + 血条
         int top = Math.round(l.hudTop / s);
         int face = 30;
-        float pl = Math.round(bx + br + 4), pr = Math.round(mx - br - 4) - face;
+        float pl = Math.round(bx + br + 4), pr = Math.round(fxX - br - 4) - face;
         portrait(t, Atlas.GOJO_HEAD, pl, top, 1, 0xFF6FC3FF);
         portrait(t, w.sukunaTrueForm ? Atlas.TRUE_HEAD : Atlas.SUKUNA_HEAD, pr, top, -1, 0xFFE0303F);
         barTop = top + 13;

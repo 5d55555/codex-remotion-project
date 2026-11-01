@@ -7,7 +7,8 @@ package com.shinjuku.showdown.core;
 public final class Events {
     public static final int HIT = 1, BLACK_FLASH = 2, RED_BURST = 3, BLUE_SPAWN = 4, BLUE_LAND = 5, BLUE_END = 6,
             INFINITY_BLOCK = 7, DAMAGE = 8, KO = 9, REVIVE = 10, CAST = 11, RED_FIRE = 12, PURPLE_FIRE = 13,
-            HOLLOW_FORM = 14, HOLLOW_END = 15, LAND = 16,
+            HOLLOW_FORM = 14, HOLLOW_END = 15,
+            LAND = 16,             // 重重落地（扬尘）：value 是落地速度，kind 是谁（Fighter.GOJO / SUKUNA / MAHORAGA，v0.15）
             CHANT = 17,            // value：第几段咒词（0..3），-1 被打断
             DOMAIN_CUTSCENE = 18,  // 要放过场了（世界停住，等 endCutscene）
             DOMAIN_OPEN = 19, DOMAIN_CLOSE = 20,

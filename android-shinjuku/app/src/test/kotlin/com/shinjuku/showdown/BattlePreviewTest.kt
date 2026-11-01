@@ -100,6 +100,14 @@ class BattlePreviewTest {
     }
 
     @Test
+    fun sfxOff() { // v0.15：音效开关关着（喇叭变暗、斜杠）
+        paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) {
+            scene.sfxOn = false
+            steps(40)
+        })
+    }
+
+    @Test
     fun blueCapture() {
         paparazzi.snapshot(Scene(paparazzi.context, Difficulty.MIWA) {
             world.gojo.x = 380f

@@ -27,6 +27,7 @@ import java.util.concurrent.CountDownLatch;
  * 通知主线程放视频；放完 endCutscene() 回到这个线程展开领域，从下一帧重新计时（不补放视频那几秒的 tick），积压的按键全丢掉。
  * 分出胜负（测试模式以外）后再走 RESULT_DELAY 个 tick（倒下的动作放完；茈·最大输出炸死的等固定动作放完），通知主线程弹出结算。
  * v0.14：线程一启动就先做好文字图集（不压在第一帧上）；Android 12+ 每帧向系统报工作量（ADPF 性能提示，见 PerfHint）。
+ * v0.15：技能音效——每推进一个 tick 让 SfxDirector 读一次事件和状态（过场、暂停时它会全停），退出时释放 SoundPool。
  */
 final class BattleLoop implements Choreographer.FrameCallback {
     interface Host {
@@ -75,8 +76,12 @@ final class BattleLoop implements Choreographer.FrameCallback {
     private int periodAge;
     private long swapStartNs;          // 这一帧开始等缓冲区（交换、提交）的时刻：之前的才算工作量
     private long lockWaitNs;           // Canvas 兜底时等 lockHardwareCanvas 的时间（等缓冲区，不算工作量）
+    private final SoundPoolOut sfxOut; // 只在战斗线程上播放、释放（开关在主线程，SoundPool 自己加锁）
+    private final SfxDirector sfx;
+    private boolean focused = true;    // 窗口有焦点（只在战斗线程）：失焦时音效静音，战斗照常
 
-    BattleLoop(World world, Controls controls, PixelScene scene, GlTarget gl, CanvasTarget canvasTarget, Host host, Context context, float dp) {
+    BattleLoop(World world, Controls controls, PixelScene scene, GlTarget gl, CanvasTarget canvasTarget, Host host, Context context, float dp,
+               SoundPoolOut sfxOut) {
         this.world = world;
         this.controls = controls;
         this.scene = scene;
@@ -84,6 +89,8 @@ final class BattleLoop implements Choreographer.FrameCallback {
         this.canvasTarget = canvasTarget;
         this.host = host;
         this.context = context;
+        this.sfxOut = sfxOut;
+        this.sfx = new SfxDirector(sfxOut);
         thread.start();
         handler = new Handler(thread.getLooper());
         handler.post(() -> {
@@ -149,6 +156,14 @@ final class BattleLoop implements Choreographer.FrameCallback {
         if (interrupted) Thread.currentThread().interrupt();
     }
 
+    /** 窗口焦点（主线程调用）：被系统窗口挡住时音效静音。 */
+    void setFocused(boolean f) {
+        handler.post(() -> {
+            focused = f;
+            update();
+        });
+    }
+
     void setResumed(boolean r) {
         handler.post(() -> {
             resumed = r;
@@ -169,6 +184,7 @@ final class BattleLoop implements Choreographer.FrameCallback {
                 controls.discardPending();
                 update();
             }
+            sfx.update(world); // 展开以后的接续音（视频结束后才响）
             mainHandler.post(resumed);
         });
     }
@@ -182,6 +198,8 @@ final class BattleLoop implements Choreographer.FrameCallback {
                     hint.close();
                     hint = null;
                 }
+                sfxOut.stopAll();
+                sfxOut.release();
                 gl.release();
             } finally {
                 thread.quitSafely();
@@ -193,6 +211,7 @@ final class BattleLoop implements Choreographer.FrameCallback {
 
     private void update() {
         boolean run = resumed && hasSurface && !cutscenePaused;
+        sfx.setPaused(!run || !focused); // 后台、没有 Surface、放过场、窗口失焦：音效全停（恢复后循环音按状态重新起，单发不补）
         if (run && !scheduled) {
             lastFrameNs = 0; // 恢复后从这一帧重新计时，不补暂停期间的 tick
             periodAge = 0;   // 恢复后重新读一次刷新率
@@ -226,6 +245,7 @@ final class BattleLoop implements Choreographer.FrameCallback {
             // 补多个 tick 时按事件发生的时间分到各个 tick；这一帧最后一个 tick 把已经到的全取走，不额外延迟
             controls.sample(input, accNs >= TICK_NS ? simNs : Long.MAX_VALUE);
             world.step(input);
+            sfx.update(world);
             input.clearEdges();
             if (world.cutscene) break;
         }
@@ -239,6 +259,7 @@ final class BattleLoop implements Choreographer.FrameCallback {
         if (!resultPosted && world.outcome != World.OUTCOME_NONE && world.cine == World.CINE_NONE && world.tick - world.outcomeTick >= RESULT_DELAY) {
             resultPosted = true;
             int outcome = world.outcome;
+            sfx.result(outcome == World.OUTCOME_WIN);
             mainHandler.post(() -> host.battleOver(outcome));
         }
         long t1 = System.nanoTime();

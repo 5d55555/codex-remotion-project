@@ -27,6 +27,7 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
     private final Controls controls;
     private final PixelScene scene;
     private final BattleLoop loop;
+    private final SoundPoolOut sfx;
     private float safeL, safeT, safeR, safeB;
 
     BattleView(Context context, World world, Difficulty difficulty, Controls.Actions actions, Bgm bgm, BattleLoop.Host host) {
@@ -39,11 +40,16 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
         Bitmap voidBg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_void_px, o);
         Bitmap shrineBg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_shrine_px, o);
         scene = new PixelScene(atlas, bg, voidBg, shrineBg, difficulty, controls, bgm);
+        sfx = new SoundPoolOut(context); // 进战斗就开始解码全部音效（不到 1.5 MB）
         loop = new BattleLoop(world, controls, scene, new GlTarget(new AndroidGl(), atlas.bitmap, bg, voidBg, shrineBg),
-                new CanvasTarget(atlas.bitmap, bg, voidBg, shrineBg), host, context, getResources().getDisplayMetrics().density);
+                new CanvasTarget(atlas.bitmap, bg, voidBg, shrineBg), host, context, getResources().getDisplayMetrics().density, sfx);
         getHolder().setFormat(PixelFormat.OPAQUE);
         getHolder().addCallback(this);
         setFocusable(true);
+    }
+
+    void setFocused(boolean focused) {
+        loop.setFocused(focused);
     }
 
     void setResumed(boolean resumed) {
@@ -58,6 +64,12 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
 
     void endCutscene(int castId, Runnable resumed) {
         loop.endCutscene(castId, resumed);
+    }
+
+    /** 技能音效开 / 关（主线程）。 */
+    void setSfxEnabled(boolean on) {
+        sfx.setEnabled(on);
+        scene.sfxOn = on;
     }
 
     void toggleStats() {

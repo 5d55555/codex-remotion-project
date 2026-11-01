@@ -25,7 +25,8 @@ final class Atlas {
     static final int TRUE_HEAD = 29, TRUE_TORSO = 30, TRUE_ARM = 31, TRUE_ARM2 = 32;
     static final int MAHO_HEAD = 33, MAHO_TORSO = 34, MAHO_ARM = 35, MAHO_SWORD = 36, MAHO_LEG = 37, AGITO = 38;
     static final int BIG_MAHORAGA = 39, BIG_TRUE_FORM = 40, BIG_SPACE = 41, BIG_SHRINE = 42; // 「魔虚罗」「原身」「空间斩」「伏魔御厨子」
-    static final int COUNT = 43;
+    static final int ICON_SFX = 43; // 音效开关（v0.15）
+    static final int COUNT = 44;
 
     static final String[] BIG_TEXT = {"「苍」", "「赫」", "「茈」", "黑闪", "击倒", "「苍拳」", "「无量空处」", "「解」"};
     static final int[] BIG_SIZE = {28, 28, 28, 30, 15, 28, 28, 28};
@@ -71,6 +72,7 @@ final class Atlas {
         for (int i = 0; i < digits.length; i++) parts[DIGIT0 + i] = outlined(part(digits[i], PixelArt.PAL_FONT_KEYS, PixelArt.PAL_FONT));
         parts[ICON_BACK] = outlined(part(PixelArt.ICON_BACK, PixelArt.PAL_FONT_KEYS, PixelArt.PAL_FONT));
         parts[ICON_NOTE] = outlined(part(PixelArt.ICON_NOTE, PixelArt.PAL_FONT_KEYS, PixelArt.PAL_FONT));
+        parts[ICON_SFX] = outlined(part(PixelArt.ICON_SFX, PixelArt.PAL_FONT_KEYS, PixelArt.PAL_FONT));
         // 大字描两圈边（2 像素），在亮的天空上也看得清
         for (int i = 0; i < BIG_TEXT.length; i++) parts[BIG_BLUE + i] = outlined(outlined(pixelText(BIG_TEXT[i], BIG_SIZE[i])));
         parts[BIG_MAHORAGA] = outlined(outlined(pixelText("「魔虚罗」", 28)));

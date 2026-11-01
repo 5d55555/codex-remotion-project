@@ -674,7 +674,7 @@ public final class World {
                     s.y = 0;
                     s.onGround = true;
                     s.downTicks = Tuning.DOWN_TICKS;
-                    events.emit(Events.LAND, s.x, 0, 900, tick);
+                    events.emit(Events.LAND, s.x, 0, 900, Fighter.SUKUNA, tick);
                 }
             }
             if (ft >= Tuning.TP_RED_AFTER && !s.scripted) enter(g, Fighter.FREE);
@@ -2380,7 +2380,7 @@ public final class World {
                 f.knockedAir = false;
             }
             if (f.y <= 0) {
-                if (!f.onGround && f.vy < -400) events.emit(Events.LAND, f.x, 0, -f.vy, tick); // 重重落地：扬尘
+                if (!f.onGround && f.vy < -400) events.emit(Events.LAND, f.x, 0, -f.vy, f.id, tick); // 重重落地：扬尘（kind 是谁落地）
                 f.knockedAir = false;
                 f.y = 0;
                 if (f.vy < 0) f.vy = 0;
