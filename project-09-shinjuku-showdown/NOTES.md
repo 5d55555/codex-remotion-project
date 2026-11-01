@@ -51,7 +51,7 @@ Sol 审片：`S1_review.md`。台词与咏唱的出处另见 `android-shinjuku/n
 ## 成片
 
 - `out/新宿決戦.mp4`：1920×1080、60fps、H.264 High（CRF 16 / preset slow，约 30 Mbps）、BT.709、AAC 320k；音频 -14 LUFS、真峰值约 -2.5 dBFS。
-- `out/新宿決戦_分享版.mp4`：同一母版两遍编码到约 19.5 Mbps（约 470 MiB），用于发送（对话里上传上限 500 MiB）。
+- `out/新宿決戦_15M.mp4`：同一母版两遍编码到 15 Mbps（约 360 MiB），用于发送（对话里上传上限 400 MiB，母版 722 MiB 发不出去）。
 - 闪光检查（`python3 scripts/flashcheck.py out/silent.mp4`）：全片相邻帧亮度跳变 ≥20% 的有 31 处，任意 1 秒内最多 1 次来回闪，低于 WCAG 每秒 3 次的上限。
 - 分幕渲染约 4–5 帧/秒（4 核），全片约 45 分钟。
 
