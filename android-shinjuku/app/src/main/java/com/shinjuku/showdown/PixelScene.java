@@ -142,6 +142,11 @@ final class PixelScene {
         drawMs = drawMsAvg;
     }
 
+    /** 提前做文字图集（v0.14：战斗线程一启动就做，不压在第一帧上）；之后 layout() 看到同样的 dp 就直接用。只在战斗线程调用。 */
+    void prepareHud(float dp) {
+        if (hud == null || hud.dp != dp) hud = new HudText(dp, difficulty);
+    }
+
     /** 布局（屏幕尺寸、安全区）变了就重算，返回 true 表示文字图集换了新的。 */
     boolean layout(int screenW, int screenH) {
         Controls.Layout l = controls.layout;
@@ -2508,19 +2513,24 @@ final class PixelScene {
             p.legBack = -12;
             p.armFront = 40;
             p.armBack = -35;
-        } else if (Math.abs(s.vx) > 30) {
-            float sn = (float) Math.sin(s.x * 0.05f);
-            p.legFront = sn * 30;
-            p.legBack = -sn * 30;
-            p.armFront = -sn * 26;
-            p.armBack = sn * 26;
-            p.lean = 8;
-            p.bob = Math.abs(sn) > 0.7f ? 1 : 0;
         } else {
-            p.bob = Math.sin(time * 2.2f + 1) > 0.3f ? 1 : 0;
-            p.armFront = 10;
-            p.armBack = -10;
+            walkPose(p, s, Tuning.SUKUNA_SPEED, 0.05f, 30, 26, 10, 8, -3, Math.sin(time * 2.2f + 1) > 0.3f);
         }
+    }
+
+    /**
+     * 站和走之间按实际速度过渡（v0.14：AI 起步、停步有加减速，姿势跟着从站姿慢慢变成走姿，不再一下子跳过去）。
+     * 步子的相位按走过的距离算；往后退的时候身子微微后仰，不再前倾着倒退。
+     */
+    private static void walkPose(Pose p, Fighter f, float speed, float stride, float leg, float arm, float idleArm, float lean, float leanBack, boolean idleBob) {
+        float k = Math.min(1, Math.abs(f.vx) / (speed * 0.75f));
+        float sn = (float) Math.sin(f.x * stride);
+        p.legFront = sn * leg * k;
+        p.legBack = -sn * leg * k;
+        p.armFront = idleArm + (-sn * arm - idleArm) * k;
+        p.armBack = -idleArm + (sn * arm + idleArm) * k;
+        p.lean = (f.vx * f.facing < 0 ? leanBack : lean) * k;
+        p.bob = k > 0.5f ? (Math.abs(sn) > 0.7f ? 1 : 0) : idleBob ? 1 : 0;
     }
 
     /** 魔虚罗的姿势：走、重拳（拉开 → 打出 → 收）、退魔之剑（举过头 → 劈下来）、挨打、被吸、无量空处里僵住。 */
@@ -2612,18 +2622,8 @@ final class PixelScene {
             p.legBack = -10;
             p.armFront = 30;
             p.armBack = -25;
-        } else if (Math.abs(m.vx) > 30) { // 走：沉重的大步
-            float sn = (float) Math.sin(m.x * 0.03f);
-            p.legFront = sn * 24;
-            p.legBack = -sn * 24;
-            p.armFront = -sn * 16;
-            p.armBack = sn * 16;
-            p.lean = 6;
-            p.bob = Math.abs(sn) > 0.7f ? 1 : 0;
-        } else {
-            p.bob = Math.sin(time * 1.6f) > 0.4f ? 1 : 0;
-            p.armFront = 8;
-            p.armBack = -8;
+        } else { // 走：沉重的大步（和站姿之间按速度过渡）
+            walkPose(p, m, Tuning.MAHORAGA_SPEED, 0.03f, 24, 16, 8, 6, -2, Math.sin(time * 1.6f) > 0.4f);
         }
     }
 

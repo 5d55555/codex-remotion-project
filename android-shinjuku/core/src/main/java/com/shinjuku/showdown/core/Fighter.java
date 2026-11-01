@@ -47,6 +47,8 @@ public final class Fighter {
     public boolean pulled;       // 这一 tick 被苍吸着（不受地面摩擦，限速）
     boolean selfMove;            // 这一 tick 是自己在走（走路、出拳往前带）：不受地面摩擦
     boolean knockedAir;          // 被打飞到空中，还没落地
+    float walkV;                 // AI 角色自己走的速度（有加速、减速，不跳变）；上一个逻辑 tick 没在走就从当前速度接着来
+    int walkAt = -2;             // walkV 最后一次更新时的 fightTicks
 
     // 给画面用
     public float moveInput;      // 本 tick 的移动输入（跑步动画）

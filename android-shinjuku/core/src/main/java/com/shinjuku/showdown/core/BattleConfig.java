@@ -62,6 +62,7 @@ public final class BattleConfig {
         public int decideInterval;                // 多久看一次局势（tick）
         public int reactMin, reactMax;            // 看到新威胁（飞来的招、开始念咒）后多久才反应
         public int holdMin, holdMax;              // 一个移动意图至少保持多久，免得左右抖
+        public int minRun;                        // v0.14：不急的变向、停步前，这一段至少走多久（tick）
         public int attackMin, attackMax;          // 每隔多久考虑一次出手
         public float attackChance;                // 考虑出手时真的出手的概率
         public float mistake;                     // 看到威胁却没反应的概率
@@ -115,6 +116,7 @@ public final class BattleConfig {
             reactMax = 36;
             holdMin = 24;
             holdMax = 48;
+            minRun = 10;
             attackMin = 36;
             attackMax = 60;
             attackChance = 0.75f;
@@ -140,8 +142,8 @@ public final class BattleConfig {
             tacticLevel = 0;
             probeChance = ampBaitChance = punishChance = interruptChance = dodgePunishChance = escapeChance = 0;
             probeCd = 300;
-            probeInTicks = 18;
-            probeOutTicks = 24;
+            probeInTicks = 30; // v0.14：18 → 30、24 → 36（一步踏进去、退回来，看得出来；按距离提前结束）
+            probeOutTicks = 36;
             probeObserveTicks = 48;
             ampBaitCd = 480;
             baitWaitMin = 12;
@@ -183,6 +185,7 @@ public final class BattleConfig {
             recoverMin = level == 1 ? 10 : level == 2 ? 8 : 2;   // 史上最强：被打断、被控之后几乎不迟疑
             recoverMax = level == 1 ? 18 : level == 2 ? 14 : 6;
             holdMin = level == 1 ? 24 : 18;
+            minRun = level == 1 ? 10 : level == 2 ? 8 : 6; // 越难变向越利落（仍然不会一 tick 一抽）
             holdMax = level == 1 ? 42 : level == 2 ? 36 : 30;
             attackMin = level == 1 ? 34 : 30;
             attackMax = level == 1 ? 54 : level == 2 ? 48 : 44;

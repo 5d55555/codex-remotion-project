@@ -919,6 +919,7 @@ public final class World {
     private void endPurpleMax(int side) {
         Fighter g = gojo, s = sukuna, m = mahoraga;
         cine = CINE_NONE;
+        sukuna.walkAt = mahoraga.walkAt = -2; // 固定动作里位置、速度都被脚本接管过：之后从实际速度重新起步
         cineBlueR = cinePurpleR = 0;
         for (int i = 0; i < Fighter.COUNT; i++) {
             Fighter f = fighter(i);
@@ -1028,6 +1029,24 @@ public final class World {
     private static void drive(Fighter f, float vx) {
         f.vx = vx;
         f.selfMove = vx != 0;
+    }
+
+    /**
+     * AI 角色自己走的速度往目标速度靠：起步按 accel 加速，停步、减速、反向按 decel 减（反向先减到 0 再加）。
+     * 上一个逻辑 tick 没走这条路（出招、挨打、被控、停顿以后）就从当前的实际速度接着来：硬直结束时还在滑的，
+     * 两倍 decel 刹住（不再一恢复行动就钉在原地）。只管自己走的那部分：被打飞的速度照旧由物理处理。
+     */
+    private float walk(Fighter f, float target, float top, float accel, float decel) {
+        float v = f.walkAt == fightTicks - 1 ? f.walkV : f.vx;
+        f.walkAt = fightTicks;
+        if (v != target) {
+            float goal = v * target < 0 ? 0 : target; // 反向：这一 tick 最多减到 0，不越过去；下一 tick 再按 accel 往反方向加
+            boolean slowing = goal == 0 || Math.abs(goal) < Math.abs(v);
+            float step = (slowing ? (Math.abs(v) > top ? 2 * decel : decel) : accel) * Tuning.DT;
+            v = Math.abs(goal - v) <= step ? goal : v + Math.copySign(step, goal - v);
+        }
+        f.walkV = v;
+        return v;
     }
 
     private void faceByInput(Fighter f, float stick) {
@@ -1315,8 +1334,10 @@ public final class World {
                 }
                 if (!config.sukunaAi && i.moveX == 0 && !i.melee && !i.dismantle && !i.jump && !i.amp && !i.ampOff && !i.world && !i.rct
                         && !i.agito && !i.summon && !i.transform && !i.space && !i.shrine) return; // 活靶子：什么都不做
-                drive(s, i.moveX * Tuning.SUKUNA_SPEED);
+                drive(s, walk(s, i.moveX * Tuning.SUKUNA_SPEED, Tuning.SUKUNA_SPEED, Tuning.S_WALK_ACCEL, Tuning.S_WALK_DECEL));
                 if (i.jump && s.onGround) {
+                    s.walkV = i.moveX * Tuning.SUKUNA_SPEED; // 起跳一蹬就是全速（墙边从五条悟头上越过去要这一下）
+                    drive(s, s.walkV);
                     s.vy = Tuning.JUMP_SPEED;
                     s.onGround = false;
                 }
@@ -1701,9 +1722,10 @@ public final class World {
                 startMahoragaAttack(Fighter.M_SWORD);
                 return;
             }
-            mMove = d > Tuning.M_PUNCH_REACH - 10 ? toward : 0; // 两招都用不了：贴到拳头够得着的地方等
+            // 两招都用不了：贴到拳头够得着的地方等（有滞回：走着的贴到离拳头边缘 10 再停，站着的等他快出拳头范围才再走，不在边上一步一停）
+            mMove = d > Tuning.M_PUNCH_REACH - (mMove != 0 ? 10 : 2) ? toward : 0;
         }
-        drive(m, mMove * Tuning.MAHORAGA_SPEED);
+        drive(m, walk(m, mMove * Tuning.MAHORAGA_SPEED, Tuning.MAHORAGA_SPEED, Tuning.M_WALK_ACCEL, Tuning.M_WALK_DECEL));
     }
 
     private void startMahoragaAttack(int state) {
@@ -2377,9 +2399,11 @@ public final class World {
         if (f.x < lo) {
             f.x = lo;
             if (f.vx < 0) f.vx = 0;
+            if (f.walkV < 0) f.walkV = 0; // 撞墙停住：自己走的速度也跟着清零（不然往回走要先刹一段不存在的速度）
         } else if (f.x > hi) {
             f.x = hi;
             if (f.vx > 0) f.vx = 0;
+            if (f.walkV > 0) f.walkV = 0;
         }
         if (f.y > Tuning.CEILING) {
             f.y = Tuning.CEILING;

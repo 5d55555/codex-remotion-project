@@ -35,6 +35,10 @@ final class SukunaAi {
     private boolean approachMode = true;
     private int modeTimer;
     private float moveIntent;
+    // 走位的连贯（v0.14）：正在走的方向、走了多久、上次发出意图的 aiClock；这一 tick 的变向是不是急的（躲招、打断、脱身）
+    private int runDir, runTicks, lastEmit = -100;
+    private boolean urgentMove;
+    private float probeD; // 这次进退试探开始时的距离
     private boolean wantMelee, wantDismantle, wantJump, wantAmp, wantAmpOff, wantWorld, wantRct, wantAgito, wantSummon, wantTransform;
     private int transformWaitFrom = -1; // 血量第一次跌破变原身血线的时刻（回血也不重置）
     private boolean wantSpace, wantShrine;
@@ -84,6 +88,7 @@ final class SukunaAi {
 
     void think(World w, SukunaIntent out) {
         out.clear();
+        urgentMove = false;
         Fighter s = w.sukuna, g = w.gojo;
         if (jumpCool > 0) jumpCool--;
         if (ampRefuse > 0) ampRefuse--;
@@ -136,6 +141,7 @@ final class SukunaAi {
                 jumpCool = t.jumpGap;
             } else {
                 moveIntent = -toward;
+                urgentMove = true;
                 holdTimer = range(t.holdMin, t.holdMax);
             }
         }
@@ -157,6 +163,7 @@ final class SukunaAi {
                 wantMelee = true;
             } else if (amp) {
                 moveIntent = toward; // 展延中：贴上去打
+                urgentMove = true;
                 holdTimer = 0;
             } else if (w.config.shrine && d <= Tuning.DISMANTLE_RANGE && w.ampLock == 0) {
                 wantDismantle = true;
@@ -167,6 +174,7 @@ final class SukunaAi {
             } else {
                 moveIntent = toward;
                 holdTimer = 0;
+                urgentMove = true;
             }
         }
 
@@ -279,9 +287,30 @@ final class SukunaAi {
 
     private void emit(Fighter s, int toward, SukunaIntent out) {
         if (holdTimer > 0) holdTimer--; // 战术层接管的 tick 也照样计时
+        // 走位连贯：不急的变向、停步（距离带、拉扯、试探、骗招、惊惧后退）要等这一段至少走满 minRun；
+        // 躲招、打断念咒、抓破绽、脱身照样立刻变。上一 tick 没在发意图（出招、被控、迟疑）就重新算
+        if (lastEmit != aiClock - 1) {
+            runDir = 0;
+            runTicks = 0;
+        }
+        lastEmit = aiClock;
         // 背后是墙就别再退
-        if (moveIntent * toward < 0 && (s.x < Tuning.BODY_HALF_W + 8 || s.x > Tuning.WIDTH - Tuning.BODY_HALF_W - 8)) moveIntent = 0;
-        out.moveX = moveIntent;
+        boolean atWall = s.x < Tuning.BODY_HALF_W + 8 || s.x > Tuning.WIDTH - Tuning.BODY_HALF_W - 8;
+        if (moveIntent * toward < 0 && atWall) moveIntent = 0;
+        // 只改这一 tick 发出去的移动，不改想法（moveIntent）：这一段走满了，想停、想掉头的就照办
+        float move = moveIntent;
+        int dir = move > 0 ? 1 : move < 0 ? -1 : 0;
+        // 起跳那一 tick 也算急的：起跳一蹬就是全速，方向必须是这次想要的（墙边从他头上越过去）
+        if (dir != runDir && runDir != 0 && runTicks < t.minRun && !urgentMove && !wantJump && !(runDir * toward < 0 && atWall)) {
+            move = runDir;
+            dir = runDir;
+        }
+        if (dir != runDir) {
+            runDir = dir;
+            runTicks = 0;
+        }
+        runTicks++;
+        out.moveX = move;
         out.jump = wantJump;
         out.melee = wantMelee;
         out.dismantle = wantDismantle;
@@ -488,6 +517,7 @@ final class SukunaAi {
                             wantAmpOff = true; // 太远：关掉展延改用解（关掉后 12 tick 才能用术式，下一轮再看）
                         } else if (left > Tuning.S_MELEE_STARTUP + 1 + (d - reach) / Tuning.SUKUNA_SPEED * Tuning.HZ) {
                             moveIntent = toward; // 走过去还来得及
+                            urgentMove = true;
                         } else {
                             opp = OPP_NONE; // 来不及了：不白白冲上去
                             return false;
@@ -505,6 +535,7 @@ final class SukunaAi {
                             opp = OPP_NONE;
                         } else {
                             moveIntent = toward;
+                            urgentMove = true;
                         }
                         return true;
                     case OPP_DODGE: // 等闪避的无敌过去，在他闪避冷却好之前打一拳
@@ -512,7 +543,11 @@ final class SukunaAi {
                             opp = OPP_NONE;
                             return false;
                         }
-                        moveIntent = d > reach - 10 ? toward : 0;
+                        // 贴到拳头边缘内 10 就站住，他退到够不着才再跟（不在边上一步一停）
+                        if (d <= reach - 10) moveIntent = 0;
+                        else if (d > reach) moveIntent = toward;
+                        else if (moveIntent != toward) moveIntent = 0;
+                        urgentMove = true;
                         if (aiClock >= oppSince + Tuning.DODGE_TICKS && d <= reach && canMelee && g.state != Fighter.DODGE) {
                             wantMelee = true;
                             opp = OPP_NONE;
@@ -533,6 +568,7 @@ final class SukunaAi {
                     wantAmp = true;
                 } else {
                     moveIntent = -toward;
+                    urgentMove = true;
                     holdTimer = 24;
                     if (s.onGround && jumpCool == 0) {
                         wantJump = true;
@@ -562,6 +598,7 @@ final class SukunaAi {
                     wantJump = true; // 起跳往他那边冲：越过头顶（一跳能越过 150 以内的人）
                     jumpCool = t.jumpGap / 2;
                     moveIntent = toward;
+                    urgentMove = true;
                     holdTimer = 30;
                 } else if (holdTimer <= 0 || moveIntent != toward) {
                     moveIntent = -toward;
@@ -602,15 +639,16 @@ final class SukunaAi {
         }
         // 6. 进退试探：走近一下（不出手）再退开，看他怎么反应
         if (probePhase != 0) {
+            // 一步踏进去（逼近约 80，但不进 110 以内）再退回原来的距离：每段都走够长，看得出是试探，不是一抽一抽
             if (probePhase == 1) {
                 moveIntent = toward;
-                if (--probeTimer <= 0 || d <= 115) {
+                if (--probeTimer <= 0 || d <= Math.max(110, probeD - 80)) {
                     probePhase = 2;
                     probeTimer = t.probeOutTicks;
                 }
             } else {
                 moveIntent = -toward;
-                if (--probeTimer <= 0 || d >= 180) probePhase = 0;
+                if (--probeTimer <= 0 || d >= Math.max(180, probeD)) probePhase = 0;
             }
             return true;
         }
@@ -619,6 +657,7 @@ final class SukunaAi {
             if (rng.nextUnitDouble() < t.probeChance * (1 - 0.6f * f())) {
                 probePhase = 1;
                 probeTimer = t.probeInTicks;
+                probeD = d;
                 moveIntent = toward;
                 return true;
             }

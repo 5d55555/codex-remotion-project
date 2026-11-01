@@ -174,6 +174,8 @@ public final class Tuning {
     // 宿傩（新宿决战的技能组，Luna 查证、Astra 定的首轮数值，见 notes/宿傩平衡.md）。
     // 体术 75、解 90 是定的；无限挡住一切，只有领域展延下的体术和世界斩能打到五条悟。
     public static final float SUKUNA_SPEED = 330f;   // v0.9 以前比五条悟（300）快一点；v0.10 起五条悟 420，走着就能拉开
+    // v0.14：AI 走路不再瞬间起停——起步 0.07 秒到全速、停步 0.05 秒停稳、反向先减后加（五条悟是玩家，照旧即按即走）
+    public static final float S_WALK_ACCEL = SUKUNA_SPEED / 0.07f, S_WALK_DECEL = SUKUNA_SPEED / 0.05f;
     public static final long S_MELEE_DAMAGE_MILLI = 75_000;
     public static final int S_MELEE_STARTUP = 8, S_MELEE_ACTIVE = 4, S_MELEE_RECOVERY = 14; // 占位
     public static final float S_MELEE_REACH = 100f, S_MELEE_LUNGE = 180f, S_MELEE_IMPULSE = 160f;
@@ -253,6 +255,7 @@ public final class Tuning {
     public static final float MAHORAGA_HALF_W = 34f, MAHORAGA_H = 150f, MAHORAGA_SPEED = 270f;
     public static final int MAHORAGA_RISE = 48;                   // 显现后多久才开始行动（可以挨打）
     public static final int MAHORAGA_DECIDE = 12, MAHORAGA_REACT = 24;
+    public static final float M_WALK_ACCEL = MAHORAGA_SPEED / 0.12f, M_WALK_DECEL = MAHORAGA_SPEED / 0.08f; // 比人重：起步、停步都更慢
     public static final float MAHORAGA_PULL = 0.5f;               // 苍对它的吸力减半（伤害不减）
     // 重拳、退魔之剑：伤害固定；没适应无限时被挡住（挡下也让法阵转一格），适应后能打穿无限（原作第 234 话）
     public static final long M_PUNCH_DAMAGE_MILLI = 90_000, M_SWORD_DAMAGE_MILLI = 140_000;

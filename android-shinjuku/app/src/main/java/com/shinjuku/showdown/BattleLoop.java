@@ -1,6 +1,8 @@
 package com.shinjuku.showdown;
 
+import android.content.Context;
 import android.graphics.Canvas;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Process;
@@ -24,6 +26,7 @@ import java.util.concurrent.CountDownLatch;
  * 领域展开的过场：World 停住（cutscene）后，这一帧剩下的 tick 不再推进，战斗帧回调也停掉（线程留着收消息），
  * 通知主线程放视频；放完 endCutscene() 回到这个线程展开领域，从下一帧重新计时（不补放视频那几秒的 tick），积压的按键全丢掉。
  * 分出胜负（测试模式以外）后再走 RESULT_DELAY 个 tick（倒下的动作放完；茈·最大输出炸死的等固定动作放完），通知主线程弹出结算。
+ * v0.14：线程一启动就先做好文字图集（不压在第一帧上）；Android 12+ 每帧向系统报工作量（ADPF 性能提示，见 PerfHint）。
  */
 final class BattleLoop implements Choreographer.FrameCallback {
     interface Host {
@@ -65,14 +68,22 @@ final class BattleLoop implements Choreographer.FrameCallback {
     private long lastFrameNs, accNs, simNs; // simNs：最近一个 tick 对应的时刻（和触摸事件同一个时钟）
     private float renderTime;               // 画面时钟（秒），暂停期间不走
     private float tickMsAvg, drawMsAvg;
+    private final Context context;     // BattleView 的 Context（Activity）：只用来取显示器的刷新率、开 ADPF 会话
+    private PerfHint hint;            // 只在战斗线程
+    private boolean hintTried;
+    private long periodNs;             // 显示器的刷新周期（每 120 帧、恢复后读一次刷新率），ADPF 的目标
+    private int periodAge;
+    private long swapStartNs;          // 这一帧开始等缓冲区（交换、提交）的时刻：之前的才算工作量
+    private long lockWaitNs;           // Canvas 兜底时等 lockHardwareCanvas 的时间（等缓冲区，不算工作量）
 
-    BattleLoop(World world, Controls controls, PixelScene scene, GlTarget gl, CanvasTarget canvasTarget, Host host) {
+    BattleLoop(World world, Controls controls, PixelScene scene, GlTarget gl, CanvasTarget canvasTarget, Host host, Context context, float dp) {
         this.world = world;
         this.controls = controls;
         this.scene = scene;
         this.gl = gl;
         this.canvasTarget = canvasTarget;
         this.host = host;
+        this.context = context;
         thread.start();
         handler = new Handler(thread.getLooper());
         handler.post(() -> {
@@ -82,6 +93,7 @@ final class BattleLoop implements Choreographer.FrameCallback {
                 Log.w(TAG, "priority", e);
             }
             choreographer = Choreographer.getInstance();
+            scene.prepareHud(dp); // 文字图集（几十到上百毫秒）趁 Surface 还没好先做掉
         });
     }
 
@@ -166,6 +178,10 @@ final class BattleLoop implements Choreographer.FrameCallback {
             try {
                 resumed = false;
                 update();
+                if (hint != null) {
+                    hint.close();
+                    hint = null;
+                }
                 gl.release();
             } finally {
                 thread.quitSafely();
@@ -179,6 +195,7 @@ final class BattleLoop implements Choreographer.FrameCallback {
         boolean run = resumed && hasSurface && !cutscenePaused;
         if (run && !scheduled) {
             lastFrameNs = 0; // 恢复后从这一帧重新计时，不补暂停期间的 tick
+            periodAge = 0;   // 恢复后重新读一次刷新率
             scheduled = true;
             choreographer.postFrameCallback(this);
         } else if (!run && scheduled) {
@@ -225,11 +242,14 @@ final class BattleLoop implements Choreographer.FrameCallback {
             mainHandler.post(() -> host.battleOver(outcome));
         }
         long t1 = System.nanoTime();
+        swapStartNs = 0;
+        lockWaitNs = 0;
         draw(accNs / (float) TICK_NS);
         long t2 = System.nanoTime();
         tickMsAvg += ((t1 - t0) * 1e-6f - tickMsAvg) * 0.05f;
         drawMsAvg += ((t2 - t1) * 1e-6f - drawMsAvg) * 0.05f;
         scene.reportFrame(dt, tickMsAvg, drawMsAvg);
+        reportHint((swapStartNs != 0 ? swapStartNs : t2) - t0 - lockWaitNs);
 
         if (cutscenePaused) update(); // 停掉帧回调（线程还在，等过场结束的消息）
         else choreographer.postFrameCallback(this);
@@ -256,6 +276,7 @@ final class BattleLoop implements Choreographer.FrameCallback {
         if (!useCanvas) {
             try {
                 scene.draw(gl, world, alpha, renderTime, surfaceW, surfaceH);
+                swapStartNs = System.nanoTime();
                 int r = gl.swap();
                 if (r == GlTarget.SWAP_OK) {
                     glFailures = 0;
@@ -273,15 +294,19 @@ final class BattleLoop implements Choreographer.FrameCallback {
             SurfaceHolder h = holder;
             if (h == null) return;
             Canvas c;
+            long l0 = System.nanoTime();
             try {
                 c = h.lockHardwareCanvas();
             } catch (RuntimeException e) {
                 return; // Surface 正在销毁
+            } finally {
+                lockWaitNs = System.nanoTime() - l0;
             }
             if (c == null) return;
             try {
                 canvasTarget.setDestination(c);
                 scene.draw(canvasTarget, world, alpha, renderTime, surfaceW, surfaceH);
+                swapStartNs = System.nanoTime();
             } finally {
                 try {
                     h.unlockCanvasAndPost(c);
@@ -293,6 +318,33 @@ final class BattleLoop implements Choreographer.FrameCallback {
     }
 
     private boolean hudSet;
+
+    /**
+     * ADPF：第一帧时开会话；每帧报这一帧的工作量，目标是显示器的刷新周期（每 120 帧、恢复后读一次当前刷新率：
+     * 不从帧间隔推算，持续掉帧时目标也不会跟着放宽）。不支持、出错就不再用。
+     */
+    private void reportHint(long workNs) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+        if (--periodAge < 0) {
+            periodAge = 119; // 每 120 帧（120Hz 下 1 秒）读一次
+            float hz = 60;
+            try {
+                android.view.Display d = context.getDisplay();
+                if (d != null && d.getRefreshRate() >= 24) hz = d.getRefreshRate();
+            } catch (RuntimeException e) {
+                // 拿不到显示器（Context 不对）：按 60Hz
+            }
+            periodNs = (long) (1e9f / hz);
+        }
+        if (!hintTried) {
+            hintTried = true;
+            hint = PerfHint.create(context, periodNs);
+        }
+        if (hint != null && !hint.report(workNs, periodNs)) {
+            hint.close();
+            hint = null;
+        }
+    }
 
     /** GL 这条路走不通：放开 GL（之后同一个 Surface 可以用硬件 Canvas 画），改用 Canvas。 */
     private void glFailed(RuntimeException e) {
