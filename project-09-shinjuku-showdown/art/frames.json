@@ -1,0 +1,1517 @@
+[
+ {
+  "id": "f001",
+  "group": "G01",
+  "chars": [],
+  "prompt": "Scene group: 空城、新宿街口 — overall lighting/palette: 冷青清晨、雪、低角度侧光. Shot: 大全景／高位俯拍. Content: 空无一人的新宿十字路口，斑马线斜贯画面，中央留出对峙轴线. Background and lighting: 冷青玻璃高楼，左后方冬日侧光，小雪. Effects painted into the image: 薄雾、远处细小紫光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "弱起、0–7、100–101",
+  "shot": "大全景／高位俯拍",
+  "content": "空无一人的新宿十字路口，斑马线斜贯画面，中央留出对峙轴线"
+ },
+ {
+  "id": "f002",
+  "group": "G01",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 空城、新宿街口 — overall lighting/palette: 冷青清晨、雪、低角度侧光. Shot: 全景／贴地仰拍. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；双手垂落，身体朝左，侧脸等待. Background and lighting: 空街向左收束，逆光勾边. Effects painted into the image: 鞋边薄雪被风卷走. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "0–7、99–101",
+  "shot": "全景／贴地仰拍",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；双手垂落，身体朝左，侧脸等待"
+ },
+ {
+  "id": "f003",
+  "group": "G01",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 空城、新宿街口 — overall lighting/palette: 冷青清晨、雪、低角度侧光. Shot: 眼睛大特写／倾斜机位. Content: 175cm宿傩，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；右眼居左，瞳孔望向画外高处. Background and lighting: 背景压成冷灰暗面，左侧硬光. Effects painted into the image: 瞳孔里一粒遥远紫光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "0–7、99–101",
+  "shot": "眼睛大特写／倾斜机位",
+  "content": "175cm宿傩，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；右眼居左，瞳孔望向画外高处"
+ },
+ {
+  "id": "f004",
+  "group": "G01",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 空城、新宿街口 — overall lighting/palette: 冷青清晨、雪、低角度侧光. Shot: 中景／街道轴线长焦. Content: 175cm宿傩居中偏左，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；略歪头露尖牙，右肩前送. Background and lighting: 路牌和空车道纵深，蓝灰漫射光. Effects painted into the image: 一条横向雪尘带. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "0–7",
+  "shot": "中景／街道轴线长焦",
+  "content": "175cm宿傩居中偏左，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；略歪头露尖牙，右肩前送"
+ },
+ {
+  "id": "f005",
+  "group": "G01",
+  "chars": [],
+  "prompt": "Scene group: 空城、新宿街口 — overall lighting/palette: 冷青清晨、雪、低角度侧光. Shot: 大全景／楼缝仰拍. Content: 两侧摩天楼挤出狭长天空，无人物，画面轴线倾斜十五度. Background and lighting: 冷蓝天空，楼顶暖白反光. Effects painted into the image: 雪粒向镜头坠落，远处能量染紫云底. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "0–7、100–101",
+  "shot": "大全景／楼缝仰拍",
+  "content": "两侧摩天楼挤出狭长天空，无人物，画面轴线倾斜十五度"
+ },
+ {
+  "id": "f006",
+  "group": "G01",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 空城、新宿街口 — overall lighting/palette: 冷青清晨、雪、低角度侧光. Shot: 近景／地面低机位. Content: 175cm宿傩，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；只取迈出半步的鞋与制服下摆，脚尖朝左. Background and lighting: 斑马线湿地反光，右后侧光. Effects painted into the image: 鞋底挤开的浅雪、紫色反射. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "0–7",
+  "shot": "近景／地面低机位",
+  "content": "175cm宿傩，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；只取迈出半步的鞋与制服下摆，脚尖朝左"
+ },
+ {
+  "id": "f007",
+  "group": "G01",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 空城、新宿街口 — overall lighting/palette: 冷青清晨、雪、低角度侧光. Shot: 大全景／屋顶背向远眺. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；背对镜头看向远处新宿. Background and lighting: 涩谷方向高楼屋顶，清冷侧光. Effects painted into the image: 袍角横飞，远天细雪. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "0–7、99–101",
+  "shot": "大全景／屋顶背向远眺",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；背对镜头看向远处新宿"
+ },
+ {
+  "id": "f008",
+  "group": "G02",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 远处高楼仪式 — overall lighting/palette: 靛蓝屋顶、白色边光. Shot: 全景／斜俯拍. Content: 190cm高瘦五条居右，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；侧身立于楼沿，手指微抬. Background and lighting: 远处新宿天际线，左后方白光. Effects painted into the image: 足下稀薄蓝色光屑. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "8–15",
+  "shot": "全景／斜俯拍",
+  "content": "190cm高瘦五条居右，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；侧身立于楼沿，手指微抬"
+ },
+ {
+  "id": "f009",
+  "group": "G02",
+  "chars": [],
+  "prompt": "Scene group: 远处高楼仪式 — overall lighting/palette: 靛蓝屋顶、白色边光. Shot: 中景／侧逆光. Content: 伊地知居左，黑短发、眼镜、深色西装；紧握仪式媒介，神情紧张，右侧留出透明屏障. Background and lighting: 屋顶设备间，冷靛蓝阴影. Effects painted into the image: 半透明「帳」如薄玻璃折射城市. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "8–15",
+  "shot": "中景／侧逆光",
+  "content": "伊地知居左，黑短发、眼镜、深色西装；紧握仪式媒介，神情紧张，右侧留出透明屏障"
+ },
+ {
+  "id": "f010",
+  "group": "G02",
+  "chars": [],
+  "prompt": "Scene group: 远处高楼仪式 — overall lighting/palette: 靛蓝屋顶、白色边光. Shot: 全景／低位侧拍. Content: 歌姬居中，深色长发、面部疤痕、白色巫女上衣与红袴；双臂展开，身体旋向右. Background and lighting: 屋顶仪式区，右侧暖白灯光. Effects painted into the image: 衣袖轨迹、脚下细金色增幅纹. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "8–15",
+  "shot": "全景／低位侧拍",
+  "content": "歌姬居中，深色长发、面部疤痕、白色巫女上衣与红袴；双臂展开，身体旋向右"
+ },
+ {
+  "id": "f011",
+  "group": "G02",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 远处高楼仪式 — overall lighting/palette: 靛蓝屋顶、白色边光. Shot: 手部特写／斜俯拍. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右手从左下伸向右上，指节绷紧. Background and lighting: 屋顶背景虚化，左蓝右红双光. Effects painted into the image: 指尖细密蓝红能量丝. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "8–15",
+  "shot": "手部特写／斜俯拍",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右手从左下伸向右上，指节绷紧"
+ },
+ {
+  "id": "f012",
+  "group": "G02",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 远处高楼仪式 — overall lighting/palette: 靛蓝屋顶、白色边光. Shot: 半身／正面微仰. Content: 190cm高瘦五条居中，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；下巴微抬，轻松微笑. Background and lighting: 楼顶暗蓝天空，右上白色轮廓光. Effects painted into the image: 袍领和发梢被气流扬起. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "8–15、99–101",
+  "shot": "半身／正面微仰",
+  "content": "190cm高瘦五条居中，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；下巴微抬，轻松微笑"
+ },
+ {
+  "id": "f013",
+  "group": "G02",
+  "chars": [],
+  "prompt": "Scene group: 远处高楼仪式 — overall lighting/palette: 靛蓝屋顶、白色边光. Shot: 大全景／仪式区俯视. Content: 伊地知左侧扶住媒介，黑短发眼镜深色西装；歌姬右侧舞步落地，深长发面疤白巫女服红袴. Background and lighting: 屋顶几何结构，中央留空，冷暖交界. Effects painted into the image: 「帳」弧面与增幅光环相交. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "8–15",
+  "shot": "大全景／仪式区俯视",
+  "content": "伊地知左侧扶住媒介，黑短发眼镜深色西装；歌姬右侧舞步落地，深长发面疤白巫女服红袴"
+ },
+ {
+  "id": "f014",
+  "group": "G02",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 远处高楼仪式 — overall lighting/palette: 靛蓝屋顶、白色边光. Shot: 近景／人物背侧. Content: 190cm高瘦五条居右，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；回头看向镜头，嘴角自信. Background and lighting: 深蓝屋顶，远处城市散景. Effects painted into the image: 眼中蓝光、袖边金色增幅反光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "8–15",
+  "shot": "近景／人物背侧",
+  "content": "190cm高瘦五条居右，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；回头看向镜头，嘴角自信"
+ },
+ {
+  "id": "f015",
+  "group": "G03",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 200% 茈蓄力 — overall lighting/palette: 蓝红双源、强透视屋顶. Shot: 中景／低位广角. Content: 190cm高瘦五条居中，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；两臂向两侧展开，重心压低. Background and lighting: 屋顶裂纹向外放射，左蓝右红. Effects painted into the image: 两侧蓝红球核，尚未相碰. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "16–23",
+  "shot": "中景／低位广角",
+  "content": "190cm高瘦五条居中，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；两臂向两侧展开，重心压低"
+ },
+ {
+  "id": "f016",
+  "group": "G03",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 200% 茈蓄力 — overall lighting/palette: 蓝红双源、强透视屋顶. Shot: 嘴部近景／斜侧. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；嘴唇正在咏唱，脸朝右. Background and lighting: 左半脸蓝光、右半脸红光. Effects painted into the image: 细小紫色反光沿下颌游走. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "16–23",
+  "shot": "嘴部近景／斜侧",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；嘴唇正在咏唱，脸朝右"
+ },
+ {
+  "id": "f017",
+  "group": "G03",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 200% 茈蓄力 — overall lighting/palette: 蓝红双源、强透视屋顶. Shot: 眼睛大特写／正面. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；双眼平视，眼神由松弛变锐利. Background and lighting: 雪白发梢遮住画面上沿，冷暗背景. Effects painted into the image: 六眼中蓝红双环倒影. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "16–23",
+  "shot": "眼睛大特写／正面",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；双眼平视，眼神由松弛变锐利"
+ },
+ {
+  "id": "f018",
+  "group": "G03",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 200% 茈蓄力 — overall lighting/palette: 蓝红双源、强透视屋顶. Shot: 手部特写／超广角. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；两手从左右向中央压合，指尖指向远景. Background and lighting: 深蓝屋顶，中心紫色主光. Effects painted into the image: 被压扁的蓝红能量弧. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "16–23",
+  "shot": "手部特写／超广角",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；两手从左右向中央压合，指尖指向远景"
+ },
+ {
+  "id": "f019",
+  "group": "G03",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 200% 茈蓄力 — overall lighting/palette: 蓝红双源、强透视屋顶. Shot: 全景／正下方仰拍. Content: 190cm高瘦五条居上中，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；白袍如双翼打开，身体稳立. Background and lighting: 高楼边缘从下方刺入，天空靛蓝. Effects painted into the image: 巨大紫球位于胸前偏右. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "16–23",
+  "shot": "全景／正下方仰拍",
+  "content": "190cm高瘦五条居上中，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；白袍如双翼打开，身体稳立"
+ },
+ {
+  "id": "f020",
+  "group": "G03",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 200% 茈蓄力 — overall lighting/palette: 蓝红双源、强透视屋顶. Shot: 大全景／楼顶横向侧拍. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；向右前方伸手，脚后跟锁住楼面. Background and lighting: 楼顶设备被强光拉出长影. Effects painted into the image: 紫球照亮整片屋顶，碎石悬浮. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "16–23",
+  "shot": "大全景／楼顶横向侧拍",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；向右前方伸手，脚后跟锁住楼面"
+ },
+ {
+  "id": "f021",
+  "group": "G03",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 200% 茈蓄力 — overall lighting/palette: 蓝红双源、强透视屋顶. Shot: 半身／斜俯拍. Content: 190cm高瘦五条居右，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；肩膀前压，伸出的手占据左前景. Background and lighting: 背景楼面向右后倾斜. Effects painted into the image: 手前紫球核心与向后飞散的雪. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "16–23",
+  "shot": "半身／斜俯拍",
+  "content": "190cm高瘦五条居右，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；肩膀前压，伸出的手占据左前景"
+ },
+ {
+  "id": "f022",
+  "group": "G04",
+  "chars": [],
+  "prompt": "Scene group: 发射前夜 — overall lighting/palette: 紫光压暗环境、远距视线轴. Shot: 大全景／城市高空斜俯. Content: 涩谷方向至新宿的城市走廊横贯左下至右上，无人物. Background and lighting: 冷蓝建筑群，远端目标街口. Effects painted into the image: 沿走廊聚拢的紫色空气透镜，不画已命中的爆炸. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "24–32",
+  "shot": "大全景／城市高空斜俯",
+  "content": "涩谷方向至新宿的城市走廊横贯左下至右上，无人物"
+ },
+ {
+  "id": "f023",
+  "group": "G04",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 发射前夜 — overall lighting/palette: 紫光压暗环境、远距视线轴. Shot: 全身／背后低机位. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；前脚踩实、后脚绷直，手臂朝右前方. Background and lighting: 高楼边缘，紫色主光来自右前. Effects painted into the image: 白袍向后拉直，脚边碎石离地. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "24–32",
+  "shot": "全身／背后低机位",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；前脚踩实、后脚绷直，手臂朝右前方"
+ },
+ {
+  "id": "f024",
+  "group": "G04",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 发射前夜 — overall lighting/palette: 紫光压暗环境、远距视线轴. Shot: 脸部近景／三分侧面. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；笑容收起，抬眼望向左上. Background and lighting: 新宿空街，冷青天光. Effects painted into the image: 紫色窄光扫过瞳孔和鼻梁. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "24–32",
+  "shot": "脸部近景／三分侧面",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；笑容收起，抬眼望向左上"
+ },
+ {
+  "id": "f025",
+  "group": "G04",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 发射前夜 — overall lighting/palette: 紫光压暗环境、远距视线轴. Shot: 手部近景／仰拍. Content: 175cm宿傩，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；双臂向上交叉防御，手掌朝来袭方向. Background and lighting: 天空被楼宇切成斜三角. Effects painted into the image: 袖口被紫色风压掀起. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "24–32",
+  "shot": "手部近景／仰拍",
+  "content": "175cm宿傩，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；双臂向上交叉防御，手掌朝来袭方向"
+ },
+ {
+  "id": "f026",
+  "group": "G04",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 发射前夜 — overall lighting/palette: 紫光压暗环境、远距视线轴. Shot: 眼睛大特写／偏轴. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；单眼居右，目光锁定画外左下. Background and lighting: 面部暗紫阴影，瞳孔冷蓝. Effects painted into the image: 瞳孔中压缩到一点的紫光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "24–32",
+  "shot": "眼睛大特写／偏轴",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；单眼居右，目光锁定画外左下"
+ },
+ {
+  "id": "f027",
+  "group": "G04",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 发射前夜 — overall lighting/palette: 紫光压暗环境、远距视线轴. Shot: 全景／极低广角. Content: 190cm高瘦五条居左后方，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；前伸手掌巨大，占右前景. Background and lighting: 屋顶向后急剧收束. Effects painted into the image: 拳头前方紧缩紫核，外圈空间扭曲. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "24–32",
+  "shot": "全景／极低广角",
+  "content": "190cm高瘦五条居左后方，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；前伸手掌巨大，占右前景"
+ },
+ {
+  "id": "f028",
+  "group": "G04",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 发射前夜 — overall lighting/palette: 紫光压暗环境、远距视线轴. Shot: 大全景／发射轴线正视. Content: 190cm高瘦五条为远处中央轮廓，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；双脚锁定，手指前送. Background and lighting: 画面四周建筑被压暗. Effects painted into the image: 中央紫核与沿地面延伸的发射导光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "24–32",
+  "shot": "大全景／发射轴线正视",
+  "content": "190cm高瘦五条为远处中央轮廓，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；双脚锁定，手指前送"
+ },
+ {
+  "id": "f029",
+  "group": "G05",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 首次茈命中 — overall lighting/palette: 新宿街道、紫白爆压、浓烟. Shot: 大全景／街道侧向广角. Content: 175cm宿傩位于右侧冲击中心，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；交叉双臂迎击左侧来袭. Background and lighting: 街道楼面被紫白光照亮. Effects painted into the image: 巨大紫束从左贯入，地面翻卷，接触点强亮但保留轮廓. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "33–35",
+  "shot": "大全景／街道侧向广角",
+  "content": "175cm宿傩位于右侧冲击中心，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，藏青高领学生制服；交叉双臂迎击左侧来袭"
+ },
+ {
+  "id": "f030",
+  "group": "G05",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 首次茈命中 — overall lighting/palette: 新宿街道、紫白爆压、浓烟. Shot: 中景／斜仰拍. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；身体向后折，双臂完全被强光和烟遮住. Background and lighting: 后方楼体斜倾，紫色逆光. Effects painted into the image: 紫束分叉、无血的衣袖碎片. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "33–35",
+  "shot": "中景／斜仰拍",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；身体向后折，双臂完全被强光和烟遮住"
+ },
+ {
+  "id": "f031",
+  "group": "G05",
+  "chars": [],
+  "prompt": "Scene group: 首次茈命中 — overall lighting/palette: 新宿街道、紫白爆压、浓烟. Shot: 大全景／正面低机位. Content: 无人物可辨，街道中央巨型烟墙，左右建筑立面向外剥离. Background and lighting: 灰紫烟尘，左上白光. Effects painted into the image: 环状冲击波、碎石射向镜头. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "33–35",
+  "shot": "大全景／正面低机位",
+  "content": "无人物可辨，街道中央巨型烟墙，左右建筑立面向外剥离"
+ },
+ {
+  "id": "f032",
+  "group": "G05",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 首次茈命中 — overall lighting/palette: 新宿街道、紫白爆压、浓烟. Shot: 半身／烟中平视. Content: 175cm宿傩居中，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；断臂位置藏在烟后，只见肩部与空袖轮廓，表情冷硬. Background and lighting: 暗灰浓烟，右侧紫余光. Effects painted into the image: 肩侧淡白修复光，不画断面. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "33–35",
+  "shot": "半身／烟中平视",
+  "content": "175cm宿傩居中，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；断臂位置藏在烟后，只见肩部与空袖轮廓，表情冷硬"
+ },
+ {
+  "id": "f033",
+  "group": "G05",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 首次茈命中 — overall lighting/palette: 新宿街道、紫白爆压、浓烟. Shot: 手部近景／侧逆光. Content: 175cm宿傩，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；新生右手从烟里张开，手指朝左. Background and lighting: 黑灰烟幕，冷白侧光. Effects painted into the image: 手腕周围反转术式蒸汽. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "34–35",
+  "shot": "手部近景／侧逆光",
+  "content": "175cm宿傩，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；新生右手从烟里张开，手指朝左"
+ },
+ {
+  "id": "f034",
+  "group": "G05",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 首次茈命中 — overall lighting/palette: 新宿街道、紫白爆压、浓烟. Shot: 中景／低位正面. Content: 175cm宿傩居左，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；双臂已恢复，握拳，向右露出尖牙. Background and lighting: 破碎道路与燃着余光的楼面. Effects painted into the image: 肩部白色蒸汽、落下的碎玻璃. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "34–35",
+  "shot": "中景／低位正面",
+  "content": "175cm宿傩居左，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；双臂已恢复，握拳，向右露出尖牙"
+ },
+ {
+  "id": "f035",
+  "group": "G05",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 首次茈命中 — overall lighting/palette: 新宿街道、紫白爆压、浓烟. Shot: 全景／侧后方. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；从低空落向街口，前脚伸出，身体朝右. Background and lighting: 受创街区，紫光褪成冷青. Effects painted into the image: 脚下环状风压，袍摆拖出弧线. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "35–36",
+  "shot": "全景／侧后方",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；从低空落向街口，前脚伸出，身体朝右"
+ },
+ {
+  "id": "f036",
+  "group": "G06",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 楼体连锁破坏 — overall lighting/palette: 冷灰建筑、碎玻璃、室内外混光. Shot: 半身／拳头前景广角. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右拳拉后，左手向右勾拽. Background and lighting: 办公楼外墙斜贯背景，左上冷光. Effects painted into the image: 右侧蓝色吸引核，玻璃向其聚拢. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "36–40",
+  "shot": "半身／拳头前景广角",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右拳拉后，左手向右勾拽"
+ },
+ {
+  "id": "f037",
+  "group": "G06",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 楼体连锁破坏 — overall lighting/palette: 冷灰建筑、碎玻璃、室内外混光. Shot: 全景／斜俯拍. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；身体横飞向右后楼面，双臂护头. Background and lighting: 外墙窗格强透视，冷灰日光. Effects painted into the image: 蓝色牵引弧与撞碎的玻璃. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "36–40",
+  "shot": "全景／斜俯拍",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；身体横飞向右后楼面，双臂护头"
+ },
+ {
+  "id": "f038",
+  "group": "G06",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 楼体连锁破坏 — overall lighting/palette: 冷灰建筑、碎玻璃、室内外混光. Shot: 中景／低位侧拍. Content: 175cm宿傩居左，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；右手两指横划向右，眼神锐利. Background and lighting: 五条身后的高楼占满右背景，冷光. Effects painted into the image: 一条极细直线切开楼体，切口错位. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "36–40",
+  "shot": "中景／低位侧拍",
+  "content": "175cm宿傩居左，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；右手两指横划向右，眼神锐利"
+ },
+ {
+  "id": "f039",
+  "group": "G06",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 楼体连锁破坏 — overall lighting/palette: 冷灰建筑、碎玻璃、室内外混光. Shot: 大全景／街心仰拍. Content: 190cm高瘦五条居左下，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；侧身抬眼，准备闪入建筑下方. Background and lighting: 被切高楼从右上倒向左下. Effects painted into the image: 横贯楼面的细斩痕、巨大尘浪. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "36–40",
+  "shot": "大全景／街心仰拍",
+  "content": "190cm高瘦五条居左下，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；侧身抬眼，准备闪入建筑下方"
+ },
+ {
+  "id": "f040",
+  "group": "G06",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 楼体连锁破坏 — overall lighting/palette: 冷灰建筑、碎玻璃、室内外混光. Shot: 双人中近景／贴身侧拍. Content: 左为190cm高瘦五条，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；右为175cm宿傩，黑刺发红眼固定面纹尖牙，破损藏青高领制服；五条抓住宿傩前冲右拳. Background and lighting: 倒塌楼体内部，斜射冷光. Effects painted into the image: 宿傩贴体半透明展延薄膜，接触点无蓝光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "36–40",
+  "shot": "双人中近景／贴身侧拍",
+  "content": "左为190cm高瘦五条，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；右为175cm宿傩，黑刺发红眼固定面纹尖牙，破损藏青高领制服；五条抓住宿傩前冲右拳"
+ },
+ {
+  "id": "f041",
+  "group": "G06",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 楼体连锁破坏 — overall lighting/palette: 冷灰建筑、碎玻璃、室内外混光. Shot: 双人全景／门框横截构图. Content: 左为190cm高瘦五条，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；右为175cm宿傩，黑刺发红眼固定面纹尖牙，破损藏青高领制服；隔一扇门同时挥拳向中央. Background and lighting: 崩塌办公室，中央门框保持清晰. Effects painted into the image: 拳头两侧空气压缩，门板未完全碎开. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "36–40",
+  "shot": "双人全景／门框横截构图",
+  "content": "左为190cm高瘦五条，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；右为175cm宿傩，黑刺发红眼固定面纹尖牙，破损藏青高领制服；隔一扇门同时挥拳向中央"
+ },
+ {
+  "id": "f042",
+  "group": "G06",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 楼体连锁破坏 — overall lighting/palette: 冷灰建筑、碎玻璃、室内外混光. Shot: 大全景／从门板后方看. Content: 190cm高瘦五条居左，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩居右，黑刺发红眼固定面纹尖牙，破损藏青高领制服；双拳已穿过中央门板. Background and lighting: 整层楼结构向镜头炸裂，右后白光. Effects painted into the image: 木屑、混凝土碎块、径向冲击环. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "36–40",
+  "shot": "大全景／从门板后方看",
+  "content": "190cm高瘦五条居左，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩居右，黑刺发红眼固定面纹尖牙，破损藏青高领制服；双拳已穿过中央门板"
+ },
+ {
+  "id": "f043",
+  "group": "G07",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 路口连击与结印 — overall lighting/palette: 青灰路面、红绿灯、蓝色吸引光. Shot: 近景／拳头逼近镜头. Content: 190cm高瘦五条居左后，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右勾拳由左下轰向右上，眼神兴奋. Background and lighting: 路口红绿灯虚化，冷青侧光. Effects painted into the image: 拳侧短促蓝弧、背景斜速度线. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "41–48、99–101",
+  "shot": "近景／拳头逼近镜头",
+  "content": "190cm高瘦五条居左后，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右勾拳由左下轰向右上，眼神兴奋"
+ },
+ {
+  "id": "f044",
+  "group": "G07",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 路口连击与结印 — overall lighting/palette: 青灰路面、红绿灯、蓝色吸引光. Shot: 全景／楼面斜俯. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；背部贴着外墙被拖向左，手撑墙急停. Background and lighting: 玻璃楼面斜穿画面. Effects painted into the image: 蓝色牵引线、长条碎玻璃尾迹. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "41–48",
+  "shot": "全景／楼面斜俯",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；背部贴着外墙被拖向左，手撑墙急停"
+ },
+ {
+  "id": "f045",
+  "group": "G07",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 路口连击与结印 — overall lighting/palette: 青灰路面、红绿灯、蓝色吸引光. Shot: 全身／仰拍. Content: 190cm高瘦五条居上左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；空中旋身，右腿踢向右下. Background and lighting: 街口俯缩，左上硬光. Effects painted into the image: 脚尖压缩空气弧、衣摆螺旋. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "41–48",
+  "shot": "全身／仰拍",
+  "content": "190cm高瘦五条居上左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；空中旋身，右腿踢向右下"
+ },
+ {
+  "id": "f046",
+  "group": "G07",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 路口连击与结印 — overall lighting/palette: 青灰路面、红绿灯、蓝色吸引光. Shot: 中景／广角平视. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；急转头向左，双臂守中线. Background and lighting: 红绿灯杆偏斜，青灰背景. Effects painted into the image: 左侧只画模糊白袍残影，不画第二个实体五条. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "41–48",
+  "shot": "中景／广角平视",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；急转头向左，双臂守中线"
+ },
+ {
+  "id": "f047",
+  "group": "G07",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 路口连击与结印 — overall lighting/palette: 青灰路面、红绿灯、蓝色吸引光. Shot: 双人中景／倾斜低机位. Content: 190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，破损藏青高领制服；拳臂相撞，肩膀互相压近. Background and lighting: 路口信号灯在上方，右后白光. Effects painted into the image: 接触点黑红裂电基底、短冲击环. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "41–47",
+  "shot": "双人中景／倾斜低机位",
+  "content": "190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，破损藏青高领制服；拳臂相撞，肩膀互相压近"
+ },
+ {
+  "id": "f048",
+  "group": "G07",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 路口连击与结印 — overall lighting/palette: 青灰路面、红绿灯、蓝色吸引光. Shot: 半身／正面略仰. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；胸前结印，嘴角收紧，肩线稳定. Background and lighting: 废墟街口压暗，眼部冷蓝光. Effects painted into the image: 脚下细蓝环，留右侧字幕空间. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "48",
+  "shot": "半身／正面略仰",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；胸前结印，嘴角收紧，肩线稳定"
+ },
+ {
+  "id": "f049",
+  "group": "G07",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 路口连击与结印 — overall lighting/palette: 青灰路面、红绿灯、蓝色吸引光. Shot: 半身／正面略俯. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；胸前结印，直视左方，露尖牙. Background and lighting: 废墟街口压暗，左侧暗红光. Effects painted into the image: 脚下暗红环，留左侧字幕空间. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "48",
+  "shot": "半身／正面略俯",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；胸前结印，直视左方，露尖牙"
+ },
+ {
+  "id": "f050",
+  "group": "G08",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 首次领域破裂 — overall lighting/palette: 宇宙蓝黑与神龛暗红. Shot: 中近景／正面. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；结印完成，目光直视前方. Background and lighting: 深蓝无限空间，右侧留空. Effects painted into the image: 细白信息流、蓝色球形边界. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "49–53",
+  "shot": "中近景／正面",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；结印完成，目光直视前方"
+ },
+ {
+  "id": "f051",
+  "group": "G08",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 首次领域破裂 — overall lighting/palette: 宇宙蓝黑与神龛暗红. Shot: 全景／低位仰拍. Content: 175cm宿傩居中下方，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；双手结印站稳. Background and lighting: 开放街区中巨大伏魔御厨子，暗红逆光. Effects painted into the image: 神龛轮廓、空气中的细密切线，无封闭罩. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "49–53",
+  "shot": "全景／低位仰拍",
+  "content": "175cm宿傩居中下方，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；双手结印站稳"
+ },
+ {
+  "id": "f052",
+  "group": "G08",
+  "chars": [],
+  "prompt": "Scene group: 首次领域破裂 — overall lighting/palette: 宇宙蓝黑与神龛暗红. Shot: 大全景／高空俯拍. Content: 无人物可辨，小型蓝黑球形结界位于街区中央，神龛处于开放环境. Background and lighting: 冷灰街网，外围暗红照明. Effects painted into the image: 斩击由球体外侧切入，路径清楚. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "49–53",
+  "shot": "大全景／高空俯拍",
+  "content": "无人物可辨，小型蓝黑球形结界位于街区中央，神龛处于开放环境"
+ },
+ {
+  "id": "f053",
+  "group": "G08",
+  "chars": [],
+  "prompt": "Scene group: 首次领域破裂 — overall lighting/palette: 宇宙蓝黑与神龛暗红. Shot: 大全景／结界外侧近观. Content: 无人物可辨，蓝黑球形表面向外碎裂成大片. Background and lighting: 新宿街区被红黑光染暗. Effects painted into the image: 外侧细斩线与向外剥落的蓝色结界碎片. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "49–53",
+  "shot": "大全景／结界外侧近观",
+  "content": "无人物可辨，蓝黑球形表面向外碎裂成大片"
+ },
+ {
+  "id": "f054",
+  "group": "G08",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 首次领域破裂 — overall lighting/palette: 宇宙蓝黑与神龛暗红. Shot: 半身／斜侧近拍. Content: 190cm高瘦五条居右，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；双臂护住上身，咬紧牙关. Background and lighting: 暗红神龛空间，左后硬光. Effects painted into the image: 衣料细切痕、白色修复蒸汽，不画血. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "49–53",
+  "shot": "半身／斜侧近拍",
+  "content": "190cm高瘦五条居右，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；双臂护住上身，咬紧牙关"
+ },
+ {
+  "id": "f055",
+  "group": "G08",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 首次领域破裂 — overall lighting/palette: 宇宙蓝黑与神龛暗红. Shot: 近景／脸和肩. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；抬眼向右，表情迅速恢复镇定. Background and lighting: 背景压黑，白蓝侧光. Effects painted into the image: 面部淡白修复光、横掠前景的细斩线. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "49–53",
+  "shot": "近景／脸和肩",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；抬眼向右，表情迅速恢复镇定"
+ },
+ {
+  "id": "f056",
+  "group": "G08",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 首次领域破裂 — overall lighting/palette: 宇宙蓝黑与神龛暗红. Shot: 全身／贴地广角. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；压低重心冲向右前，左臂护脸. Background and lighting: 被切碎的路面、远处神龛. Effects painted into the image: 脚后尘浪，身体外围细小修复光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "49–53",
+  "shot": "全身／贴地广角",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；压低重心冲向右前，左臂护脸"
+ },
+ {
+  "id": "f057",
+  "group": "G09",
+  "chars": [],
+  "prompt": "Scene group: 缩小结界、多轮对撞 — overall lighting/palette: 球体外景与狭窄蓝黑空间. Shot: 大全景／街道高位. Content: 无人物可辨，篮球大小的蓝黑结界悬于碎石中央，周围巨大废墟反衬尺度. Background and lighting: 冷灰环境、蓝色点光. Effects painted into the image: 球体表面细白流线与暗红斩击擦痕. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "54–59",
+  "shot": "大全景／街道高位",
+  "content": "无人物可辨，篮球大小的蓝黑结界悬于碎石中央，周围巨大废墟反衬尺度"
+ },
+ {
+  "id": "f058",
+  "group": "G09",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 缩小结界、多轮对撞 — overall lighting/palette: 球体外景与狭窄蓝黑空间. Shot: 双人全景／空间倾斜. Content: 190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，破损藏青高领制服；同时向中央踏步出拳. Background and lighting: 无限深蓝空间，地面仅一层反光. Effects painted into the image: 两侧压力弧、中间留接触点. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "54–59",
+  "shot": "双人全景／空间倾斜",
+  "content": "190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，破损藏青高领制服；同时向中央踏步出拳"
+ },
+ {
+  "id": "f059",
+  "group": "G09",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 缩小结界、多轮对撞 — overall lighting/palette: 球体外景与狭窄蓝黑空间. Shot: 半身／五条肩后. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；侧身卸力，左肘向前；前景只见白袍虚影. Background and lighting: 狭窄蓝黑空间，右侧暗红光. Effects painted into the image: 贴身展延薄膜、拳风短线. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "54–59",
+  "shot": "半身／五条肩后",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；侧身卸力，左肘向前；前景只见白袍虚影"
+ },
+ {
+  "id": "f060",
+  "group": "G09",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 缩小结界、多轮对撞 — overall lighting/palette: 球体外景与狭窄蓝黑空间. Shot: 半身／宿傩肩后. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右肩前压，左手抓拽，视线锁定右前. Background and lighting: 蓝黑空间，左上蓝光. Effects painted into the image: 掌边小型苍、向手心弯曲的空间线. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "54–59",
+  "shot": "半身／宿傩肩后",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右肩前压，左手抓拽，视线锁定右前"
+ },
+ {
+  "id": "f061",
+  "group": "G09",
+  "chars": [],
+  "prompt": "Scene group: 缩小结界、多轮对撞 — overall lighting/palette: 球体外景与狭窄蓝黑空间. Shot: 大全景／球体近侧. Content: 无人物可辨，小结界表面出现一道从右上到左下的裂纹. Background and lighting: 巨大街道石块作尺度参照，冷灰光. Effects painted into the image: 蓝色裂光与外部红色斩线. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "54–59",
+  "shot": "大全景／球体近侧",
+  "content": "无人物可辨，小结界表面出现一道从右上到左下的裂纹"
+ },
+ {
+  "id": "f062",
+  "group": "G09",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 缩小结界、多轮对撞 — overall lighting/palette: 球体外景与狭窄蓝黑空间. Shot: 双人中景／低位正侧. Content: 190cm高瘦五条居左，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩居右，黑刺发红眼固定面纹尖牙，破损藏青高领制服；五条膝击、宿傩交臂格挡. Background and lighting: 蓝黑领域内部，红蓝双侧光. Effects painted into the image: 接触点白色冲击核、衣摆被压平. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "54–59",
+  "shot": "双人中景／低位正侧",
+  "content": "190cm高瘦五条居左，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩居右，黑刺发红眼固定面纹尖牙，破损藏青高领制服；五条膝击、宿傩交臂格挡"
+ },
+ {
+  "id": "f063",
+  "group": "G09",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 缩小结界、多轮对撞 — overall lighting/palette: 球体外景与狭窄蓝黑空间. Shot: 中景／近地俯视. Content: 190cm高瘦五条居左，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩居右，黑刺发红眼固定面纹尖牙，破损藏青高领制服；两人拉开半步，各自重置手印. Background and lighting: 蓝黑空间中央明亮，边缘破碎. Effects painted into the image: 两侧术式环重新点亮. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "54–59",
+  "shot": "中景／近地俯视",
+  "content": "190cm高瘦五条居左，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩居右，黑刺发红眼固定面纹尖牙，破损藏青高领制服；两人拉开半步，各自重置手印"
+ },
+ {
+  "id": "f064",
+  "group": "G10",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 第五轮、法轮、破域 — overall lighting/palette: 蓝白静止空间转黑影. Shot: 半身／正面近拍. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；手印先一步锁定，眼神坚定. Background and lighting: 背景蓝白骤亮，右侧仍暗. Effects painted into the image: 已经闭合的蓝色术式环. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "60–64",
+  "shot": "半身／正面近拍",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；手印先一步锁定，眼神坚定"
+ },
+ {
+  "id": "f065",
+  "group": "G10",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 第五轮、法轮、破域 — overall lighting/palette: 蓝白静止空间转黑影. Shot: 半身／正面偏右. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；手势停在未完成位置，瞳孔僵直. Background and lighting: 蓝白无限空间，冷顶光. Effects painted into the image: 细白信息线穿过背景，身体无运动尾迹. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "60–64",
+  "shot": "半身／正面偏右",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；手势停在未完成位置，瞳孔僵直"
+ },
+ {
+  "id": "f066",
+  "group": "G10",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 第五轮、法轮、破域 — overall lighting/palette: 蓝白静止空间转黑影. Shot: 中景／拳头前景. Content: 190cm高瘦五条居左后，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右拳直取右前方胸口，表情凶狠. Background and lighting: 蓝白空间倾斜，右后强光. Effects painted into the image: 拳头前方短蓝弧与压缩冲击核. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "60–64",
+  "shot": "中景／拳头前景",
+  "content": "190cm高瘦五条居左后，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右拳直取右前方胸口，表情凶狠"
+ },
+ {
+  "id": "f067",
+  "group": "G10",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 第五轮、法轮、破域 — overall lighting/palette: 蓝白静止空间转黑影. Shot: 半身／侧拍. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；上身受击后弯、双脚仍被定住. Background and lighting: 蓝白空间，左侧冲击光. Effects painted into the image: 胸前衣褶凹陷、无血冲击纹. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "60–64",
+  "shot": "半身／侧拍",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；上身受击后弯、双脚仍被定住"
+ },
+ {
+  "id": "f068",
+  "group": "G10",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 第五轮、法轮、破域 — overall lighting/palette: 蓝白静止空间转黑影. Shot: 近景／头顶仰拍. Content: 175cm宿傩居下方，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；头微垂，视线在阴影里. Background and lighting: 蓝白背景逐渐被黑影吞没. Effects painted into the image: 头上悬浮金色八辐法轮，清楚画出八根辐条. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "60–64",
+  "shot": "近景／头顶仰拍",
+  "content": "175cm宿傩居下方，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；头微垂，视线在阴影里"
+ },
+ {
+  "id": "f069",
+  "group": "G10",
+  "chars": [
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 第五轮、法轮、破域 — overall lighting/palette: 蓝白静止空间转黑影. Shot: 全景／低机位. Content: 魔虚罗约人类2.5倍高，灰白肌肉巨人、头侧两对折叠翼冠、头顶金色八辐轮、右前臂长直宽刃剑、深色布裙；从中央黑影升起，剑臂斜向右下. Background and lighting: 蓝白领域底部裂开黑色影池. Effects painted into the image: 金轮边光、影液向上拉丝. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "64",
+  "shot": "全景／低机位",
+  "content": "魔虚罗约人类2.5倍高，灰白肌肉巨人、头侧两对折叠翼冠、头顶金色八辐轮、右前臂长直宽刃剑、深色布裙；从中央黑影升起，剑臂斜向右下"
+ },
+ {
+  "id": "f070",
+  "group": "G10",
+  "chars": [
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 第五轮、法轮、破域 — overall lighting/palette: 蓝白静止空间转黑影. Shot: 大全景／极低仰拍. Content: 魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折叠翼冠、金色八辐轮、右前臂长直宽刃剑、深色布裙；剑臂向左上劈开空间. Background and lighting: 蓝白领域像玻璃穹顶破裂. Effects painted into the image: 宽大白色剑弧、崩解的结界碎片. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "64",
+  "shot": "大全景／极低仰拍",
+  "content": "魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折叠翼冠、金色八辐轮、右前臂长直宽刃剑、深色布裙；剑臂向左上劈开空间"
+ },
+ {
+  "id": "f071",
+  "group": "G11",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 术式熔断、宿傩宣言 — overall lighting/palette: 废墟尘雾、苍白午后. Shot: 近景／侧俯. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；两指贴近额头，眉头压紧，呼吸急促. Background and lighting: 灰白废墟，左侧冷光. Effects painted into the image: 额侧断续白光，不画医学剖面. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "65–68",
+  "shot": "近景／侧俯",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；两指贴近额头，眉头压紧，呼吸急促"
+ },
+ {
+  "id": "f072",
+  "group": "G11",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 术式熔断、宿傩宣言 — overall lighting/palette: 废墟尘雾、苍白午后. Shot: 手部特写／正面. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；尝试结印的手微微颤抖. Background and lighting: 灰色烟尘背景，光线平冷. Effects painted into the image: 未闭合术式环化成细碎光点. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "65–68",
+  "shot": "手部特写／正面",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；尝试结印的手微微颤抖"
+ },
+ {
+  "id": "f073",
+  "group": "G11",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 术式熔断、宿傩宣言 — overall lighting/palette: 废墟尘雾、苍白午后. Shot: 半身／低位仰拍. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；下巴前伸，张口讥笑，右手松垂. Background and lighting: 背后斜立的废墟梁柱，右侧暗红反光. Effects painted into the image: 肩后细尘、淡金法轮反光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "65–68",
+  "shot": "半身／低位仰拍",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；下巴前伸，张口讥笑，右手松垂"
+ },
+ {
+  "id": "f074",
+  "group": "G11",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 术式熔断、宿傩宣言 — overall lighting/palette: 废墟尘雾、苍白午后. Shot: 眼部近景／正面偏轴. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；眼皮微垂后重新聚焦，目光朝右. Background and lighting: 灰白废墟虚化，蓝色眼光. Effects painted into the image: 眼底细小蓝核重新亮起. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "65–68",
+  "shot": "眼部近景／正面偏轴",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；眼皮微垂后重新聚焦，目光朝右"
+ },
+ {
+  "id": "f075",
+  "group": "G11",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 术式熔断、宿傩宣言 — overall lighting/palette: 废墟尘雾、苍白午后. Shot: 全景／背影低机位. Content: 190cm高瘦五条居左前，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；放下结印双手，改成近战架势. Background and lighting: 空旷废墟广场，冷白天光. Effects painted into the image: 足边蓝色流线，白袍被横风吹起. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "65–68",
+  "shot": "全景／背影低机位",
+  "content": "190cm高瘦五条居左前，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；放下结印双手，改成近战架势"
+ },
+ {
+  "id": "f076",
+  "group": "G11",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 术式熔断、宿傩宣言 — overall lighting/palette: 废墟尘雾、苍白午后. Shot: 半身／侧面近拍. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；指向画外左方，露齿说话. Background and lighting: 灰色楼体残骸，左侧硬光. Effects painted into the image: 指尖微弱切线、背景压暗. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "65–68",
+  "shot": "半身／侧面近拍",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；指向画外左方，露齿说话"
+ },
+ {
+  "id": "f077",
+  "group": "G11",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 术式熔断、宿傩宣言 — overall lighting/palette: 废墟尘雾、苍白午后. Shot: 大全景／高位俯拍. Content: 190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，破损藏青高领制服；两人隔碎石道路对峙. Background and lighting: 大片灰白残骸，下午冷光. Effects painted into the image: 两人之间缓慢横移的尘带. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "65–68",
+  "shot": "大全景／高位俯拍",
+  "content": "190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，破损藏青高领制服；两人隔碎石道路对峙"
+ },
+ {
+  "id": "f078",
+  "group": "G12",
+  "chars": [
+   "gojo",
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 魔虚罗近战、法轮计数 — overall lighting/palette: 混凝土广场、金轮蓝光. Shot: 双人全景／斜低机位. Content: 左为190cm高瘦五条，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；右为魔虚罗，2.5倍人高灰白肌肉、两对折翼冠、金八辐轮、右臂宽直剑、深布裙；五条贴地滑入剑臂内侧. Background and lighting: 灰白广场，左上冷光. Effects painted into the image: 剑尖刮地火花、五条脚后蓝尘. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "69–72",
+  "shot": "双人全景／斜低机位",
+  "content": "左为190cm高瘦五条，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；右为魔虚罗，2.5倍人高灰白肌肉、两对折翼冠、金八辐轮、右臂宽直剑、深布裙；五条贴地滑入剑臂内侧"
+ },
+ {
+  "id": "f079",
+  "group": "G12",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 魔虚罗近战、法轮计数 — overall lighting/palette: 混凝土广场、金轮蓝光. Shot: 半身／手掌前景. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；左掌向镜头张开，右拳拉后. Background and lighting: 混凝土碎块悬空，蓝色侧光. Effects painted into the image: 掌前苍，碎石向左汇聚. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "69–72",
+  "shot": "半身／手掌前景",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；左掌向镜头张开，右拳拉后"
+ },
+ {
+  "id": "f080",
+  "group": "G12",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 魔虚罗近战、法轮计数 — overall lighting/palette: 混凝土广场、金轮蓝光. Shot: 中景／侧向广角. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；身体被拖向左，脚尖擦地，右手试图反击. Background and lighting: 灰白广场，金色轮光反射. Effects painted into the image: 细蓝牵引轨迹与地面擦痕. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "69–72",
+  "shot": "中景／侧向广角",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；身体被拖向左，脚尖擦地，右手试图反击"
+ },
+ {
+  "id": "f081",
+  "group": "G12",
+  "chars": [
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 魔虚罗近战、法轮计数 — overall lighting/palette: 混凝土广场、金轮蓝光. Shot: 近景／仰拍轮与头. Content: 魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；头转向左，轮的一根辐条垂直朝上. Background and lighting: 灰色天空，左后金光. Effects painted into the image: 轮缘一格适应亮痕，其余辐条清楚. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "69–72",
+  "shot": "近景／仰拍轮与头",
+  "content": "魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；头转向左，轮的一根辐条垂直朝上"
+ },
+ {
+  "id": "f082",
+  "group": "G12",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 魔虚罗近战、法轮计数 — overall lighting/palette: 混凝土广场、金轮蓝光. Shot: 双人中景／侧面. Content: 190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，破损藏青高领制服；五条拳头撞向宿傩肋侧. Background and lighting: 灰白废墟，接触点强反差. Effects painted into the image: 黑红裂电基底、短促冲击环. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "69–72",
+  "shot": "双人中景／侧面",
+  "content": "190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，破损藏青高领制服；五条拳头撞向宿傩肋侧"
+ },
+ {
+  "id": "f083",
+  "group": "G12",
+  "chars": [
+   "gojo",
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 魔虚罗近战、法轮计数 — overall lighting/palette: 混凝土广场、金轮蓝光. Shot: 双人全景／高位斜俯. Content: 190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；魔虚罗右侧，2.5倍人高灰白肌肉、两对折翼冠、金八辐轮、右臂宽直剑、深布裙；剑刃越过防御擦中五条肩部，五条扭身撤步. Background and lighting: 灰白广场，右上硬光. Effects painted into the image: 肩部衣料裂开、白色剑痕，无血. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "71–72",
+  "shot": "双人全景／高位斜俯",
+  "content": "190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；魔虚罗右侧，2.5倍人高灰白肌肉、两对折翼冠、金八辐轮、右臂宽直剑、深布裙；剑刃越过防御擦中五条肩部，五条扭身撤步"
+ },
+ {
+  "id": "f084",
+  "group": "G12",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 魔虚罗近战、法轮计数 — overall lighting/palette: 混凝土广场、金轮蓝光. Shot: 近景／肩部侧拍. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；左手扶住破损肩部，眼神朝右，表情警觉. Background and lighting: 混凝土背景，冷蓝侧光. Effects painted into the image: 衣料裂口、修复白雾，无伤口特写. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "71–72",
+  "shot": "近景／肩部侧拍",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；左手扶住破损肩部，眼神朝右，表情警觉"
+ },
+ {
+  "id": "f085",
+  "group": "G13",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 水流、顎吐、三打一 — overall lighting/palette: 暗云废墟、青色电光. Shot: 半身／斜仰拍. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；双手在身前压缩水流，手臂指向左. Background and lighting: 暗灰废墟，青白侧光. Effects painted into the image: 高压水束由右射向左，细水珠形成锥形. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "73–76",
+  "shot": "半身／斜仰拍",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，破损藏青高领学生制服；双手在身前压缩水流，手臂指向左"
+ },
+ {
+  "id": "f086",
+  "group": "G13",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 水流、顎吐、三打一 — overall lighting/palette: 暗云废墟、青色电光. Shot: 全身／贴地广角. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；向右后侧翻身闪避，左掌触地. Background and lighting: 破碎广场，青灰天光. Effects painted into the image: 水束擦过前景、地面被切出窄槽. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "73–76",
+  "shot": "全身／贴地广角",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；向右后侧翻身闪避，左掌触地"
+ },
+ {
+  "id": "f087",
+  "group": "G13",
+  "chars": [
+   "agito"
+  ],
+  "prompt": "Scene group: 水流、顎吐、三打一 — overall lighting/palette: 暗云废墟、青色电光. Shot: 全景／低位仰拍. Content: 顎吐约人类2倍高，炭蓝兽人、银白长鬃、长吻利齿大嘴、青色小眼、爪手、电光手臂；由右后黑影中踏出，张嘴咆哮. Background and lighting: 废墟立柱，冷青逆光. Effects painted into the image: 两臂电光、影池与飞扬银鬃. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "73–76",
+  "shot": "全景／低位仰拍",
+  "content": "顎吐约人类2倍高，炭蓝兽人、银白长鬃、长吻利齿大嘴、青色小眼、爪手、电光手臂；由右后黑影中踏出，张嘴咆哮"
+ },
+ {
+  "id": "f088",
+  "group": "G13",
+  "chars": [
+   "gojo",
+   "sukuna",
+   "mahoraga",
+   "agito"
+  ],
+  "prompt": "Scene group: 水流、顎吐、三打一 — overall lighting/palette: 暗云废墟、青色电光. Shot: 大全景／斜俯三角构图. Content: 中央190cm高瘦五条，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；右175cm宿傩黑刺发红眼固定面纹尖牙藏青高领制服；左魔虚罗2.5倍人高灰白肌肉两对折翼冠金八辐轮右臂宽直剑深布裙；上方顎吐2倍人高炭蓝兽人银长鬃长吻利齿青小眼爪手电臂；三方夹向中央. Background and lighting: 灰黑废墟，青电与金轮双光. Effects painted into the image: 三条不同方向的攻击轨迹. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "73–76",
+  "shot": "大全景／斜俯三角构图",
+  "content": "中央190cm高瘦五条，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；右175cm宿傩黑刺发红眼固定面纹尖牙藏青高领制服；左魔虚罗2.5倍人高灰白肌肉两对折翼冠金八辐轮右臂宽直剑深布裙；上方顎吐2倍人高炭蓝兽人银长鬃长吻利齿青小眼爪手电臂；三方夹向中央"
+ },
+ {
+  "id": "f089",
+  "group": "G13",
+  "chars": [
+   "agito"
+  ],
+  "prompt": "Scene group: 水流、顎吐、三打一 — overall lighting/palette: 暗云废墟、青色电光. Shot: 中景／爪子逼近镜头. Content: 顎吐约人类2倍高，炭蓝兽人、银白长鬃、长吻利齿大嘴、青色小眼、爪手、电光手臂；从右上挥左爪向左下. Background and lighting: 倾斜废墟，青色电光为主光. Effects painted into the image: 爪间电弧、银鬃后甩、短速度线. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "73–76",
+  "shot": "中景／爪子逼近镜头",
+  "content": "顎吐约人类2倍高，炭蓝兽人、银白长鬃、长吻利齿大嘴、青色小眼、爪手、电光手臂；从右上挥左爪向左下"
+ },
+ {
+  "id": "f090",
+  "group": "G13",
+  "chars": [
+   "gojo",
+   "agito"
+  ],
+  "prompt": "Scene group: 水流、顎吐、三打一 — overall lighting/palette: 暗云废墟、青色电光. Shot: 双人中景／低位侧拍. Content: 190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；顎吐右侧，2倍人高炭蓝兽人银长鬃长吻利齿青小眼爪手电臂；五条一拳没入其腹部衣毛轮廓，重心向前. Background and lighting: 灰黑废墟，接触点白光. Effects painted into the image: 腹部黑红裂电、环状风压. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "75–76",
+  "shot": "双人中景／低位侧拍",
+  "content": "190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍；顎吐右侧，2倍人高炭蓝兽人银长鬃长吻利齿青小眼爪手电臂；五条一拳没入其腹部衣毛轮廓，重心向前"
+ },
+ {
+  "id": "f091",
+  "group": "G13",
+  "chars": [
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 水流、顎吐、三打一 — overall lighting/palette: 暗云废墟、青色电光. Shot: 全景／斜仰拍. Content: 魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；远处立定，剑臂横向左挥. Background and lighting: 破碎楼面与暗云，金色轮光. Effects painted into the image: 一条极细远距斩线向左延伸. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "76",
+  "shot": "全景／斜仰拍",
+  "content": "魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；远处立定，剑臂横向左挥"
+ },
+ {
+  "id": "f092",
+  "group": "G14",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 右臂受损、苍压碎顎吐、再蓄力 — overall lighting/palette: 蓝黑废墟、吸引核. Shot: 半身／背侧近拍. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；向左急撤，右臂缺失位置藏在白袍和烟后，右袖空荡. Background and lighting: 灰黑废墟，右侧冷光. Effects painted into the image: 前景细斩线、飞开的袖布，不画血或断面. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "77–82",
+  "shot": "半身／背侧近拍",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；向左急撤，右臂缺失位置藏在白袍和烟后，右袖空荡"
+ },
+ {
+  "id": "f093",
+  "group": "G14",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 右臂受损、苍压碎顎吐、再蓄力 — overall lighting/palette: 蓝黑废墟、吸引核. Shot: 脸与左手特写／仰拍. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍，右臂缺失处隐蔽；左掌向右前伸，咬牙. Background and lighting: 背景压黑，蓝光从左掌照脸. Effects painted into the image: 掌心苍核心、碎石向其偏转. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "77–82",
+  "shot": "脸与左手特写／仰拍",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍，右臂缺失处隐蔽；左掌向右前伸，咬牙"
+ },
+ {
+  "id": "f094",
+  "group": "G14",
+  "chars": [
+   "gojo",
+   "agito"
+  ],
+  "prompt": "Scene group: 右臂受损、苍压碎顎吐、再蓄力 — overall lighting/palette: 蓝黑废墟、吸引核. Shot: 双人中景／侧向广角. Content: 190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍、右臂缺失隐蔽；顎吐右侧，2倍人高炭蓝兽人银长鬃长吻利齿青小眼爪手电臂；五条左掌将苍推入顎吐腹部. Background and lighting: 蓝黑废墟，中心蓝色主光. Effects painted into the image: 腹前蓝球、向中心倒卷的电光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "77–80",
+  "shot": "双人中景／侧向广角",
+  "content": "190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍、右臂缺失隐蔽；顎吐右侧，2倍人高炭蓝兽人银长鬃长吻利齿青小眼爪手电臂；五条左掌将苍推入顎吐腹部"
+ },
+ {
+  "id": "f095",
+  "group": "G14",
+  "chars": [
+   "agito"
+  ],
+  "prompt": "Scene group: 右臂受损、苍压碎顎吐、再蓄力 — overall lighting/palette: 蓝黑废墟、吸引核. Shot: 全景／斜俯拍. Content: 顎吐约人类2倍高，炭蓝兽人、银白长鬃、长吻利齿大嘴、青色小眼、爪手、电光手臂；躯干向腹部蓝核折叠，四肢被吸向中央. Background and lighting: 地面碎块向中心飞，蓝黑主色. Effects painted into the image: 高输出苍、压缩轮廓、无血碎散. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "77–80",
+  "shot": "全景／斜俯拍",
+  "content": "顎吐约人类2倍高，炭蓝兽人、银白长鬃、长吻利齿大嘴、青色小眼、爪手、电光手臂；躯干向腹部蓝核折叠，四肢被吸向中央"
+ },
+ {
+  "id": "f096",
+  "group": "G14",
+  "chars": [
+   "agito"
+  ],
+  "prompt": "Scene group: 右臂受损、苍压碎顎吐、再蓄力 — overall lighting/palette: 蓝黑废墟、吸引核. Shot: 大全景／地面低机位. Content: 顎吐只剩被蓝核吞没的银白鬃毛与炭蓝剪影残片，其原型为2倍人高炭蓝兽人、银长鬃长吻利齿青小眼爪手电臂. Background and lighting: 广场向中心形成漏斗，蓝光照亮烟尘. Effects painted into the image: 苍悬于空中、式神消散粒子. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "79–82",
+  "shot": "大全景／地面低机位",
+  "content": "顎吐只剩被蓝核吞没的银白鬃毛与炭蓝剪影残片，其原型为2倍人高炭蓝兽人、银长鬃长吻利齿青小眼爪手电臂"
+ },
+ {
+  "id": "f097",
+  "group": "G14",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 右臂受损、苍压碎顎吐、再蓄力 — overall lighting/palette: 蓝黑废墟、吸引核. Shot: 半身／正面低机位. Content: 190cm高瘦五条居中，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右臂缺失藏于袍后，左拳收在腰侧，抬头微笑. Background and lighting: 废墟压暗，左上蓝色边光. Effects painted into the image: 左拳微弱黑红电丝、脚边尘粒悬起. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "79–82",
+  "shot": "半身／正面低机位",
+  "content": "190cm高瘦五条居中，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右臂缺失藏于袍后，左拳收在腰侧，抬头微笑"
+ },
+ {
+  "id": "f098",
+  "group": "G14",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 右臂受损、苍压碎顎吐、再蓄力 — overall lighting/palette: 蓝黑废墟、吸引核. Shot: 眼睛大特写／倾斜. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；瞳孔紧锁右前，白发贴着画面上沿. Background and lighting: 深蓝阴影，极窄白色眼光. Effects painted into the image: 瞳孔蓝核、前景悬停的尘粒. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "81–82",
+  "shot": "眼睛大特写／倾斜",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；瞳孔紧锁右前，白发贴着画面上沿"
+ },
+ {
+  "id": "f099",
+  "group": "G15",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 连续黑闪与修复 — overall lighting/palette: 废墟近战、黑红闪电. Shot: 中景／左拳超广角. Content: 190cm高瘦五条居左后，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右臂缺失隐蔽，左拳向右前猛击，笑容锐利. Background and lighting: 灰黑废墟，接触点白光. Effects painted into the image: 左拳黑红裂电、压缩空气核. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "83–87",
+  "shot": "中景／左拳超广角",
+  "content": "190cm高瘦五条居左后，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右臂缺失隐蔽，左拳向右前猛击，笑容锐利"
+ },
+ {
+  "id": "f100",
+  "group": "G15",
+  "chars": [
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 连续黑闪与修复 — overall lighting/palette: 废墟近战、黑红闪电. Shot: 全景／低位侧拍. Content: 魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；上身受击向右后仰，剑臂抬起失衡. Background and lighting: 废墟地面被拉成斜线. Effects painted into the image: 胸侧黑红残电、脚边碎石. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "83–87",
+  "shot": "全景／低位侧拍",
+  "content": "魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；上身受击向右后仰，剑臂抬起失衡"
+ },
+ {
+  "id": "f101",
+  "group": "G15",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 连续黑闪与修复 — overall lighting/palette: 废墟近战、黑红闪电. Shot: 近景／脸与右肩. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右肩藏于白雾，嘴角上扬，目光朝右. Background and lighting: 暗蓝背景，冷白侧光. Effects painted into the image: 反转术式蒸汽沿右侧聚拢，不露断面. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "83–87",
+  "shot": "近景／脸与右肩",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右肩藏于白雾，嘴角上扬，目光朝右"
+ },
+ {
+  "id": "f102",
+  "group": "G15",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 连续黑闪与修复 — overall lighting/palette: 废墟近战、黑红闪电. Shot: 右手特写／侧逆光. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；恢复的右手由雾中握拳，黑袖破口位于腕后. Background and lighting: 灰黑废墟虚化，白蓝逆光. Effects painted into the image: 指缝白色修复光、少量黑红残电. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "84–87",
+  "shot": "右手特写／侧逆光",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；恢复的右手由雾中握拳，黑袖破口位于腕后"
+ },
+ {
+  "id": "f103",
+  "group": "G15",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 连续黑闪与修复 — overall lighting/palette: 废墟近战、黑红闪电. Shot: 双人中景／侧面广角. Content: 190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍、双臂完整；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，严重破损藏青高领制服；五条右拳打中宿傩腹侧. Background and lighting: 灰黑街面，左侧冷光. Effects painted into the image: 接触点黑红裂电、短冲击环. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "85–87",
+  "shot": "双人中景／侧面广角",
+  "content": "190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍、双臂完整；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，严重破损藏青高领制服；五条右拳打中宿傩腹侧"
+ },
+ {
+  "id": "f104",
+  "group": "G15",
+  "chars": [
+   "gojo",
+   "sukuna"
+  ],
+  "prompt": "Scene group: 连续黑闪与修复 — overall lighting/palette: 废墟近战、黑红闪电. Shot: 双人全景／斜俯拍. Content: 190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍、双臂完整；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，严重破损藏青高领制服；五条抓住宿傩衣领旋身甩向右后. Background and lighting: 废墟道路形成圆弧构图. Effects painted into the image: 袍摆和制服拉出相反方向弧线. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "85–87",
+  "shot": "双人全景／斜俯拍",
+  "content": "190cm高瘦五条左侧，雪白短刺发天蓝大眼裸眼，黑高领长袖白阔裤敞白短袍、双臂完整；175cm宿傩右侧，黑刺发红眼固定面纹尖牙，严重破损藏青高领制服；五条抓住宿傩衣领旋身甩向右后"
+ },
+ {
+  "id": "f105",
+  "group": "G15",
+  "chars": [
+   "sukuna",
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 连续黑闪与修复 — overall lighting/palette: 废墟近战、黑红闪电. Shot: 全景／低位仰拍. Content: 175cm宿傩从左飞向右，黑刺发红眼固定面纹尖牙，严重破损藏青高领制服；右后魔虚罗2.5倍人高灰白肌肉两对折翼冠金八辐轮右臂宽直剑深布裙，抬臂迎接. Background and lighting: 断楼之间，灰白天光. Effects painted into the image: 两者接近处的风压与碎石. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "86–87",
+  "shot": "全景／低位仰拍",
+  "content": "175cm宿傩从左飞向右，黑刺发红眼固定面纹尖牙，严重破损藏青高领制服；右后魔虚罗2.5倍人高灰白肌肉两对折翼冠金八辐轮右臂宽直剑深布裙，抬臂迎接"
+ },
+ {
+  "id": "f106",
+  "group": "G16",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 苍与赫分置 — overall lighting/palette: 高空蓝红双源、废墟纵深. Shot: 中景／仰拍. Content: 190cm高瘦五条居左下，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍、双臂完整；抬左手指向左上方苍，右手收于胸前. Background and lighting: 破碎高楼围出天空，左蓝右暗. Effects painted into the image: 高空苍、向其聚拢的云尘. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "88–92",
+  "shot": "中景／仰拍",
+  "content": "190cm高瘦五条居左下，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍、双臂完整；抬左手指向左上方苍，右手收于胸前"
+ },
+ {
+  "id": "f107",
+  "group": "G16",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 苍与赫分置 — overall lighting/palette: 高空蓝红双源、废墟纵深. Shot: 嘴与眼近景／侧面. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；面向右侧咏唱，眼神稳定. Background and lighting: 深蓝天空虚化，左蓝右红侧光. Effects painted into the image: 蓝色细线映在颧骨，右侧红光初现. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "88–92",
+  "shot": "嘴与眼近景／侧面",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；面向右侧咏唱，眼神稳定"
+ },
+ {
+  "id": "f108",
+  "group": "G16",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 苍与赫分置 — overall lighting/palette: 高空蓝红双源、废墟纵深. Shot: 手部特写／广角. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右手两指朝右上，手掌近大远小. Background and lighting: 天空压暗，红色主光. Effects painted into the image: 指前赫核心、向外撑开的红色气环. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "88–92",
+  "shot": "手部特写／广角",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右手两指朝右上，手掌近大远小"
+ },
+ {
+  "id": "f109",
+  "group": "G16",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 苍与赫分置 — overall lighting/palette: 高空蓝红双源、废墟纵深. Shot: 全景／高空斜俯. Content: 190cm高瘦五条居左下，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右手上举，身体朝向右上. Background and lighting: 碎楼如针林，左蓝右红两处光源. Effects painted into the image: 赫向右上飞行，苍悬在更高左侧，两球分离. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "88–92",
+  "shot": "全景／高空斜俯",
+  "content": "190cm高瘦五条居左下，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；右手上举，身体朝向右上"
+ },
+ {
+  "id": "f110",
+  "group": "G16",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 苍与赫分置 — overall lighting/palette: 高空蓝红双源、废墟纵深. Shot: 中景／低位侧拍. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，严重破损藏青高领学生制服；猛抬头看向左上，右手前伸试图阻止. Background and lighting: 废墟背景，蓝红交替照脸. Effects painted into the image: 前景红色弧线掠过，眼中双球倒影. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "88–92",
+  "shot": "中景／低位侧拍",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，严重破损藏青高领学生制服；猛抬头看向左上，右手前伸试图阻止"
+ },
+ {
+  "id": "f111",
+  "group": "G16",
+  "chars": [
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 苍与赫分置 — overall lighting/palette: 高空蓝红双源、废墟纵深. Shot: 全景／剑尖前景仰拍. Content: 魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；向左上跃起，剑臂伸向高空光球. Background and lighting: 灰黑高楼残骸，蓝红边光. Effects painted into the image: 剑尖白色气流、金轮强反射. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "88–92",
+  "shot": "全景／剑尖前景仰拍",
+  "content": "魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；向左上跃起，剑臂伸向高空光球"
+ },
+ {
+  "id": "f112",
+  "group": "G16",
+  "chars": [],
+  "prompt": "Scene group: 苍与赫分置 — overall lighting/palette: 高空蓝红双源、废墟纵深. Shot: 大全景／高空正侧. Content: 无人物近景，左上蓝色苍、右下红色赫沿弧线互相接近，中央留一小段暗空隙. Background and lighting: 完整可辨的城市地平线，深靛蓝天空. Effects painted into the image: 两球各自独立光晕，之间紫色细丝. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "88–92",
+  "shot": "大全景／高空正侧",
+  "content": "无人物近景，左上蓝色苍、右下红色赫沿弧线互相接近，中央留一小段暗空隙"
+ },
+ {
+  "id": "f113",
+  "group": "G17",
+  "chars": [],
+  "prompt": "Scene group: 无指向茈、爆炸、误判胜利 — overall lighting/palette: 球形扩张、白紫废墟. Shot: 大全景／高空广角. Content: 蓝色苍与红色赫在中央相碰，无人物近景. Background and lighting: 深蓝城市天际线，中央紫白主光. Effects painted into the image: 球形紫核向所有方向膨胀，绝不画定向光束. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "93–97",
+  "shot": "大全景／高空广角",
+  "content": "蓝色苍与红色赫在中央相碰，无人物近景"
+ },
+ {
+  "id": "f114",
+  "group": "G17",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 无指向茈、爆炸、误判胜利 — overall lighting/palette: 球形扩张、白紫废墟. Shot: 半身／低位仰拍. Content: 190cm高瘦五条居左下，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；双臂放开，仰脸看向中央上方. Background and lighting: 紫白天空，背后楼体变剪影. Effects painted into the image: 全身紫色轮廓光、衣摆向外鼓起. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "93–97",
+  "shot": "半身／低位仰拍",
+  "content": "190cm高瘦五条居左下，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；双臂放开，仰脸看向中央上方"
+ },
+ {
+  "id": "f115",
+  "group": "G17",
+  "chars": [],
+  "prompt": "Scene group: 无指向茈、爆炸、误判胜利 — overall lighting/palette: 球形扩张、白紫废墟. Shot: 大全景／鸟瞰. Content: 无人物可辨，圆形紫白爆炸覆盖新宿大片街区，中心与外环层次清楚. Background and lighting: 灰黑城市网格，中心极亮外侧暗. Effects painted into the image: 同心球面冲击波、建筑剪影向外倾倒. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "93–97",
+  "shot": "大全景／鸟瞰",
+  "content": "无人物可辨，圆形紫白爆炸覆盖新宿大片街区，中心与外环层次清楚"
+ },
+ {
+  "id": "f116",
+  "group": "G17",
+  "chars": [
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 无指向茈、爆炸、误判胜利 — overall lighting/palette: 球形扩张、白紫废墟. Shot: 全景／低位侧拍. Content: 魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；全身轮廓被紫白光吞没，右臂向前伸. Background and lighting: 背景只剩紫白压力场. Effects painted into the image: 灰白身体与金轮化成无血光屑. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "94–97",
+  "shot": "全景／低位侧拍",
+  "content": "魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；全身轮廓被紫白光吞没，右臂向前伸"
+ },
+ {
+  "id": "f117",
+  "group": "G17",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 无指向茈、爆炸、误判胜利 — overall lighting/palette: 球形扩张、白紫废墟. Shot: 中景／地面侧拍. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，严重破损藏青高领学生制服；单膝跪地、一手撑地，头低垂. Background and lighting: 巨大坑底，灰紫尘雾，左侧余光. Effects painted into the image: 身周残留紫色火星和飘散衣片，无血特写. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "94–98、100–101",
+  "shot": "中景／地面侧拍",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，严重破损藏青高领学生制服；单膝跪地、一手撑地，头低垂"
+ },
+ {
+  "id": "f118",
+  "group": "G17",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 无指向茈、爆炸、误判胜利 — overall lighting/palette: 球形扩张、白紫废墟. Shot: 全身／略低正面. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；双臂完整，放松站立，浅笑，衣服战损. Background and lighting: 坑底远处断楼，紫光褪为苍白日光. Effects painted into the image: 白色修复蒸汽、稀薄紫色余烬. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "95–98、100–101",
+  "shot": "全身／略低正面",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；双臂完整，放松站立，浅笑，衣服战损"
+ },
+ {
+  "id": "f119",
+  "group": "G17",
+  "chars": [],
+  "prompt": "Scene group: 无指向茈、爆炸、误判胜利 — overall lighting/palette: 球形扩张、白紫废墟. Shot: 近景／屏幕侧后. Content: 匿名观战者的模糊侧脸居右前，前景监看屏幕显示巨大爆炸后坑底，不画明确可辨人物. Background and lighting: 暗室，屏幕蓝白光照脸. Effects painted into the image: 屏幕扫描纹与极轻信号噪点. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "97",
+  "shot": "近景／屏幕侧后",
+  "content": "匿名观战者的模糊侧脸居右前，前景监看屏幕显示巨大爆炸后坑底，不画明确可辨人物"
+ },
+ {
+  "id": "f120",
+  "group": "G18",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 世界斩与空间解释 — overall lighting/palette: 灰白巨坑、失去方向的画面. Shot: 中景／平视. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；完整身体站立，微笑尚未消失，地平线保持水平. Background and lighting: 灰白巨坑，柔冷天光，中央留一条无遮挡水平带. Effects painted into the image: 不画血、不画斩线、不画断体，供程序切开整幅画面. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "98–101",
+  "shot": "中景／平视",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；完整身体站立，微笑尚未消失，地平线保持水平"
+ },
+ {
+  "id": "f121",
+  "group": "G18",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 世界斩与空间解释 — overall lighting/palette: 灰白巨坑、失去方向的画面. Shot: 眼部近景／正面. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；瞳孔微缩，表情极轻变化. Background and lighting: 苍白灰色背景，柔顶光. Effects painted into the image: 瞳孔里一条细白水平反射. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "98–101",
+  "shot": "眼部近景／正面",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；瞳孔微缩，表情极轻变化"
+ },
+ {
+  "id": "f122",
+  "group": "G18",
+  "chars": [],
+  "prompt": "Scene group: 世界斩与空间解释 — overall lighting/palette: 灰白巨坑、失去方向的画面. Shot: 大全景／坑底平视. Content: 空无人物的巨坑，建筑、烟柱和地平线完整连续，中央留清晰水平参照物. Background and lighting: 冷灰白天光，左右残墙. Effects painted into the image: 薄尘，无预制错位，供程序斩开空间. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "98–101",
+  "shot": "大全景／坑底平视",
+  "content": "空无人物的巨坑，建筑、烟柱和地平线完整连续，中央留清晰水平参照物"
+ },
+ {
+  "id": "f123",
+  "group": "G18",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 世界斩与空间解释 — overall lighting/palette: 灰白巨坑、失去方向的画面. Shot: 近景／宿傩脸部侧拍. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，严重破损藏青高领学生制服；抬起眼睛，张口低声解释. Background and lighting: 灰白巨坑，左后冷光. Effects painted into the image: 脸边漂浮细尘，无攻击光球. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "98–101",
+  "shot": "近景／宿傩脸部侧拍",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，严重破损藏青高领学生制服；抬起眼睛，张口低声解释"
+ },
+ {
+  "id": "f124",
+  "group": "G18",
+  "chars": [],
+  "prompt": "Scene group: 世界斩与空间解释 — overall lighting/palette: 灰白巨坑、失去方向的画面. Shot: 大全景／抽象空间透视. Content: 空无人物，废墟街道透视网格向中央收束，天空与地面保持同一完整空间. Background and lighting: 近黑与苍白双色. Effects painted into the image: 一条极细白线贯穿近景、远景与天空，强调切开整个空间. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "98–101",
+  "shot": "大全景／抽象空间透视",
+  "content": "空无人物，废墟街道透视网格向中央收束，天空与地面保持同一完整空间"
+ },
+ {
+  "id": "f125",
+  "group": "G18",
+  "chars": [
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 世界斩与空间解释 — overall lighting/palette: 灰白巨坑、失去方向的画面. Shot: 全景／记忆中的低机位. Content: 魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；远处横挥剑臂，姿态与091一致. Background and lighting: 去饱和蓝灰废墟，冷顶光. Effects painted into the image: 横跨整个场景的细斩线，作为示范闪回. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "99–101",
+  "shot": "全景／记忆中的低机位",
+  "content": "魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；远处横挥剑臂，姿态与091一致"
+ },
+ {
+  "id": "f126",
+  "group": "G18",
+  "chars": [
+   "mahoraga"
+  ],
+  "prompt": "Scene group: 世界斩与空间解释 — overall lighting/palette: 灰白巨坑、失去方向的画面. Shot: 近景／抽象法轮. Content: 魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；仅取上半头与悬轮，头朝左. Background and lighting: 近黑记忆背景，金光从上方落下. Effects painted into the image: 八辐法轮边缘与白色空间切线重叠. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "99–101",
+  "shot": "近景／抽象法轮",
+  "content": "魔虚罗约人类2.5倍高，灰白肌肉巨人、两对折翼冠、金八辐轮、右前臂宽直剑、深布裙；仅取上半头与悬轮，头朝左"
+ },
+ {
+  "id": "f127",
+  "group": "G19",
+  "chars": [],
+  "prompt": "Scene group: 机场、南へ — overall lighting/palette: 明亮暖白、玻璃反光、静中快切. Shot: 大全景／候机厅长轴. Content: 明亮机场候机厅，左侧玻璃幕墙，右侧一排空座，远处人影模糊不可辨. Background and lighting: 暖白日光从左倾泻，地面浅金反射. Effects painted into the image: 微小浮尘与玻璃反光，不画文字标牌. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "102–108",
+  "shot": "大全景／候机厅长轴",
+  "content": "明亮机场候机厅，左侧玻璃幕墙，右侧一排空座，远处人影模糊不可辨"
+ },
+ {
+  "id": "f128",
+  "group": "G19",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 机场、南へ — overall lighting/palette: 明亮暖白、玻璃反光、静中快切. Shot: 中景／座椅侧拍. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；完整双臂自然放松地坐着，面向右侧空座. Background and lighting: 明亮候机厅，左侧暖白窗光. Effects painted into the image: 发梢金白边光，背景柔散景. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "102–108",
+  "shot": "中景／座椅侧拍",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；完整双臂自然放松地坐着，面向右侧空座"
+ },
+ {
+  "id": "f129",
+  "group": "G19",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 机场、南へ — overall lighting/palette: 明亮暖白、玻璃反光、静中快切. Shot: 近景／相邻空座. Content: 五条旁边的空座位居中，扶手与坐垫清楚，左边缘仅露白袍一角；五条设定为190cm高瘦、雪白短刺发天蓝大眼裸眼、黑高领长袖白阔裤敞白短袍. Background and lighting: 机场暖白窗光，远处模糊人影. Effects painted into the image: 空座上的柔和窗格光影. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "102–108",
+  "shot": "近景／相邻空座",
+  "content": "五条旁边的空座位居中，扶手与坐垫清楚，左边缘仅露白袍一角；五条设定为190cm高瘦、雪白短刺发天蓝大眼裸眼、黑高领长袖白阔裤敞白短袍"
+ },
+ {
+  "id": "f130",
+  "group": "G19",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 机场、南へ — overall lighting/palette: 明亮暖白、玻璃反光、静中快切. Shot: 半身／正面略侧. Content: 190cm高瘦五条居右，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；靠着座椅轻轻转头向左，表情平静. Background and lighting: 候机厅玻璃墙，暖白逆光. Effects painted into the image: 眼中窗格倒影，柔亮轮廓光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "102–108",
+  "shot": "半身／正面略侧",
+  "content": "190cm高瘦五条居右，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；靠着座椅轻轻转头向左，表情平静"
+ },
+ {
+  "id": "f131",
+  "group": "G19",
+  "chars": [],
+  "prompt": "Scene group: 机场、南へ — overall lighting/palette: 明亮暖白、玻璃反光、静中快切. Shot: 大全景／走廊背向远眺. Content: 机场通道通向左上亮处，前景空置，远处数个旧友般的模糊人影背向镜头，不能辨认脸. Background and lighting: 浅金白色空间，尽头高亮. Effects painted into the image: 柔和空气透视、地面长反光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "102–108",
+  "shot": "大全景／走廊背向远眺",
+  "content": "机场通道通向左上亮处，前景空置，远处数个旧友般的模糊人影背向镜头，不能辨认脸"
+ },
+ {
+  "id": "f132",
+  "group": "G19",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 机场、南へ — overall lighting/palette: 明亮暖白、玻璃反光、静中快切. Shot: 手部近景／侧俯. Content: 190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；完整右手松放在座椅扶手，手指不再绷紧. Background and lighting: 暖白候机厅，左侧柔光. Effects painted into the image: 细微浮尘、手背自然反光. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "102–108",
+  "shot": "手部近景／侧俯",
+  "content": "190cm高瘦五条，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；完整右手松放在座椅扶手，手指不再绷紧"
+ },
+ {
+  "id": "f133",
+  "group": "G19",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 机场、南へ — overall lighting/palette: 明亮暖白、玻璃反光、静中快切. Shot: 背影全景／低位长焦. Content: 190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；坐在座椅上望向右侧明亮窗外，旁边空座完整入画. Background and lighting: 机场白金色光线，远处人影模糊. Effects painted into the image: 袍角柔亮，窗外没有可读文字. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "102–108",
+  "shot": "背影全景／低位长焦",
+  "content": "190cm高瘦五条居左，蓬松雪白短刺发、天蓝大眼裸眼，黑高领长袖＋白阔裤＋敞白短袍；坐在座椅上望向右侧明亮窗外，旁边空座完整入画"
+ },
+ {
+  "id": "f134",
+  "group": "G20",
+  "chars": [],
+  "prompt": "Scene group: 黄昏巨坑、片名 — overall lighting/palette: 暖金与灰黑、低风. Shot: 大全景／巨坑高位俯拍. Content: 无可辨近景人物，巨大圆坑占满画面，残楼沿边缘排列，构图呼应115. Background and lighting: 黄昏暖金光自左后进入，坑底灰黑. Effects painted into the image: 薄尘横移、少量紫色余烬. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "109–114",
+  "shot": "大全景／巨坑高位俯拍",
+  "content": "无可辨近景人物，巨大圆坑占满画面，残楼沿边缘排列，构图呼应115"
+ },
+ {
+  "id": "f135",
+  "group": "G20",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 黄昏巨坑、片名 — overall lighting/palette: 暖金与灰黑、低风. Shot: 全身／低位远景. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，严重破损藏青高领学生制服；站在坑底，肩膀下沉，看向左侧画外. Background and lighting: 黄昏废墟，左后金色逆光. Effects painted into the image: 脚边低矮尘带，无血细节. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "109–114",
+  "shot": "全身／低位远景",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，严重破损藏青高领学生制服；站在坑底，肩膀下沉，看向左侧画外"
+ },
+ {
+  "id": "f136",
+  "group": "G20",
+  "chars": [
+   "sukuna"
+  ],
+  "prompt": "Scene group: 黄昏巨坑、片名 — overall lighting/palette: 暖金与灰黑、低风. Shot: 半身／三分侧面. Content: 175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，严重破损藏青高领学生制服；微抬下巴，嘴角收敛，神情认真地说话. Background and lighting: 暖金巨坑，左侧落日照亮面纹. Effects painted into the image: 暗部冷灰，细尘掠过肩头. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "109–114",
+  "shot": "半身／三分侧面",
+  "content": "175cm宿傩居右，黑刺发红眼、眼下双细纹及额眉黑纹、尖牙，严重破损藏青高领学生制服；微抬下巴，嘴角收敛，神情认真地说话"
+ },
+ {
+  "id": "f137",
+  "group": "G20",
+  "chars": [
+   "gojo"
+  ],
+  "prompt": "Scene group: 黄昏巨坑、片名 — overall lighting/palette: 暖金与灰黑、低风. Shot: 近景／碎石俯拍. Content: 破碎路面上落着一角白色和服布料，衣料结构对应五条敞开的白短和服外袍；不出现身体或血迹. Background and lighting: 暖金侧光拉长碎石影子. Effects painted into the image: 一粒紫色余烬在布边熄灭. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "109–114",
+  "shot": "近景／碎石俯拍",
+  "content": "破碎路面上落着一角白色和服布料，衣料结构对应五条敞开的白短和服外袍；不出现身体或血迹"
+ },
+ {
+  "id": "f138",
+  "group": "G20",
+  "chars": [],
+  "prompt": "Scene group: 黄昏巨坑、片名 — overall lighting/palette: 暖金与灰黑、低风. Shot: 大全景／废墟街轴. Content: 无人物，断裂路灯与斑马线指向远处巨坑，构图呼应001. Background and lighting: 黄昏金灰主色，天空浅橙. Effects painted into the image: 小雪与尘粒混合，风向统一向右. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "109–114",
+  "shot": "大全景／废墟街轴",
+  "content": "无人物，断裂路灯与斑马线指向远处巨坑，构图呼应001"
+ },
+ {
+  "id": "f139",
+  "group": "G20",
+  "chars": [],
+  "prompt": "Scene group: 黄昏巨坑、片名 — overall lighting/palette: 暖金与灰黑、低风. Shot: 大全景／天空占大半. Content: 无人物，低处新宿残破天际线，中间留宽阔干净暗云区供片名. Background and lighting: 落日金边、灰蓝天空. Effects painted into the image: 微弱烟柱、稀疏余烬，不画文字. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "112–114",
+  "shot": "大全景／天空占大半",
+  "content": "无人物，低处新宿残破天际线，中间留宽阔干净暗云区供片名"
+ },
+ {
+  "id": "f140",
+  "group": "G20",
+  "chars": [],
+  "prompt": "Scene group: 黄昏巨坑、片名 — overall lighting/palette: 暖金与灰黑、低风. Shot: 纯环境近景／平视. Content: 无人物，近黑烟尘幕中保留极淡城市轮廓，中央留完整片名字区. Background and lighting: 黑灰底、极细暖金地平线. Effects painted into the image: 三五粒渐暗紫色余烬，不画文字. (Chinese descriptions; 'nude eyes/裸眼' means no blindfold and no sunglasses. Keep clean crop margins of about 12% around the main action.)",
+  "bars": "113–片尾",
+  "shot": "纯环境近景／平视",
+  "content": "无人物，近黑烟尘幕中保留极淡城市轮廓，中央留完整片名字区"
+ }
+]

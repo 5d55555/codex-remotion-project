@@ -546,6 +546,15 @@ def s_memory():
     return x[::-1].copy()  # 反向的混响
 
 
+def s_suck_short():
+    return s_suck(0.35)
+
+
+def s_ring():
+    t = T(1.6)
+    return np.sin(2 * np.pi * 4200 * t) * env_ar(len(t), 0.05, 1.2) * 0.4
+
+
 def s_airport():
     d = 6
     n = int(d * SR)
@@ -567,7 +576,7 @@ SFX = {
     'sword_hum': (s_sword_hum, -14), 'sword_cut': (s_sword_cut, -2), 'fizzle': (s_fizzle, -10), 'land_heavy': (s_land_heavy, -4), 'jump': (s_jump, -10),
     'red_charge': (s_red_charge, -8), 'red_fire': (s_red_fire, -3), 'jet': (s_jet, -8), 'swallow': (s_swallow, -6), 'purple_form': (s_purple_form, -4),
     'reverse_suck': (s_reverse_suck, -6), 'purple_boom': (s_purple_boom, 0), 'shockwave': (s_shockwave, -5), 'rumble': (s_rumble, -8),
-    'dissolve': (s_dissolve, -10), 'heartbeat': (s_heartbeat, -6), 'world_cut': (s_world_cut, 0), 'memory': (s_memory, -12), 'airport_air': (s_airport, -18),
+    'dissolve': (s_dissolve, -10), 'heartbeat': (s_heartbeat, -6), 'world_cut': (s_world_cut, 0), 'memory': (s_memory, -12), 'airport_air': (s_airport, -18), 'suck_short': (s_suck_short, -10), 'ring': (s_ring, -12),
 }
 
 

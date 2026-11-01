@@ -1,5 +1,29 @@
 # 新宿決戦（project-09）
 
+> **当前是第二版（v2）。**第一版用游戏里的像素小人，用户反馈“节奏过慢、出招非常慢、用游戏素材有局限”，于是推倒重做：
+> 先查资料、出角色设定，再重新绘制 140 张动画关键帧，按 140.8 BPM 半拍级快切。第一版的说明保留在下面“第一版”一节。
+
+## 第二版（v2）
+
+| 步骤 | 内容 / 命令 | 产物 |
+|---|---|---|
+| 资料 | Luna 联网：`notes/research/R5_panels.md`（逐话动作链与名场面）、`R6_designs.md`（新宿决战造型）、`R7_method.md`（静帧快剪方法） | |
+| 角色设定 | Luna 生图：五条（黑高领上衣 + 白阔裤 + 敞开的白短和服外袍，裸眼）、宿傩（伏黑惠的身体、藏青高领制服、面纹）、魔虚罗、顎吐 | `art/refs/*.jpg`，之后每张关键帧都附带这几张设定图 |
+| 分镜 | Astra：`notes/research/A2_board.md`——(A) 140 张插画清单（20 组）、(B) 532 个切点的剪辑表（运动码、特效码、音效码） | `art/frames.json`、`src/v2/edl.json`（由表格解析） |
+| 关键帧 | `CODEX_MODEL=<模型> python3 scripts/gen_batch.py -j10`：每张一个独立 `CODEX_HOME` 的 Luna 任务（避免并行任务互相拿错图），只取任务自己生成目录里的图，裁成 16:9 | `public/frames/fNNN.jpg` |
+| 焦点标注 | `CODEX_MODEL=<模型> python3 scripts/annotate.py`：Luna 看图标出主点、脸、手、脚、光球和动作方向 | `src/v2/focus.json` |
+| 剪辑引擎 | `src/v2/film2.ts`、`cut.ts`：运动码（推/拉/预/冲/击/退/接/掠…）、冲击帧（高反差黑白 / 反色 / 黑闪）、拖影、速度线、震屏、术式光、世界斩整帧错切；脸部尽量不被裁掉 | |
+| 文字 | `src/v2/texts.ts`（时间取自剪辑表里写了字幕的切点） | |
+| 音效 | `python3 scripts/cues_v2.py && python3 scripts/sfx.py && bash scripts/mix.sh` | `out/mix.wav` |
+| 渲染 | `bash scripts/render.sh [幕号…]`，`bash scripts/mux.sh` | `out/新宿決戦.mp4` |
+
+- 平均每 0.37 秒一个切点（中位数一拍 0.426 秒），打斗段半拍一切，命中前 3 帧是冲击帧。
+- 生图额度在画到第 123 张时用完（24 小时窗口），缺的 17 张（f093、f101–f109、f131、f135–f140）先用内容最接近的已有插画顶替，见 `film2.ts` 的 `SUBSTITUTE`；额度恢复后跑 `gen_batch.py` 补画（已有的会跳过），再跑 `annotate.py`，然后重写 `src/v2/frames_have.json`（`ls public/frames | sed -n 's/\.jpg$//p' | python3 -c "import sys,json;print(json.dumps(sys.stdin.read().split()))" > src/v2/frames_have.json`，顶替表随之失效），重渲第 4–6 幕。
+
+---
+
+## 第一版（像素小人版，已被替换）
+
 五条悟 vs 两面宿傩「人外魔境新宿决战」（原作第 221–236 话）的像素风同人短片：1920×1080、60fps、197.17 s，配乐是游戏里的原曲（不剪不改）。
 角色用游戏 `android-shinjuku` 的像素纸娃娃，背景、立绘、特效、文字都是这里程序化合成的，没有用任何动画原片画面。
 
