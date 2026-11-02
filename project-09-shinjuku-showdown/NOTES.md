@@ -18,7 +18,7 @@
 | 渲染 | `bash scripts/render.sh [幕号…]`，`bash scripts/mux.sh` | `out/新宿決戦.mp4` |
 
 - 平均每 0.37 秒一个切点（中位数一拍 0.426 秒），打斗段半拍一切，命中前 3 帧是冲击帧。
-- 生图额度在画到第 123 张时用完（24 小时窗口），缺的 17 张（f093、f101–f109、f131、f135–f140）先用内容最接近的已有插画顶替，见 `film2.ts` 的 `SUBSTITUTE`；额度恢复后跑 `gen_batch.py` 补画（已有的会跳过），再跑 `annotate.py`，然后重写 `src/v2/frames_have.json`（`ls public/frames | sed -n 's/\.jpg$//p' | python3 -c "import sys,json;print(json.dumps(sys.stdin.read().split()))" > src/v2/frames_have.json`，顶替表随之失效），重渲第 4–6 幕。
+- 生图额度在画到第 123 张时用完（24 小时窗口），缺的 17 张（f093、f101–f109、f131、f135–f140）先用内容最接近的已有插画顶替（`film2.ts` 的 `SUBSTITUTE`）。11 月 2 日额度恢复后已补画（`gen_batch.py`，逐张对照设定图目检）、补标注（`annotate.py`）、重写 `src/v2/frames_have.json` 并重渲第 4–6 幕，140 张全是原画，顶替表不再生效（留着以防以后删图）。以后再缺图照此办理：`ls public/frames | sed -n 's/\.jpg$//p' | python3 -c "import sys,json;print(json.dumps(sys.stdin.read().split()))" > src/v2/frames_have.json`。
 
 ---
 
