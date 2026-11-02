@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 设置（v0.16）：总音量、音乐、技能音效（开关 + 音量）。背景和主页一样是代码绘制的新宿夜景 -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <com.shinjuku.showdown.ShinjukuView
+        android:id="@+id/scene"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no" />
+
+    <ScrollView
+        android:id="@+id/settings_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="true"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="0.8" />
+
+            <TextView
+                android:id="@+id/settings_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.3"
+                android:shadowColor="#CCE0283C"
+                android:shadowRadius="22"
+                android:text="@string/settings"
+                android:textColor="@color/text"
+                android:textSize="34sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="140dp"
+                android:layout_height="1.5dp"
+                android:layout_marginTop="10dp"
+                android:background="#668FA7FF" />
+
+            <LinearLayout
+                android:id="@+id/settings_panel"
+                android:layout_width="@dimen/settings_width"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:background="@drawable/settings_panel"
+                android:orientation="vertical"
+                android:paddingLeft="20dp"
+                android:paddingTop="16dp"
+                android:paddingRight="20dp"
+                android:paddingBottom="16dp">
+
+                <LinearLayout style="@style/SettingRow">
+                    <TextView style="@style/SettingLabel" android:text="@string/master_volume" />
+                    <TextView android:id="@+id/master_value" style="@style/SettingValue" />
+                </LinearLayout>
+
+                <SeekBar
+                    android:id="@+id/master_seek"
+                    style="@style/SettingSeek"
+                    android:contentDescription="@string/master_volume" />
+
+                <LinearLayout style="@style/SettingRow" android:layout_marginTop="14dp">
+                    <TextView style="@style/SettingLabel" android:text="@string/music_volume" />
+                    <TextView android:id="@+id/music_value" style="@style/SettingValue" />
+                </LinearLayout>
+
+                <SeekBar
+                    android:id="@+id/music_seek"
+                    style="@style/SettingSeek"
+                    android:contentDescription="@string/music_volume" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="16dp"
+                    android:background="#338FA7FF" />
+
+                <LinearLayout style="@style/SettingRow" android:layout_marginTop="12dp">
+                    <TextView style="@style/SettingLabel" android:text="@string/sfx" />
+                    <Switch
+                        android:id="@+id/sfx_switch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="@string/sfx"
+                        android:minHeight="48dp" />
+                </LinearLayout>
+
+                <LinearLayout style="@style/SettingRow" android:layout_marginTop="4dp">
+                    <TextView style="@style/SettingLabel" android:text="@string/sfx_volume" />
+                    <TextView android:id="@+id/sfx_value" style="@style/SettingValue" />
+                </LinearLayout>
+
+                <SeekBar
+                    android:id="@+id/sfx_seek"
+                    style="@style/SettingSeek"
+                    android:contentDescription="@string/sfx_volume" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:lineSpacingExtra="3dp"
+                    android:text="@string/settings_hint"
+                    android:textColor="@color/text_dim"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btn_settings_back"
+                style="@style/MenuButton"
+                android:layout_marginTop="22dp"
+                android:background="@drawable/btn_secondary"
+                android:text="@string/back" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1.2" />
+        </LinearLayout>
+    </ScrollView>
+</merge>

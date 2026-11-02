@@ -81,13 +81,14 @@
             android:text="@string/god_war"
             android:textColor="@color/text_dim" />
 
+        <!-- 设置（v0.16，原来的“空置”）：音量、音乐、技能音效 -->
         <Button
-            android:id="@+id/btn_vacant"
+            android:id="@+id/btn_settings"
             style="@style/MenuButton"
             android:layout_marginTop="@dimen/menu_gap"
             android:background="@drawable/btn_secondary"
-            android:contentDescription="@string/vacant_desc"
-            android:text="@string/vacant" />
+            android:contentDescription="@string/settings_desc"
+            android:text="@string/settings" />
 
         <Space
             android:layout_width="match_parent"

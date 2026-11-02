@@ -667,7 +667,7 @@ CUES = [
     ('JUMP', 'jump', jump, -10, 2, False),
     ('LAND_LIGHT', 'land_light', lambda v: land(False, v), -8, 2, False),
     ('LAND_HEAVY', 'land_heavy', lambda v: land(True, v), -2, 2, False),
-    ('VOID_OPEN', 'void_open', lambda v: void_open(), 1, 1, False),
+    ('VOID_OPEN', 'void_open', lambda v: void_open(), 4, 1, False),   # v0.16：领域展开接在视频后面，再响一些
     ('VOID_LOOP', 'void_loop', lambda v: void_loop(), -18, 1, True),
     ('VOID_CLOSE', 'void_close', lambda v: void_close(), -5, 1, False),
     ('INFINITY_BLOCK', 'infinity_block', infinity_block, -2, 3, False),
@@ -700,7 +700,7 @@ CUES = [
     ('SPACE_KILL', 'space_kill', lambda v: space_kill(), 2, 1, False),
     ('EXHAUST', 'exhaust', lambda v: exhaust(), -5, 1, False),
     ('SHRINE_SIGN', 'shrine_sign', lambda v: shrine_sign(), -4, 1, False),
-    ('SHRINE_OPEN', 'shrine_open', lambda v: shrine_open(), 1, 1, False),
+    ('SHRINE_OPEN', 'shrine_open', lambda v: shrine_open(), 4, 1, False),
     ('SHRINE_WARN', 'shrine_warn', lambda v: shrine_warn(), -3, 1, False),
     ('SHRINE_SLASH_HIT', 'shrine_slash_hit', lambda v: shrine_slash(True, v), 0, 2, False),
     ('SHRINE_SLASH_MISS', 'shrine_slash_miss', lambda v: shrine_slash(False, v), -5, 2, False),
@@ -756,7 +756,9 @@ def main():
                 sf.write(ogg, np.clip(x, -1, 1), SR, subtype='PCM_16')
             else:
                 ogg = os.path.join(RAW, f'sfx_{name}_{v}.ogg')
-                subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', wav, '-c:a', 'libvorbis', '-q:a', '3', '-ac', '1', '-ar', str(SR), ogg], check=True)
+                # bitexact：Ogg 流编号不随机，同样的声音每次生成的文件一字不差（不然重新生成会让全部文件都“变了”）
+                subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', wav, '-fflags', '+bitexact', '-flags:a', '+bitexact',
+                                '-c:a', 'libvorbis', '-q:a', '3', '-ac', '1', '-ar', str(SR), ogg], check=True)
             total_bytes += os.path.getsize(ogg)
             total_sec += len(x) / SR
             dmax = max(dmax, len(x) / SR)

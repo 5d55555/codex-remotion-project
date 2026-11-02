@@ -7,4 +7,5 @@
     <dimen name="menu_height">50dp</dimen>
     <dimen name="menu_gap">12dp</dimen>
     <dimen name="menu_text">18sp</dimen>
+    <dimen name="settings_width">300dp</dimen>
 </resources>

@@ -17,6 +17,7 @@ final class SoundPoolOut implements SfxOut {
     private final boolean[] ready;      // 按 sampleId：解码好了
     private volatile int loaded;        // 解码好的个数（写 ready 之后再写它：战斗线程先读它再读 ready，保证看得到）
     private volatile boolean enabled = true;
+    private volatile float volume = 1f;  // 设置里的总音量 × 技能音效音量（v0.16）
     private volatile boolean flush;     // 开关刚切过：战斗线程下一次调用时把流全停掉（流的记录只在战斗线程上动）
     private final int[] loopStream = new int[SfxBank.LOOP_SLOTS], loopCue = new int[SfxBank.LOOP_SLOTS];
     private final float[] loopL = new float[SfxBank.LOOP_SLOTS], loopR = new float[SfxBank.LOOP_SLOTS];
@@ -60,7 +61,7 @@ final class SoundPoolOut implements SfxOut {
         int[] v = ids[cue];
         int id = v[variant % v.length];
         if (!ready(id)) return 0;
-        float g = Math.max(0, Math.min(1, gain));
+        float g = Math.max(0, Math.min(1, gain)) * volume;
         int s = pool.play(id, g * Math.min(1, 1 - pan), g * Math.min(1, 1 + pan), priority, 0, Math.max(0.5f, Math.min(2, rate)));
         if (s != 0) {
             recent[recentHead] = s;
@@ -78,7 +79,7 @@ final class SoundPoolOut implements SfxOut {
     public void loop(int slot, int cue, float pan, float gain) {
         if (flush) flushNow();
         if (!enabled) return;
-        float g = Math.max(0, Math.min(1, gain));
+        float g = Math.max(0, Math.min(1, gain)) * volume;
         float l = g * Math.min(1, 1 - pan), r = g * Math.min(1, 1 + pan);
         if (loopCue[slot] == cue && loopStream[slot] != 0) {
             if (Math.abs(l - loopL[slot]) > 0.01f || Math.abs(r - loopR[slot]) > 0.01f) {
@@ -126,6 +127,11 @@ final class SoundPoolOut implements SfxOut {
         flush = true;
         if (!on) pool.autoPause();
         else pool.autoResume();
+    }
+
+    /** 设置里的音量（线性，0–1）。 */
+    void setVolume(float v) {
+        volume = Math.max(0, Math.min(1, v));
     }
 
     boolean isEnabled() {

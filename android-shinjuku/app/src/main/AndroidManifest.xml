@@ -21,6 +21,12 @@
             </intent-filter>
         </activity>
 
+        <!-- 设置（v0.16）：和主页一样竖屏 -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
         <activity
             android:name=".SelectActivity"
             android:exported="false"

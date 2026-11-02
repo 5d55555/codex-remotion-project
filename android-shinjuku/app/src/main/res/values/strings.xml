@@ -7,12 +7,17 @@
     <string name="god_war">神战模式</string>
     <string name="god_war_desc">神战模式，暂未开放</string>
     <string name="god_war_not_open">神战模式暂未开放</string>
-    <string name="vacant">空置</string>
-    <string name="not_open">未开放</string>
-    <string name="vacant_desc">空置，未开放</string>
+    <string name="settings">设置</string>
+    <string name="settings_desc">设置：总音量、音乐、技能音效</string>
+    <string name="master_volume">总音量</string>
+    <string name="music_volume">音乐</string>
+    <string name="sfx">技能音效</string>
+    <string name="sfx_volume">音效音量</string>
+    <string name="percent">%1$d%%</string>
+    <string name="settings_hint">总音量同时管音乐、技能音效和领域展开的过场。调音效音量时会放一声试听；战斗里右上角的喇叭按钮也能开关技能音效。</string>
     <string name="back">返回</string>
     <string name="arrow_back" translatable="false">←</string>
     <string name="select_title">选择难度</string>
     <string name="select_sub">新宿决战 · 宿傩</string>
-    <string name="version">v0.15</string>
+    <string name="version">v0.16</string>
 </resources>

@@ -68,10 +68,12 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
     private long mPlayedMs, mResumedAt;  // 前台累计播放时间（超时用）
     private final Runnable mFirstFrameTimeout = () -> finish("首帧超时");
     private final Runnable mTotalTimeout = () -> finish("总时长超时");
+    private final float mVolume;         // 设置里的总音量（v0.16；视频声音原本已经统一到 −10 LUFS 左右）
 
     CutscenePlayer(Context context, FrameLayout parent, Host host) {
         this.app = context.getApplicationContext();
         this.host = host;
+        mVolume = Settings.videoGain(context);
         thread.start();
         media = new Handler(thread.getLooper());
         video = new SurfaceView(context);
@@ -136,6 +138,7 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
                 armTimeouts();
                 if (mStarted) {
                     try {
+                        mPlayer.setVolume(mVolume, mVolume);
                         mPlayer.start();
                         mResumedAt = SystemClock.uptimeMillis();
                     } catch (RuntimeException e) {
@@ -324,6 +327,7 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
         if (mSession < 0 || mStarted || !mPrepared || mLoaded != mWant || mSurface == null || !mForeground) return;
         try {
             mPlayer.seekTo(0);
+            mPlayer.setVolume(mVolume, mVolume); // 设置里的总音量（v0.16）
             mPlayer.start();
             mStarted = true;
             mResumedAt = SystemClock.uptimeMillis();

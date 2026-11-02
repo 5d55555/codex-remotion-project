@@ -25,7 +25,7 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
         AudioManager.OnAudioFocusChangeListener {
 
     private static final String TAG = "Bgm";
-    private static final float VOLUME = 1.0f; // 原曲原样播放，不改音量
+    private static final float DUCK = 0.3f;    // 领域展开的过场视频（自带声音）放的时候音乐压低到 30%（约 −10 dB），放完恢复
     private static final int MAX_AUTO_RETRIES = 3;
 
     @android.annotation.SuppressLint("StaticFieldLeak") // 只持有 Application Context，不会泄漏 Activity
@@ -44,6 +44,8 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
     private boolean focusRegistered, focusUsable; // 焦点请求还登记着；现在允许出声
     private int retries;
     private volatile boolean muted;             // 战斗界面的音乐按钮关掉了（主线程写，bgm 线程读）
+    private volatile float volume;              // 设置里的总音量 × 音乐音量（v0.16；100% 就是原曲原音量）
+    private float duck = 1f, duckTarget = 1f;   // 过场时压低（只在 bgm 线程）
 
     static synchronized Bgm get(Context context) {
         if (instance == null) instance = new Bgm(context.getApplicationContext());
@@ -52,6 +54,7 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
 
     private Bgm(Context app) {
         this.app = app;
+        volume = Settings.musicGain(app);
         HandlerThread thread = new HandlerThread("bgm"); // 只发命令，解码和出声不在这个线程，用默认优先级
         thread.start();
         handler = new Handler(thread.getLooper());
@@ -107,6 +110,40 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
         return muted;
     }
 
+    /** 设置里改了总音量、音乐音量（主线程）：马上生效。 */
+    void setVolume(float v) {
+        volume = v;
+        handler.post(this::applyVolume);
+    }
+
+    /** 领域展开的过场开始 / 结束（主线程）：音乐在 0.25 秒里压低到 30% / 恢复。 */
+    void setDucked(boolean d) {
+        handler.post(() -> {
+            duckTarget = d ? DUCK : 1f;
+            handler.removeCallbacksAndMessages(DUCK_STEP);
+            stepDuck();
+        });
+    }
+
+    private static final Object DUCK_STEP = new Object();
+
+    private void stepDuck() {
+        float step = (1f - DUCK) / 10f;
+        duck = duck < duckTarget ? Math.min(duckTarget, duck + step) : Math.max(duckTarget, duck - step);
+        applyVolume();
+        if (duck != duckTarget) handler.postAtTime(this::stepDuck, DUCK_STEP, android.os.SystemClock.uptimeMillis() + 25);
+    }
+
+    private void applyVolume() {
+        if (player == null || !prepared) return; // 准备中调 setVolume 是未定义行为：只记目标值，准备好时再设
+        float v = volume * duck;
+        try {
+            player.setVolume(v, v);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "setVolume", e);
+        }
+    }
+
     /** 主页退出时释放播放器和音频焦点。bgm 线程随进程保留（只有这一个），下次进来直接复用。 */
     void release() {
         handler.post(() -> {
@@ -131,7 +168,7 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
             mp.setAudioAttributes(attrs);
             mp.setDataSource(fd.getFileDescriptor(), fd.getStartOffset(), fd.getLength());
             mp.setLooping(true);
-            mp.setVolume(VOLUME, VOLUME);
+            mp.setVolume(volume * duck, volume * duck);
             mp.setOnPreparedListener(this);
             mp.setOnSeekCompleteListener(this);
             mp.setOnErrorListener(this);
@@ -148,6 +185,7 @@ final class Bgm implements MediaPlayer.OnPreparedListener, MediaPlayer.OnSeekCom
     public void onPrepared(MediaPlayer mp) {
         if (mp != player) return;
         prepared = true; // 重试计数只在用户点击时清零，避免“准备成功、播放失败”无限重建
+        applyVolume();   // 准备期间改过的音量、压低补上
         drive();
     }
 

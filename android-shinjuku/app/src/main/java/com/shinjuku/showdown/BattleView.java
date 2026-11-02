@@ -41,6 +41,7 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
         Bitmap shrineBg = BitmapFactory.decodeResource(getResources(), R.drawable.bg_shrine_px, o);
         scene = new PixelScene(atlas, bg, voidBg, shrineBg, difficulty, controls, bgm);
         sfx = new SoundPoolOut(context); // 进战斗就开始解码全部音效（不到 1.5 MB）
+        sfx.setVolume(Settings.sfxGain(context));
         loop = new BattleLoop(world, controls, scene, new GlTarget(new AndroidGl(), atlas.bitmap, bg, voidBg, shrineBg),
                 new CanvasTarget(atlas.bitmap, bg, voidBg, shrineBg), host, context, getResources().getDisplayMetrics().density, sfx);
         getHolder().setFormat(PixelFormat.OPAQUE);

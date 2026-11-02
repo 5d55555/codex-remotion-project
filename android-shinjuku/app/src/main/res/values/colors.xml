@@ -5,5 +5,6 @@
     <color name="red_dark">#9E1426</color>
     <color name="text">#F4F1EA</color>
     <color name="text_dim">#9AA3C7</color>
+    <color name="blue">#5AB8F2</color>
     <color name="ic_launcher_background">#07081A</color>
 </resources>
