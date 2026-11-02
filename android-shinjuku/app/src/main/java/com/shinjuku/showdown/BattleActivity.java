@@ -83,11 +83,24 @@ public class BattleActivity extends Activity implements Controls.Actions, Battle
     /* ---------------- 领域展开的过场（主线程） ---------------- */
 
     @Override
-    public void startCutscene(int castId, int kind) {
+    public void startCutscene(int castId, int kind, int counterStatus, float cooldownSec) {
         if (isFinishing() || isDestroyed()) return;
         view.setInputBlocked(true);
         bgm.setDucked(true); // 视频自带领域展开的声音：音乐先压低
-        cutscene.play(castId, kind == World.CUTSCENE_SHRINE ? CutscenePlayer.SHRINE : CutscenePlayer.VOID);
+        cutscene.play(castId, kind == World.CUTSCENE_SHRINE ? CutscenePlayer.SHRINE : CutscenePlayer.VOID, counterStatus, cooldownSec);
+    }
+
+    /** 宿傩的过场里长按成功（v0.17）：去战斗线程校验。 */
+    @Override
+    public void cutsceneCounter(int castId) {
+        if (isDestroyed()) return;
+        view.tryCounter(castId);
+    }
+
+    @Override
+    public void counterResult(int castId, boolean accepted, int newCastId) {
+        if (isDestroyed()) return;
+        cutscene.counterResult(castId, accepted, newCastId);
     }
 
     @Override

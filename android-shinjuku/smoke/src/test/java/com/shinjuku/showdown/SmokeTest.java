@@ -119,7 +119,7 @@ public class SmokeTest {
         Field cf = BattleActivity.class.getDeclaredField("cutscene");
         cf.setAccessible(true);
         CutscenePlayer cutscene = (CutscenePlayer) cf.get(battle.get());
-        battle.get().startCutscene(1, com.shinjuku.showdown.core.World.CUTSCENE_VOID);
+        battle.get().startCutscene(1, com.shinjuku.showdown.core.World.CUTSCENE_VOID, CutscenePlayer.COUNTER_NONE, 0f);
         assertTrue(cutscene.isPlaying());
         // 后台：不计时
         battle.pause();
@@ -134,6 +134,32 @@ public class SmokeTest {
             Thread.sleep(5); // cutscene 线程是真线程
         }
         assertFalse("首帧超时后应该自己结束", cutscene.isPlaying());
+        battle.pause().stop().destroy();
+        idle();
+    }
+
+    /**
+     * v0.17：宿傩的过场里反制被接受，换成领域对撞的那一段；视频起不来时照样自己结束，不卡在过场里。
+     * 宿傩那段的 castId 换掉以后，旧的结束通知不能结束新的这一段。
+     */
+    @Test
+    public void counterSwitchesToClashAndStillEnds() throws Exception {
+        Intent i = new Intent().putExtra(BattleActivity.EXTRA_DIFFICULTY, Difficulty.TEST.name());
+        ActivityController<BattleActivity> battle = Robolectric.buildActivity(BattleActivity.class, i).setup();
+        idle();
+        Field cf = BattleActivity.class.getDeclaredField("cutscene");
+        cf.setAccessible(true);
+        CutscenePlayer cutscene = (CutscenePlayer) cf.get(battle.get());
+        battle.get().startCutscene(1, com.shinjuku.showdown.core.World.CUTSCENE_SHRINE, CutscenePlayer.COUNTER_READY, 0f);
+        assertTrue(cutscene.isPlaying());
+        battle.get().counterResult(1, true, 2);
+        idle();
+        assertTrue("换片后接着放", cutscene.isPlaying());
+        for (int k = 0; k < 60 && cutscene.isPlaying(); k++) {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100));
+            Thread.sleep(5);
+        }
+        assertFalse("对撞那段起不来也要自己结束", cutscene.isPlaying());
         battle.pause().stop().destroy();
         idle();
     }

@@ -48,14 +48,14 @@ final class SfxDirector {
                 SfxBank.BLACK_FLASH, SfxBank.BLACK_FLASH_FIST, SfxBank.VOID_OPEN, SfxBank.CINE_CONTACT, SfxBank.CINE_BLAST, SfxBank.WORLD_SIGN,
                 SfxBank.WORLD_SIGN_CRACK, SfxBank.SUKUNA_CHANT, SfxBank.LOCK_WORLD, SfxBank.LOCK_SPACE, SfxBank.SLASH_WORLD, SfxBank.SLASH_SPACE,
                 SfxBank.SPACE_WINDUP, SfxBank.SPACE_KILL, SfxBank.SHRINE_SIGN, SfxBank.SHRINE_OPEN, SfxBank.SHRINE_WARN, SfxBank.BREAK_SHRINE,
-                SfxBank.BREAK_VOID, SfxBank.ADAPT_WORLD, SfxBank.ADAPT_INFINITY}) PRIORITY[c] = 3;
+                SfxBank.BREAK_VOID, SfxBank.ADAPT_WORLD, SfxBank.ADAPT_INFINITY, SfxBank.SIMPLE_BREAK}) PRIORITY[c] = 3;
         for (int c : new int[]{SfxBank.CHANT_BLUE, SfxBank.CHANT_RED, SfxBank.CHANT_PURPLE, SfxBank.BLUE_ANCHOR, SfxBank.BLUE_ANCHOR_MAX,
                 SfxBank.RED_FIRE, SfxBank.RED_FIRE_MAX, SfxBank.RED_FIRE_TP, SfxBank.RED_BURST, SfxBank.RED_BURST_MAX, SfxBank.RED_BURST_TP,
                 SfxBank.TP_DEPART, SfxBank.TP_ARRIVE, SfxBank.VOID_CLOSE, SfxBank.INFINITY_BLOCK, SfxBank.SLASH_DISMANTLE, SfxBank.AMP_ON,
                 SfxBank.AGITO_ZAP, SfxBank.SUMMON_CHANT, SfxBank.MAHORAGA_RISE, SfxBank.TRANSFORM_START, SfxBank.TRANSFORM_DONE, SfxBank.EXHAUST,
                 SfxBank.SHRINE_SLASH_HIT, SfxBank.SHRINE_SLASH_MISS, SfxBank.SHRINE_END, SfxBank.WHEEL_CLICK, SfxBank.MAHO_SWORD_WINDUP,
                 SfxBank.MAHORAGA_FALL, SfxBank.KO, SfxBank.SIG_WIN, SfxBank.SIG_LOSE, SfxBank.SIG_START, SfxBank.SIG_REVIVE,
-                SfxBank.LAND_HEAVY, SfxBank.DOWN_THUD}) PRIORITY[c] = 2;
+                SfxBank.LAND_HEAVY, SfxBank.DOWN_THUD, SfxBank.SIMPLE_OPEN, SfxBank.SIMPLE_ERODE}) PRIORITY[c] = 2;
         for (int c : new int[]{SfxBank.JUMP, SfxBank.DISSOLVE, SfxBank.DISSOLVE_LONG, SfxBank.HEAD_TURN, SfxBank.HOLD_BLUE, SfxBank.HOLD_RED,
                 SfxBank.HOLD_PURPLE}) PRIORITY[c] = 0;
     }
@@ -394,6 +394,12 @@ final class SfxDirector {
             case Events.SHRINE:
                 shrine(v, kind, x);
                 break;
+            case Events.SIMPLE_DOMAIN: // 简易领域（v0.17）：开、被削一层、削光碎掉；别的原因收掉只是轻轻散掉
+                if (v == Events.SIMPLE_OPEN) play(SfxBank.SIMPLE_OPEN, x);
+                else if (v == Events.SIMPLE_ERODE) play(SfxBank.SIMPLE_ERODE, x);
+                else if (v == Events.SIMPLE_CLOSE && kind == Events.SIMPLE_ERODED) play(SfxBank.SIMPLE_BREAK, x);
+                else if (v == Events.SIMPLE_CLOSE && kind != Events.SIMPLE_FIGHT_END) play(SfxBank.DISSOLVE, x);
+                break;
             default:
                 break;
         }
@@ -455,6 +461,7 @@ final class SfxDirector {
             case Events.SHRINE_SLASH:
                 if (kind == 1) play(SfxBank.SHRINE_SLASH_HIT, x);
                 else if (kind == 0) play(SfxBank.SHRINE_SLASH_MISS, x);
+                else if (kind == 3) play(SfxBank.SHRINE_SLASH_MISS, -1, 0.5f, x); // 被简易领域中和：很轻的切口，主声是“被削”
                 break;
             case Events.SHRINE_BROKEN:
                 play(SfxBank.BREAK_SHRINE, 0, 1f, -1);

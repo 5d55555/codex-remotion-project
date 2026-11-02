@@ -740,6 +740,40 @@ class BattlePreviewTest {
         })
     }
 
+    /** 简易领域（v0.17）：伏魔御厨子里长按跳跃开圈，地上一个扁的圈、前沿三段刻线，头上「简易领域」，跳跃键外圈是还剩几层。 */
+    @Test
+    fun simpleDomain() {
+        paparazzi.snapshot(shrine {
+            openShrine()
+            steps(20)
+            input.jump = true; input.jumpHeld = true
+            steps(com.shinjuku.showdown.core.Tuning.SIMPLE_DOMAIN_HOLD + 4)
+        })
+    }
+
+    /** 简易领域挡下一轮必中、被削掉一层：刻线少一段。 */
+    @Test
+    fun simpleDomainEroded() {
+        paparazzi.snapshot(shrine {
+            openShrine()
+            input.jump = true; input.jumpHeld = true
+            steps(com.shinjuku.showdown.core.Tuning.SIMPLE_DOMAIN_HOLD + 1)
+            input.jumpHeld = false
+            steps(com.shinjuku.showdown.core.Tuning.SHRINE_ROUND + 6)
+        })
+    }
+
+    /** 宿傩的过场里长按反制、两边同时展开以后：直接进入领域对撞。 */
+    @Test
+    fun counterClash() {
+        paparazzi.snapshot(shrine {
+            steps(com.shinjuku.showdown.core.Tuning.SHRINE_SIGN + 2)
+            world.tryCounterDomain(world.castId)
+            world.endCutscene(world.castId)
+            steps(60)
+        })
+    }
+
     /** 空间斩：打满 20 秒、宿傩剩 20% 血；script 里起手以后再推进。 */
     private fun space(script: Scene.() -> Unit) = Scene(paparazzi.context, Difficulty.URAUME, { it.sukunaAi = false }) {
         world.gojo.x = 420f

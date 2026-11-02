@@ -269,6 +269,54 @@ class SfxDirectorTest {
         assertTrue("同一个人同一次落地不叠普通落地：$n", same.isEmpty())
     }
 
+    /** 简易领域（v0.17）：开圈、挡两轮被削、第三轮削光碎掉；被中和的斩击只有轻切口，不出受击声。 */
+    @Test
+    fun simpleDomainSounds() {
+        val cfg = BattleConfig().also { Difficulty.URAUME.configure(it); it.sukunaAi = false; it.gojoMaxHp = 100_000f }
+        val r = Rig(cfg)
+        r.world.gojo.x = 380f
+        r.world.sukuna.x = 860f
+        r.steps(5)
+        r.world.sukunaIntent.shrine = true
+        r.steps(com.shinjuku.showdown.core.Tuning.SHRINE_SIGN + 2)
+        assertTrue(r.world.cutscene)
+        assertEquals("过场里没声音", 0, r.out.playsInCutscene)
+        r.world.endCutscene(r.world.castId)
+        r.sfx.update(r.world)
+        r.input.jump = true; r.input.jumpHeld = true
+        r.steps(com.shinjuku.showdown.core.Tuning.SIMPLE_DOMAIN_HOLD)
+        r.input.jumpHeld = false
+        r.steps(com.shinjuku.showdown.core.Tuning.SHRINE_ROUND * 3 + 2)
+        val n = r.out.names()
+        assertEquals("开圈一次：$n", 1, n.count { it == "SIMPLE_OPEN" })
+        assertEquals("被削两层：$n", 2, n.count { it == "SIMPLE_ERODE" })
+        assertEquals("第三轮碎掉：$n", 1, n.count { it == "SIMPLE_BREAK" })
+        assertFalse("挡下的斩击不出受击声：$n", n.contains("SHRINE_SLASH_HIT"))
+    }
+
+    /** 宿傩的过场里长按反制：整个过场（换片前后）一声都没有，放完以后同时响两边的展开音、对撞的循环。 */
+    @Test
+    fun counterClashIsSilentUntilBothOpen() {
+        val cfg = BattleConfig().also { Difficulty.URAUME.configure(it); it.sukunaAi = false }
+        val r = Rig(cfg)
+        r.world.gojo.x = 380f
+        r.world.sukuna.x = 860f
+        r.steps(5)
+        r.world.sukunaIntent.shrine = true
+        r.steps(com.shinjuku.showdown.core.Tuning.SHRINE_SIGN + 2)
+        assertTrue(r.world.tryCounterDomain(r.world.castId))
+        r.steps(10)
+        assertEquals(0, r.out.playsInCutscene)
+        assertEquals(0, r.out.loopsInCutscene)
+        r.world.endCutscene(r.world.castId)
+        r.sfx.setPaused(false)
+        r.sfx.update(r.world)
+        r.steps(2)
+        val n = r.out.names()
+        assertTrue("两边的展开音：$n", n.contains("VOID_OPEN") && n.contains("SHRINE_OPEN"))
+        assertEquals("对撞的循环", SfxBank.CLASH_LOOP, r.out.loops[1])
+    }
+
     /** 无量空处：过场期间一声都没有（全停），视频结束后才有展开音，困住宿傩时是循环音。 */
     @Test
     fun domainCutsceneIsSilent() {

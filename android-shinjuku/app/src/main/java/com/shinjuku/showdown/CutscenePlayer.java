@@ -27,7 +27,10 @@ import java.util.concurrent.CountDownLatch;
  *   上面盖一层“幕布”：第一帧出来之前全黑（不露出战斗画面），之后只挡黑边。放的时候战斗收不到触摸。
  * - 进战斗就 prepareAsync，按下领域时直接开播。MediaPlayer 的所有调用都在专用线程上（和 Bgm 一样，不碰主线程）。
  * - 结束（播完、出错、准备或首帧超过 2 秒、前台累计超过视频长度 + 2.5 秒）都走同一个入口，同一次只算一次；结束后回调 Host.cutsceneDone。
- * - 切后台：视频暂停、不计时；回前台接着播。背景音乐不动（原样继续，视频的声音和它混在一起）。
+ * - 切后台：视频暂停、不计时；回前台接着播。背景音乐由 BattleActivity 在过场期间压低。
+ * - v0.17 反制：放宿傩的伏魔御厨子时，幕布识别长按（0.45 秒、移动不超过 24dp）→ Host.cutsceneCounter；战斗线程接受后
+ *   counterResult(true) 换成两边同时展开的 domain_clash.mp4（新的 castId，换一个新的 MediaPlayer：旧播放器排着的回调对不上就丢掉）。
+ *   宿傩那段在长按进行中或请求还没回来时播完：先停在末帧等结果。宿傩那段放不出来：给 1 秒的兜底卡片，照样能长按。
  *
  * 带 “m” 前缀的字段只在 cutscene 线程上读写。
  */
@@ -37,12 +40,19 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
     interface Host {
         /** 过场结束（主线程）：castId 是开始时带过来的那个。 */
         void cutsceneDone(int castId);
+
+        /** 宿傩的过场里长按成功（主线程）：去战斗线程试着反制，结果回 counterResult。 */
+        void cutsceneCounter(int castId);
     }
+
+    /** 反制的提示：能用、冷却中、当前状态不能、不适用（不是宿傩的过场）。 */
+    static final int COUNTER_READY = 0, COUNTER_COOLDOWN = 1, COUNTER_BLOCKED = 2, COUNTER_NONE = 3;
+    private static final long COUNTER_HOLD_MS = 450, COUNTER_FALLBACK_MS = 1000;
 
     private static final String TAG = "Cutscene";
     private static final long FIRST_FRAME_TIMEOUT_MS = 2000, TOTAL_SLACK_MS = 2500, TOTAL_FALLBACK_MS = 16_000;
-    static final int VOID = 0, SHRINE = 1; // 哪一段：无量空处、伏魔御厨子
-    private static final int[] RAW = {R.raw.domain_void, R.raw.domain_shrine};
+    static final int VOID = 0, SHRINE = 1, CLASH = 2; // 哪一段：无量空处、伏魔御厨子、两边同时展开（v0.17）
+    private static final int[] RAW = {R.raw.domain_void, R.raw.domain_shrine, R.raw.domain_clash};
 
     private final Context app;
     private final Host host;
@@ -54,7 +64,11 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
 
     // 主线程
     private int showing = -1; // 正在放的 castId，-1 没在放
+    private int showingKind = -1;
     private boolean released;
+    private boolean counterInFlight; // 长按成功、等战斗线程的结果
+    private int doneWaiting = -1;    // 这一段已经放完，等长按 / 反制的结果再收
+    private boolean fallbackShown;
     private float videoAspect = 16f / 9f;
 
     // cutscene 线程
@@ -90,10 +104,15 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
 
     /* ---------------- 主线程 ---------------- */
 
-    /** 开始放（主线程）：kind 是 VOID 或 SHRINE。 */
-    void play(int castId, int kind) {
+    /** 开始放（主线程）：kind 是 VOID 或 SHRINE；宿傩的过场带上反制的状态（能不能长按、冷却还剩几秒）。 */
+    void play(int castId, int kind, int counterStatus, float cooldownSec) {
         if (released) return;
         showing = castId;
+        showingKind = kind;
+        counterInFlight = false;
+        doneWaiting = -1;
+        fallbackShown = false;
+        curtain.setCounter(kind == SHRINE ? counterStatus : COUNTER_NONE, cooldownSec);
         curtain.open = false;
         curtain.setVisibility(View.VISIBLE);
         curtain.invalidate();
@@ -197,8 +216,67 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
         video.setLayoutParams(lp);
     }
 
+    /** 长按反制的结果（主线程）：接受了就换成同时展开的那一段（新的 castId）；没接受就照常收尾。 */
+    void counterResult(int oldId, boolean accepted, int newId) {
+        if (released || showing != oldId) return;
+        counterInFlight = false;
+        if (!accepted) {
+            curtain.setCounter(COUNTER_BLOCKED, 0);
+            if (doneWaiting == oldId) complete(oldId);
+            return;
+        }
+        showing = newId;
+        showingKind = CLASH;
+        doneWaiting = -1;
+        curtain.setCounter(COUNTER_NONE, 0);
+        curtain.showClashTitle();
+        curtain.open = false; // 新片第一帧出来之前全黑
+        curtain.invalidate();
+        media.post(() -> {
+            media.removeCallbacks(mFirstFrameTimeout);
+            media.removeCallbacks(mTotalTimeout);
+            if (mPlayer != null) { // 换一个新的播放器：旧的排着的回调（播完、出错、首帧）对不上 mPlayer 就丢掉
+                try {
+                    mPlayer.release();
+                } catch (RuntimeException ignored) {
+                    // 已经坏了
+                }
+                mPlayer = null;
+            }
+            mSession = newId;
+            mWant = CLASH;
+            mRendering = false;
+            mPlayedMs = 0;
+            mLoaded = -1;
+            mPrepared = mStarted = false;
+            create(); // 新播放器装上 CLASH
+            if (mForeground) armTimeouts();
+        });
+    }
+
+    /** 长按在进行（主线程，幕布回调）：这一段放完也先别收。 */
+    private void onCounterGesture(boolean holding) {
+        if (!holding && doneWaiting == showing && !counterInFlight) complete(showing);
+    }
+
+    private void onCounterFire() {
+        if (released || showing < 0 || showingKind != SHRINE || counterInFlight) return;
+        counterInFlight = true;
+        host.cutsceneCounter(showing);
+    }
+
+    /** 真正收尾：藏起来、告诉 Host。 */
+    private void complete(int id) {
+        if (released || showing != id) return;
+        doneWaiting = -1;
+        hide();
+        host.cutsceneDone(id);
+    }
+
     private void hide() {
         showing = -1;
+        showingKind = -1;
+        curtain.setCounter(COUNTER_NONE, 0);
         video.setVisibility(View.GONE);
         curtain.setVisibility(View.GONE);
     }
@@ -271,6 +349,10 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
         load(mSession >= 0 ? mWant : VOID);
     }
 
+    private boolean stale(MediaPlayer mp) {
+        return mp != mPlayer; // 换片时换掉的旧播放器的回调
+    }
+
     /** 把这一段装进播放器（异步准备）。 */
     private void load(int kind) {
         if (mPlayer == null) {
@@ -297,6 +379,7 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
 
     @Override
     public void onPrepared(MediaPlayer mp) {
+        if (stale(mp)) return;
         mPrepared = true;
         try {
             mDurationMs = Math.max(0, mp.getDuration());
@@ -307,8 +390,9 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
         int w = mp.getVideoWidth(), h = mp.getVideoHeight();
         if (w > 0 && h > 0) {
             float aspect = w / (float) h;
+            int id = mSession;
             main.post(() -> {
-                if (released) return;
+                if (released || showing != id) return;
                 videoAspect = aspect;
                 fit();
             });
@@ -350,11 +434,13 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
 
     @Override
     public boolean onInfo(MediaPlayer mp, int what, int extra) {
+        if (stale(mp)) return false;
         if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START && mSession >= 0 && !mRendering) {
             mRendering = true;
             media.removeCallbacks(mFirstFrameTimeout);
+            int id = mSession;
             main.post(() -> {
-                if (released) return;
+                if (released || showing != id) return; // 换片后才到的旧首帧通知：不能提前打开幕布
                 curtain.open = true; // 第一帧出来了：幕布只挡黑边
                 curtain.invalidate();
             });
@@ -364,11 +450,13 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
 
     @Override
     public void onCompletion(MediaPlayer mp) {
+        if (stale(mp)) return;
         finish(null);
     }
 
     @Override
     public boolean onError(MediaPlayer mp, int what, int extra) {
+        if (stale(mp)) return true;
         Log.w(TAG, "error " + what + "/" + extra);
         if (mLoaded >= 0) mFailed[mLoaded] = true; // 这一段坏了就不再用它：以后的这种领域展开直接跳过过场
         mPrepared = false;
@@ -394,23 +482,65 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
             }
         }
         mStarted = false;
+        boolean failed = why != null;
         main.post(() -> {
             if (released || showing != id) return;
-            hide();
-            host.cutsceneDone(id);
+            // 宿傩那段放完或放不出来，而玩家正在长按 / 反制请求还没回来：停在末帧等结果
+            if (showingKind == SHRINE && (curtain.holding() || counterInFlight)) {
+                doneWaiting = id;
+                return;
+            }
+            // 宿傩那段放不出来、本来能反制：给 1 秒的兜底卡片，照样能长按
+            if (showingKind == SHRINE && failed && curtain.counterReady() && !fallbackShown) {
+                fallbackShown = true;
+                doneWaiting = id;
+                curtain.showFallback();
+                main.postDelayed(() -> {
+                    if (doneWaiting == id && !curtain.holding() && !counterInFlight) complete(id);
+                }, COUNTER_FALLBACK_MS);
+                return;
+            }
+            complete(id);
         });
     }
 
-    /** 幕布：第一帧之前全黑；之后只把视频以外的地方涂黑。吃掉所有触摸。 */
+    /**
+     * 幕布：第一帧之前全黑；之后只把视频以外的地方涂黑。吃掉所有触摸（战斗收不到）。
+     * v0.17：放宿傩的过场时在底部写反制的提示；能用时识别长按（主指按住 0.45 秒、移动不超过 24dp，第二根手指不算），
+     * 按着时在指尖画一圈进度。长按成功后这一次触摸一直吞到全部抬起。
+     */
     @SuppressLint("ViewConstructor")
-    private static final class Curtain extends View {
-        private final Paint black = new Paint();
+    private final class Curtain extends View {
+        private final Paint black = new Paint(), text = new Paint(Paint.ANTI_ALIAS_FLAG), box = new Paint(Paint.ANTI_ALIAS_FLAG),
+                ring = new Paint(Paint.ANTI_ALIAS_FLAG), ringBg = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final float dp;
         boolean open;
         private int hl, ht, hr, hb;
+        private int counter = COUNTER_NONE;
+        private float cooldown;
+        private boolean fallback, clashTitle;
+        private int pointer = -1;          // 正在长按的主指
+        private float downX, downY;
+        private long downAt;
+        private boolean fired, swallow;
+        private final Runnable fire = this::fire;
 
         Curtain(Context c) {
             super(c);
+            dp = c.getResources().getDisplayMetrics().density;
             black.setColor(0xFF000000);
+            text.setColor(0xFFF4F1EA);
+            text.setTextSize(android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 15, c.getResources().getDisplayMetrics()));
+            text.setTextAlign(Paint.Align.CENTER);
+            text.setLetterSpacing(0.12f);
+            box.setColor(0xB3000000);
+            ring.setStyle(Paint.Style.STROKE);
+            ring.setStrokeWidth(3 * dp);
+            ring.setStrokeCap(Paint.Cap.ROUND);
+            ring.setColor(0xFF7FC8FF);
+            ringBg.setStyle(Paint.Style.STROKE);
+            ringBg.setStrokeWidth(3 * dp);
+            ringBg.setColor(0x55FFFFFF);
             setClickable(true);
         }
 
@@ -422,22 +552,126 @@ final class CutscenePlayer implements SurfaceHolder.Callback, MediaPlayer.OnPrep
             invalidate();
         }
 
+        void setCounter(int status, float cooldownSec) {
+            counter = status;
+            cooldown = cooldownSec;
+            fallback = false;
+            clashTitle = false;
+            cancelGesture();
+            invalidate();
+        }
+
+        void showFallback() {
+            fallback = true;
+            open = false;
+            invalidate();
+        }
+
+        void showClashTitle() {
+            clashTitle = true;
+            invalidate();
+        }
+
+        boolean counterReady() {
+            return counter == COUNTER_READY;
+        }
+
+        boolean holding() {
+            return pointer >= 0 && !fired;
+        }
+
+        private void cancelGesture() {
+            boolean was = holding();
+            removeCallbacks(fire);
+            pointer = -1;
+            if (was) onCounterGesture(false);
+        }
+
+        private void fire() {
+            if (pointer < 0 || fired) return;
+            fired = true;
+            swallow = true;
+            pointer = -1;
+            invalidate();
+            onCounterFire();
+        }
+
         @Override
         protected void onDraw(Canvas c) {
             int w = getWidth(), h = getHeight();
             if (!open) {
                 c.drawRect(0, 0, w, h, black);
-                return;
+            } else {
+                c.drawRect(0, 0, w, ht, black);
+                c.drawRect(0, hb, w, h, black);
+                c.drawRect(0, ht, hl, hb, black);
+                c.drawRect(hr, ht, w, hb, black);
             }
-            c.drawRect(0, 0, w, ht, black);
-            c.drawRect(0, hb, w, h, black);
-            c.drawRect(0, ht, hl, hb, black);
-            c.drawRect(hr, ht, w, hb, black);
+            if (fallback) drawLabel(c, w, h * 0.45f, "伏魔御厨子正在展开");
+            String hint = null;
+            if (clashTitle) hint = "领域对撞";
+            else if (counter == COUNTER_READY) hint = holding() ? "正在展开" : "长按屏幕 · 展开无量空处";
+            else if (counter == COUNTER_COOLDOWN) hint = String.format(java.util.Locale.ROOT, "无量空处冷却中 · %.1f 秒", cooldown);
+            else if (counter == COUNTER_BLOCKED) hint = "当前状态无法展开";
+            if (hint != null) drawLabel(c, w, h - 24 * dp - 22 * dp, hint);
+            if (holding()) {
+                float k = Math.min(1f, (SystemClock.uptimeMillis() - downAt) / (float) COUNTER_HOLD_MS);
+                float r = 28 * dp;
+                c.drawCircle(downX, downY, r, ringBg);
+                c.drawArc(downX - r, downY - r, downX + r, downY + r, -90, 360 * k, false, ring);
+                postInvalidateOnAnimation();
+            }
+        }
+
+        private void drawLabel(Canvas c, int w, float y, String s) {
+            float tw = text.measureText(s), pad = 14 * dp, th = text.getTextSize();
+            c.drawRoundRect(w * 0.5f - tw * 0.5f - pad, y - th - 8 * dp, w * 0.5f + tw * 0.5f + pad, y + 10 * dp, 8 * dp, 8 * dp, box);
+            c.drawText(s, w * 0.5f, y, text);
         }
 
         @Override
         @SuppressLint("ClickableViewAccessibility")
         public boolean onTouchEvent(MotionEvent e) {
+            int a = e.getActionMasked();
+            if (swallow) { // 长按成功以后：这一次触摸吞到全部抬起
+                if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) swallow = false;
+                return true;
+            }
+            if (counter != COUNTER_READY || showingKind != SHRINE || counterInFlight) return true;
+            switch (a) {
+                case MotionEvent.ACTION_DOWN:
+                    if (doneWaiting >= 0 && !fallback) return true; // 片子已经放完：不再开始新的长按
+                    pointer = e.getPointerId(0);
+                    downX = e.getX();
+                    downY = e.getY();
+                    downAt = SystemClock.uptimeMillis();
+                    fired = false;
+                    postDelayed(fire, COUNTER_HOLD_MS);
+                    onCounterGesture(true);
+                    invalidate();
+                    break;
+                case MotionEvent.ACTION_MOVE: {
+                    int i = e.findPointerIndex(pointer);
+                    if (i >= 0 && Math.hypot(e.getX(i) - downX, e.getY(i) - downY) > 24 * dp) {
+                        cancelGesture();
+                        invalidate();
+                    }
+                    break;
+                }
+                case MotionEvent.ACTION_POINTER_UP:
+                    if (e.getPointerId(e.getActionIndex()) == pointer) {
+                        cancelGesture();
+                        invalidate();
+                    }
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    cancelGesture();
+                    invalidate();
+                    break;
+                default:
+                    break;
+            }
             return true;
         }
     }

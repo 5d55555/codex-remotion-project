@@ -224,6 +224,10 @@ public final class Tuning {
     // 领域结束后术式烧断 4 秒（解、世界斩、空间斩不能用）。
     public static final int SHRINE_SIGN = 120, SHRINE_BREAK_LOCK = 60, SHRINE_RETRY = 1200, SHRINE_DURATION = 720,
             SHRINE_ROUND = 60, SHRINE_WARN = 36, SHRINE_CLASH = 240, SHRINE_BURNOUT = 480;
+    // 简易领域（v0.17，用户定：伏魔御厨子里长按跳跃开，没有冷却，自己领域展开时立刻没，自己没领域时也能用；
+    // Astra 补的：地上一个固定的圆，圈内能走能出招，挡三轮必中斩击后被削掉（原作第 258 话），可以马上重开）
+    public static final int SIMPLE_DOMAIN_HOLD = 30, SIMPLE_DOMAIN_ROUNDS = 3;
+    public static final float SIMPLE_DOMAIN_RADIUS = 120f;
     public static final long SHRINE_DAMAGE_MILLI = 25_000;
 
     // 宿傩的恐惧（v0.11，Astra 的方案，占位）：0–100 存成万分制。每 1 秒一个窗口：开头按局势估这一秒大概会挨多少，

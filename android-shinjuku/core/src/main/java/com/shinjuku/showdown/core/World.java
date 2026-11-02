@@ -89,7 +89,11 @@ public final class World {
     // 领域
     public boolean cutscene;          // 正在放领域展开的过场：全场暂停
     public int castId;                // 第几次展开（画面结束过场时带回来，旧的回调不算数）
-    public static final int CUTSCENE_VOID = 0, CUTSCENE_SHRINE = 1;
+    public static final int CUTSCENE_VOID = 0, CUTSCENE_SHRINE = 1, CUTSCENE_CLASH = 2; // CLASH：宿傩的过场里长按反制，两边同时展开（v0.17）
+    public int simpleDomainRounds;    // 简易领域还能挡几轮（>0 就是开着）
+    public float simpleDomainX;       // 简易领域的圆心（开的时候五条悟的位置，不跟人走）
+    public int simpleDomainHold;      // 长按跳跃已经按了多久（开简易领域的进度；没在蓄就是 0）
+    private boolean jumpSimplePending; // 这次按下跳跃走的是“短按松手跳 / 长按开简易领域”
     public int cutsceneKind;          // 这次的过场是谁的领域：无量空处、伏魔御厨子
     public int domainTicks;           // 无量空处还剩多久（>0 且没在对撞时宿傩无法主动行动，见 voidControl）
     // 伏魔御厨子（里梅以上，一局成功展开一次）
@@ -171,6 +175,7 @@ public final class World {
             hitstop--;
             return;
         }
+        simpleInput(in);
         controlGojo(in);
         gojo.invuln = gojo.state == Fighter.DODGE || gojo.state == Fighter.TP_BLUE || gojo.state == Fighter.TP_RED || gojo.state == Fighter.TP_PURPLE;
         if (cutscene || cine != CINE_NONE) return; // 这一 tick 按了领域展开（停在这里等过场）或开始了固定动作（全场从这一 tick 起就暂停）
@@ -191,10 +196,12 @@ public final class World {
         resolveWorldSlash();
         resolveSpaceSlash();
         resolveShrineSign();
+        checkSimpleDomain(); // 斩之前先看圈还成不成立（瞬移出圈、被打离地）
         updateShrine();
         integrate(gojo);
         integrate(sukuna);
         if (mahoraga.present) integrate(mahoraga);
+        checkSimpleDomain(); // 走出圈、跳起来
         timers();
     }
 
@@ -204,7 +211,14 @@ public final class World {
     private void latch(TickInput in) {
         if (in.melee) bufMelee = Tuning.INPUT_BUFFER;
         if (in.red) bufRed = Tuning.INPUT_BUFFER;
-        if (in.jump) bufJump = Tuning.INPUT_BUFFER;
+        if (in.jump) {
+            if (canStartSimpleDomain()) { // 伏魔御厨子里：短按松手才跳，按住开简易领域（v0.17）
+                jumpSimplePending = true;
+                simpleDomainHold = 0;
+            } else {
+                bufJump = Tuning.INPUT_BUFFER;
+            }
+        }
         if (in.purple) bufPurple = Tuning.INPUT_BUFFER;
         if (in.domain) bufDomain = Tuning.INPUT_BUFFER;
         if (in.dodge) {
@@ -215,6 +229,10 @@ public final class World {
         if (!in.purpleHeld) purpleLetGo = true;
         if (in.blueDown) bluePush(true);
         if (in.blueUp) bluePush(false);
+        if (jumpSimplePending && (in.melee || in.dodge || in.red || in.purple || in.domain || in.blueDown)) {
+            jumpSimplePending = false; // 下砸苍拳、闪避、术式优先：不跳也不开圈（在这里判，命中停顿里按的也算）
+            simpleDomainHold = 0;
+        }
     }
 
     private void bluePush(boolean down) {
@@ -247,6 +265,8 @@ public final class World {
     private void clearInputs() {
         bufMelee = bufRed = bufJump = bufPurple = bufDomain = bufDodge = 0;
         bqSize = 0;
+        jumpSimplePending = false; // 按着的跳跃也作废：之后松手不补跳
+        simpleDomainHold = 0;
     }
 
     /* ---------------- 五条悟 ---------------- */
@@ -1146,6 +1166,11 @@ public final class World {
      * 苍拳和瞬移的前摇也一样，被攻击碰到就断（“容易被打断”）。
      */
     private void breakChant() {
+        breakChant(true);
+    }
+
+    /** announce=false：长按反制接受时用，手上的念咒、起手照样作废（锁定照旧），但过场里不发“断”的事件。 */
+    private void breakChant(boolean announce) {
         Fighter g = gojo;
         int kind;
         switch (g.state) {
@@ -1175,16 +1200,16 @@ public final class World {
             case Fighter.FIST_WINDUP:
                 if (!fistSmash) return; // 长按体术的苍拳：挨打才断（interruptGojo）
                 enter(g, Fighter.FREE);
-                events.emit(Events.CHANT, g.x, g.centerY(), -1, Attack.BLUE_FIST, tick);
+                if (announce) events.emit(Events.CHANT, g.x, g.centerY(), -1, Attack.BLUE_FIST, tick);
                 return;
             case Fighter.TP_WINDUP:
                 enter(g, Fighter.FREE);
                 if (tpKind == Attack.PURPLE) { // 瞬移·茈的咒词被打断
                     chantPhase = -1;
                     purpleFailLock = Tuning.CHANT_BROKEN_LOCK;
-                    events.emit(Events.CHANT, g.x, g.centerY(), -1, Attack.PURPLE, tick);
+                    if (announce) events.emit(Events.CHANT, g.x, g.centerY(), -1, Attack.PURPLE, tick);
                 } else {
-                    events.emit(Events.CHANT, g.x, g.centerY(), -1, Attack.BLUE_FIST, tick);
+                    if (announce) events.emit(Events.CHANT, g.x, g.centerY(), -1, Attack.BLUE_FIST, tick);
                 }
                 return;
             case Fighter.PURPLE_MAX_CHANT:
@@ -1196,7 +1221,7 @@ public final class World {
         }
         enter(g, Fighter.FREE);
         chantPhase = -1;
-        events.emit(Events.CHANT, g.x, g.centerY(), -1, kind, tick);
+        if (announce) events.emit(Events.CHANT, g.x, g.centerY(), -1, kind, tick);
     }
 
     /** 五条悟挨打（硬直）：手上的动作作废（念咒算打断；蓄苍被打断短时间内不能再按）。还没放出去的招不进冷却。 */
@@ -1236,6 +1261,7 @@ public final class World {
 
     /** 按下领域展开：世界停住，等画面把过场放完（或者放不了）再调 endCutscene。 */
     private void startDomain() {
+        closeSimpleDomain(Events.SIMPLE_OWN_DOMAIN); // 自己领域展开：简易领域立刻没（用户定）
         enter(gojo, Fighter.DOMAIN_CAST);
         drive(gojo, 0);
         cutscene = true;
@@ -1253,6 +1279,19 @@ public final class World {
         if (outcome != OUTCOME_NONE) return; // 已经分出胜负：什么都不展开
         if (cutsceneKind == CUTSCENE_SHRINE) {
             openShrine();
+            return;
+        }
+        if (cutsceneKind == CUTSCENE_CLASH) { // 两边同时展开：一次建好两个领域，直接对撞（不能先开御厨子再走一遍普通的后开）
+            shrineTicks = Tuning.SHRINE_DURATION;
+            shrineNext = Tuning.SHRINE_ROUND;
+            interruptMahoraga();
+            events.emit(Events.SHRINE, sukuna.x, sukuna.centerY(), Events.SHRINE_OPEN, tick);
+            enter(gojo, Fighter.FREE);
+            domainTicks = Tuning.DOMAIN_DURATION;
+            events.emit(Events.DOMAIN_OPEN, gojo.x, gojo.centerY(), Tuning.DOMAIN_DURATION, tick);
+            clashTicks = Tuning.SHRINE_CLASH;
+            refreshSureHit();
+            events.emit(Events.SHRINE, gojo.x, gojo.centerY(), Events.SHRINE_CLASH, tick);
             return;
         }
         enter(gojo, Fighter.FREE);
@@ -1868,6 +1907,98 @@ public final class World {
         events.emit(Events.SPACE, s.x, s.centerY(), 4, spaceDir, tick);
     }
 
+    /* ---------------- 宿傩过场里的反制、简易领域（v0.17） ---------------- */
+
+    /** 宿傩的领域展开过场正在放（castId 对得上），五条悟现在能长按反制同时展开吗。 */
+    public boolean canCounterDomain(int id) {
+        Fighter g = gojo;
+        return cutscene && cutsceneKind == CUTSCENE_SHRINE && id == castId && outcome == OUTCOME_NONE
+                && domainCd == 0 && domainTicks == 0 && g.hpMilli > 0 && sukuna.hpMilli > 0
+                && g.state != Fighter.KO && g.downTicks == 0 && !g.knockedAir && !g.captured && !g.scripted && g.hitstun == 0
+                && cine == CINE_NONE && g.state != Fighter.TP_BLUE && g.state != Fighter.TP_RED && g.state != Fighter.TP_PURPLE
+                && g.state != Fighter.PURPLE_MAX; // 瞬移连段、茈·最大输出这类固定动作不能半路换成领域展开
+    }
+
+    /** 画面提示用：0 能反制；1 无量空处冷却中（看 domainCd）；2 当前状态不能展开；3 不是宿傩的过场。 */
+    public int counterBlocker() {
+        if (!cutscene || cutsceneKind != CUTSCENE_SHRINE || outcome != OUTCOME_NONE) return 3;
+        if (canCounterDomain(castId)) return 0;
+        return domainCd > 0 && domainTicks == 0 ? 1 : 2;
+    }
+
+    /**
+     * 长按成功（战斗线程上再校验一次）：五条悟也开始领域展开。世界继续停着，过场换成两边同时展开的那一段（castId 换新的，
+     * 宿傩那段的旧回调就对不上了）；放完 endCutscene 一次建好两个领域、直接对撞。接受就返回 true。
+     */
+    public boolean tryCounterDomain(int id) {
+        if (!canCounterDomain(id)) return false;
+        closeSimpleDomain(Events.SIMPLE_OWN_DOMAIN);
+        clearInputs();
+        breakChant(false); // 手上的念咒、起手作废（过场后松开的按键本来也会打断它，锁定照旧），过场里不出声
+        chantPhase = -1;
+        enter(gojo, Fighter.DOMAIN_CAST);
+        drive(gojo, 0);
+        cutsceneKind = CUTSCENE_CLASH;
+        castId++;
+        events.emit(Events.DOMAIN_CUTSCENE, gojo.x, gojo.centerY(), castId, tick);
+        return true;
+    }
+
+    /** 现在能开简易领域吗：身在伏魔御厨子里、自己没有领域、站在地上能动。不看无量空处的冷却（用户定：自己没领域时也能用）。 */
+    public boolean canStartSimpleDomain() {
+        Fighter g = gojo;
+        return shrineTicks > 0 && domainTicks == 0 && simpleDomainRounds == 0 && !cutscene && cine == CINE_NONE && outcome == OUTCOME_NONE
+                && g.hpMilli > 0 && g.state == Fighter.FREE && g.onGround && g.hitstun == 0 && g.downTicks == 0
+                && !g.knockedAir && !g.captured && !g.scripted;
+    }
+
+    /** 简易领域现在护得住五条悟吗（开着、人在地上、在圈里）。 */
+    public boolean simpleDomainProtectsGojo() {
+        return simpleDomainRounds > 0 && gojo.onGround && Math.abs(gojo.x - simpleDomainX) <= Tuning.SIMPLE_DOMAIN_RADIUS;
+    }
+
+    /** 这次按下的跳跃：松手（按得短）就跳；按满 SIMPLE_DOMAIN_HOLD 开简易领域；中途点了体术（下砸苍拳优先）、别的招就作废（在 latch 里判）。 */
+    private void simpleInput(TickInput in) {
+        if (!jumpSimplePending) return;
+        Fighter g = gojo;
+        if (!in.jumpHeld) { // 松手了：短按就是跳
+            jumpSimplePending = false;
+            simpleDomainHold = 0;
+            bufJump = Tuning.INPUT_BUFFER;
+            return;
+        }
+        if (g.state == Fighter.KO || g.hitstun > 0 || g.downTicks > 0 || g.knockedAir || g.captured || g.scripted) { // 被打断：不补跳
+            jumpSimplePending = false;
+            simpleDomainHold = 0;
+            return;
+        }
+        if (shrineTicks == 0) { // 御厨子没了：只剩松手跳
+            simpleDomainHold = 0;
+            return;
+        }
+        if (++simpleDomainHold >= Tuning.SIMPLE_DOMAIN_HOLD && canStartSimpleDomain()) {
+            jumpSimplePending = false;
+            simpleDomainHold = 0;
+            simpleDomainRounds = Tuning.SIMPLE_DOMAIN_ROUNDS;
+            simpleDomainX = g.x;
+            events.emit(Events.SIMPLE_DOMAIN, simpleDomainX, 0, Events.SIMPLE_OPEN, simpleDomainRounds, tick);
+        }
+    }
+
+    /** 圈还成不成立：倒下、被抓、被打飞就没了；跳起来、走出圈也没了。 */
+    private void checkSimpleDomain() {
+        if (simpleDomainRounds == 0) return;
+        Fighter g = gojo;
+        if (g.state == Fighter.KO || g.downTicks > 0 || g.captured || g.scripted || g.knockedAir) closeSimpleDomain(Events.SIMPLE_DISABLED);
+        else if (!g.onGround || Math.abs(g.x - simpleDomainX) > Tuning.SIMPLE_DOMAIN_RADIUS) closeSimpleDomain(Events.SIMPLE_LEFT_AREA);
+    }
+
+    private void closeSimpleDomain(int why) {
+        if (simpleDomainRounds == 0) return;
+        simpleDomainRounds = 0;
+        events.emit(Events.SIMPLE_DOMAIN, simpleDomainX, 0, Events.SIMPLE_CLOSE, why, tick);
+    }
+
     /* ---------------- 伏魔御厨子 ---------------- */
 
     private void startShrineSign() {
@@ -1929,12 +2060,21 @@ public final class World {
                 shrineNext = Tuning.SHRINE_ROUND;
                 int how = 2;
                 if (s.hitstun == 0 && g.state != Fighter.KO) {
-                    long before = g.hpMilli;
-                    attack.set(Fighter.SUKUNA, Fighter.GOJO, Attack.SHRINE_SLASH, ++attackSeq, Tuning.SHRINE_DAMAGE_MILLI, 0, 0, 0, Attack.SURE_HIT);
-                    how = (apply(attack) & Defense.ALLOW_DAMAGE) != 0 ? 1 : 0;
-                    shrineDealt += before - g.hpMilli;
+                    if (simpleDomainProtectsGojo()) { // 简易领域中和必中：这一轮不伤，圈被削掉一层
+                        how = 3;
+                        simpleDomainRounds--;
+                    } else {
+                        long before = g.hpMilli;
+                        attack.set(Fighter.SUKUNA, Fighter.GOJO, Attack.SHRINE_SLASH, ++attackSeq, Tuning.SHRINE_DAMAGE_MILLI, 0, 0, 0, Attack.SURE_HIT);
+                        how = (apply(attack) & Defense.ALLOW_DAMAGE) != 0 ? 1 : 0;
+                        shrineDealt += before - g.hpMilli;
+                    }
                 }
                 events.emit(Events.SHRINE, g.x, g.centerY(), Events.SHRINE_SLASH, how, tick);
+                if (how == 3) {
+                    if (simpleDomainRounds > 0) events.emit(Events.SIMPLE_DOMAIN, simpleDomainX, 0, Events.SIMPLE_ERODE, simpleDomainRounds, tick);
+                    else events.emit(Events.SIMPLE_DOMAIN, simpleDomainX, 0, Events.SIMPLE_CLOSE, Events.SIMPLE_ERODED, tick);
+                }
             }
         }
         if (--shrineTicks == 0) endShrine(false);
@@ -1943,6 +2083,7 @@ public final class World {
     /** 领域结束（broken：被拆掉）：术式烧断 4 秒；对撞中结束的话无量空处赢了，接着困住宿傩。 */
     private void endShrine(boolean broken) {
         shrineTicks = 0;
+        closeSimpleDomain(Events.SIMPLE_ENEMY_END);
         shrineBurn = Tuning.SHRINE_BURNOUT;
         events.emit(Events.SHRINE, sukuna.x, sukuna.centerY(), broken ? Events.SHRINE_BROKEN : Events.SHRINE_END, tick);
         if (clashTicks > 0) {
@@ -2571,6 +2712,7 @@ public final class World {
         castId++;
         spaceExhaust = 0;
         shrineTicks = clashTicks = 0;
+        closeSimpleDomain(Events.SIMPLE_FIGHT_END);
         refreshSureHit();
         chantPhase = -1;
         for (int i = 0; i < Fighter.COUNT; i++) {

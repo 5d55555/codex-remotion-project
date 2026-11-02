@@ -5,7 +5,8 @@
   app/src/main/java/com/shinjuku/showdown/SfxBank.java（编号、资源表、时长）
 响度：背景音乐是用户给的原曲、原音量（实测 −7.5 LUFS，峰值过满），不能压低它，所以音效整体做得比设计稿的建议响：
 普通中等命中（hit_medium）最响 80 ms 窗口的 RMS 定在 REF_DB，其余按设计稿的相对增益排开，峰值限在 CEIL_DB 以内。
-用法：python3 scripts/game_sfx.py            （需要 numpy、scipy、soundfile、ffmpeg）
+用法：python3 scripts/game_sfx.py                      （全部重写；需要 numpy、scipy、soundfile、ffmpeg）
+      python3 scripts/game_sfx.py --only=名字,名字      （只重写这几个，SfxBank 照样全量生成）
 """
 import os, subprocess, sys, tempfile
 import numpy as np
@@ -618,6 +619,25 @@ def down_thud(v):
     return finish(x, 1.4, 0.02)
 
 
+def simple_open():
+    """简易领域张开（v0.17，Astra）：220 Hz 正弦带弱泛音，15 ms 起音；900→500 Hz 窄带气流收拢；末尾一点清鸣。"""
+    x = mix(P(0.24, 220, [1, 2, 3], [1, 0.3, 0.15], 6, 0.015), 0.5 * W(0.24, 900, 500, 0.03, 0.12),
+            D(0.15 * P(0.10, 1320, [1, 1.5], [1, 0.3], 25, 0.004), 0.15))
+    return finish(x, 1.1, 0.02)
+
+
+def simple_erode(v):
+    """被削一层：1.2–3 kHz 噪声 8 ms 瞬态，叠 680 / 940 Hz 非整数双音很快衰减；没有爆炸的低频。"""
+    return finish(mix(0.6 * C(0.008, 1200, 3000), 0.4 * P(0.10, jit(v, 680), [1, 940 / 680], [1, 0.7], 30, 0.002)), 1.2)
+
+
+def simple_break():
+    """削光碎掉：三下相隔 18 ms 的干裂，叠 700→350 Hz 下扫，一股短气流散开。"""
+    x = mix(*[D(a * C(0.010, 900, 3200), t) for t, a in ((0, 0.8), (0.018, 0.6), (0.036, 0.45))], 0.45 * S(0.16, 700, 350),
+            D(0.3 * W(0.14, 1400, 500, 0.01, 0.10), 0.05))
+    return finish(x, 1.4, 0, 0, 0.22)
+
+
 def ko():
     return finish(mix(0.3 * C(0.010, 650, 2200), 0.45 * S(0.20, 430, 170), 0.25 * N(0.18, 450, 1400)), 1.4, 0.02)
 
@@ -724,6 +744,9 @@ CUES = [
     ('HIT_HEAVY', 'hit_heavy', lambda v: hit(2, True, v), 2, 2, False),
     ('KO', 'ko', lambda v: ko(), -2, 1, False),
     ('DOWN_THUD', 'down_thud', down_thud, -4, 2, False),
+    ('SIMPLE_OPEN', 'simple_open', lambda v: simple_open(), -7, 1, False),   # v0.17 简易领域
+    ('SIMPLE_ERODE', 'simple_erode', simple_erode, -9, 2, False),
+    ('SIMPLE_BREAK', 'simple_break', lambda v: simple_break(), -5, 1, False),
     ('SIG_START', 'sig_start', lambda v: signal([440, 660], 0.16), -5, 1, False),
     ('SIG_REVIVE', 'sig_revive', lambda v: signal([330, 440, 660], 0.09), -5, 1, False),
     ('SIG_WIN', 'sig_win', lambda v: signal([440, 554.37, 660], 0.17), -2, 1, False),
@@ -734,10 +757,16 @@ LOOP_SLOTS = 3  # 循环位：0 苍的吸引、1 领域（无量空处 / 对撞�
 
 
 def main():
+    # --only a,b：只重写这几个音效的文件（其余照样合成一遍，用来算时长、写 SfxBank，但不动已有的文件）
+    only = None
+    for a in sys.argv[1:]:
+        if a.startswith('--only='):
+            only = set(a[len('--only='):].split(','))
     os.makedirs(RAW, exist_ok=True)
-    for f in os.listdir(RAW):
-        if f.startswith('sfx_') and (f.endswith('.ogg') or f.endswith('.wav')):
-            os.remove(os.path.join(RAW, f))
+    if only is None:
+        for f in os.listdir(RAW):
+            if f.startswith('sfx_') and (f.endswith('.ogg') or f.endswith('.wav')):
+                os.remove(os.path.join(RAW, f))
     names, durs, total_bytes, total_sec = [], [], 0, 0.0
     report = []
     tmp = tempfile.mkdtemp()
@@ -749,6 +778,10 @@ def main():
             assert np.all(np.isfinite(x)), name
             x = master(x, loop)
             x = level(x, gain, loop)
+            files.append(f'sfx_{name}_{v}')
+            dmax = max(dmax, len(x) / SR)
+            if only is not None and name not in only:
+                continue
             wav = os.path.join(tmp, f'{name}_{v}.wav')
             sf.write(wav, x.astype(np.float32), SR, subtype='FLOAT')
             if loop:  # 循环音存 16 位 WAV：libvorbis 编码会丢掉末尾一块，循环就接不上了
@@ -761,8 +794,6 @@ def main():
                                 '-c:a', 'libvorbis', '-q:a', '3', '-ac', '1', '-ar', str(SR), ogg], check=True)
             total_bytes += os.path.getsize(ogg)
             total_sec += len(x) / SR
-            dmax = max(dmax, len(x) / SR)
-            files.append(f'sfx_{name}_{v}')
             pk = 20 * np.log10(np.max(np.abs(x)) + 1e-12)
             report.append(f'{name}_{v}: {len(x) / SR:.3f}s peak {pk:.1f} dBFS rms80 {20 * np.log10(rms80(x) + 1e-12):.1f}')
         names.append((const, files, loop))

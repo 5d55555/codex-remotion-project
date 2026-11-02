@@ -63,6 +63,10 @@ final class BattleView extends SurfaceView implements SurfaceHolder.Callback {
         controls.setBlocked(blocked);
     }
 
+    void tryCounter(int castId) {
+        loop.tryCounter(castId);
+    }
+
     void endCutscene(int castId, Runnable resumed) {
         loop.endCutscene(castId, resumed);
     }

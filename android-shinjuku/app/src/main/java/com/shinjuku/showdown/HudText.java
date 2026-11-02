@@ -25,6 +25,7 @@ final class HudText {
     static final int SUB_PURPLE_MAX = 46, SUB_TP_PURPLE = 47, PIERCING = 48; // 茈·最大输出、瞬移·茈的横幅小字；宿傩的「穿血」
     static final int SPACE_SLASH = 49, SUB_SPACE_SLASH = 50, EXHAUSTED = 51; // 宿傩的空间斩：头上的字、横幅小字；打空后的「力竭」
     static final int CLASH = 52, SHRINE_BROKEN = 53, VOID_BROKEN = 54, BURNOUT = 55; // 领域对撞、伏魔御厨子崩解、无量空处结界破裂、术式烧断
+    static final int SIMPLE_DOMAIN = 56; // 五条悟头上的「简易领域」（v0.17）
     /**
      * 台词（Luna 查证的原作台词，见 notes/招式名称考证.md；头两句是用户指定的）。
      * 五条悟：0 挑战者（第 224 话）……9 无量空处后（第 229 话）、10 第 235 话的大范围茈。
@@ -34,7 +35,7 @@ final class HudText {
             "接下来我要认真了", "还能继续吧", "倒数吧，直到你笑不出来", "我可是正义的伙伴", "至少先打穿心脏！", "我赢了"};
     static final String[] SUKUNA_QUOTES = {"你只不过是没有诞生在我时代的凡夫罢了", "真是的，咒术师何时都麻烦", "真是个好时代啊",
             "连解闷都不够", "自豪吧，你很强", "好啊，再让我看看", "只是比别的鱼鲜活些", "接下来边切碎你，边适应无下限", "五条悟，你值得我铭记一生"};
-    static final int QUOTE_G0 = 56, QUOTE_S0 = QUOTE_G0 + GOJO_QUOTES.length;
+    static final int QUOTE_G0 = 57, QUOTE_S0 = QUOTE_G0 + GOJO_QUOTES.length;
     static final int COUNT = QUOTE_S0 + SUKUNA_QUOTES.length;
 
     final Bitmap bitmap;
@@ -54,11 +55,11 @@ final class HudText {
                 "位相", "黄昏", "智慧之瞳", "位相", "波罗蜜", "光之柱",
                 "魔虚罗", "布瑠部由良由良", "八握剑异戒神将 · 魔虚罗", "十种影法术 · 顎吐", "原身", "两面宿傩 · 原身", "适应无限",
                 "虚式 · 最大输出", "瞬移 · 虚式", "穿血", "空间斩", "斩断空间的斩击", "力竭",
-                "领域对撞 · 必中抵消", "伏魔御厨子崩解", "无量空处结界破裂", "术式烧断"};
+                "领域对撞 · 必中抵消", "伏魔御厨子崩解", "无量空处结界破裂", "术式烧断", "简易领域"};
         float[] size = {13, 13, 16, 10, 15, 15, 22, 22, 22, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 17, 17, 17, 17, 16,
                 13, 13, 14, 17, 17, 17, 15, 15, 17, 17, 17, 17, 17, 17,
                 11, 17, 15, 13, 14, 15, 14,
-                15, 15, 14, 17, 15, 15, 16, 16, 16, 13};
+                15, 15, 14, 17, 15, 15, 16, 16, 16, 13, 15};
         if (text.length != QUOTE_G0 || size.length != QUOTE_G0) throw new IllegalStateException("HudText 的字和字号要一一对应");
         String[] base = text;
         float[] baseSize = size;

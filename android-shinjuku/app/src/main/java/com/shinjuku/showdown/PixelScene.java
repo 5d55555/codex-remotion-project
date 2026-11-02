@@ -97,6 +97,7 @@ final class PixelScene {
     private float worldT0 = -99, worldX0, worldY0, worldX1;
     private boolean worldSpace;          // 这一道斩带是空间斩（紫黑）还是世界斩（红白）
     private float spaceT0 = -99, exhaustT0 = -99;
+    private float simpleOpenT = -99, simpleErodeT = -99, simpleEndT = -99, simpleEndX; // 简易领域（v0.17）：开、被削、收掉的时刻
     private float hollowT0 = -99, hollowX, hollowY, hollowR; // 无指向茈的演出：相撞的时刻、位置、最终半径（像素层）
     private boolean silhouette;                               // 冲击帧：人物画成纯色剪影
     private int silhouetteColor;
@@ -216,6 +217,7 @@ final class PixelScene {
         mahoSY = my;
         if (m.present) shadow(t, mx, m.y, sy);
         if (k.state == Fighter.S_SUMMON) summonPool(t, w, sx, sy);
+        simpleDomain(t, w, time, sx, sy);
 
         boolean cine = w.cine != World.CINE_NONE;
         float csx = X(w.cineSx) + sx, csy = Y(w.cineSy) + sy;
@@ -860,6 +862,25 @@ final class PixelScene {
                 case Events.LAND:
                     dust(x, y, Math.min(1, ev.value[i] / 700f));
                     break;
+                case Events.SIMPLE_DOMAIN: { // 简易领域：开、被削一层、收掉（被削光就碎成一圈散开）
+                    int v = (int) ev.value[i];
+                    if (v == Events.SIMPLE_OPEN) {
+                        simpleOpenT = time;
+                    } else if (v == Events.SIMPLE_ERODE) {
+                        simpleErodeT = time;
+                        sparks(x, groundY, 8, SIMPLE_LINE, SIMPLE_EDGE, 90);
+                    } else if (v == Events.SIMPLE_CLOSE) {
+                        simpleEndT = time;
+                        simpleEndX = x;
+                        if (kind == Events.SIMPLE_ERODED) {
+                            float r = Tuning.SIMPLE_DOMAIN_RADIUS * PPU;
+                            fx(FX_RING, x, groundY - 2, 0.3f, r * 0.8f, r * 1.3f, SIMPLE_LINE, SIMPLE_EDGE);
+                            sparks(x - r * 0.6f, groundY - 2, 10, SIMPLE_LINE, SIMPLE_EDGE, 140);
+                            sparks(x + r * 0.6f, groundY - 2, 10, SIMPLE_LINE, SIMPLE_EDGE, 140);
+                        }
+                    }
+                    break;
+                }
                 default:
                     break;
             }
@@ -1059,6 +1080,41 @@ final class PixelScene {
     }
 
     /* ---------------- 场景 ---------------- */
+
+    private static final int SIMPLE_LINE = 0xFFF2F4FF, SIMPLE_EDGE = 0xFF9FD6FF;
+
+    /**
+     * 简易领域（v0.17）：地上一个扁的圈（横半径 = 圈的半径，纵半径五分之一），淡米白的线加浅蓝的内缘，0.1 秒从中心展开；
+     * 前沿三段小刻线是还能挡几轮，被削一层时整圈往里一缩；收掉（自己展开领域、走出圈……）时 0.15 秒淡掉。
+     */
+    private void simpleDomain(PixelTarget t, World w, float time, int sx, int sy) {
+        boolean on = w.simpleDomainRounds > 0;
+        float fade = on ? 1 : Math.max(0, 1 - (time - simpleEndT) / 0.15f);
+        if (!on && (fade <= 0 || simpleEndT < simpleOpenT)) return;
+        float cx = (on ? X(w.simpleDomainX) : simpleEndX) + sx, cy = groundY + sy - 1;
+        float grow = on ? Math.min(1, (time - simpleOpenT) / 0.1f) : 1;
+        float pinch = time - simpleErodeT < 0.12f ? 4 * (1 - (time - simpleErodeT) / 0.12f) : 0;
+        float rx = Math.max(2, Tuning.SIMPLE_DOMAIN_RADIUS * PPU * grow - pinch), ry = Math.max(1, rx * 0.2f);
+        int seg = 28;
+        float px0 = cx + rx, py0 = cy;
+        for (int i = 1; i <= seg; i++) {
+            double a = Math.PI * 2 * i / seg;
+            float px1 = cx + (float) Math.cos(a) * rx, py1 = cy + (float) Math.sin(a) * ry;
+            t.line(Math.round(px0), Math.round(py0), Math.round(px1), Math.round(py1), 1, withAlpha(SIMPLE_LINE, 0.85f * fade));
+            t.line(Math.round(px0 * 0.96f + cx * 0.04f), Math.round(py0 * 0.9f + cy * 0.1f), Math.round(px1 * 0.96f + cx * 0.04f),
+                    Math.round(py1 * 0.9f + cy * 0.1f), 1, withAlpha(SIMPLE_EDGE, 0.45f * fade));
+            px0 = px1;
+            py0 = py1;
+        }
+        t.rect(Math.round(cx - rx * 0.7f), Math.round(cy - 1), Math.round(rx * 1.4f), 1, withAlpha(SIMPLE_EDGE, 0.12f * fade)); // 圈里一层很淡的光
+        if (on) { // 前沿的刻线：还剩几层
+            for (int q = 0; q < Tuning.SIMPLE_DOMAIN_ROUNDS; q++) {
+                double a = Math.PI / 2 + (q - 1) * 0.42;
+                float qx = cx + (float) Math.cos(a) * rx, qy = cy + (float) Math.sin(a) * ry;
+                t.rect(Math.round(qx) - 1, Math.round(qy) - 2, 2, 4, q < w.simpleDomainRounds ? SIMPLE_LINE : withAlpha(SIMPLE_EDGE, 0.3f));
+            }
+        }
+    }
 
     private void shadow(PixelTarget t, float x, float wy, int sy) {
         float k = 1 - Math.min(0.7f, wy / 260f);
@@ -3329,6 +3385,9 @@ final class PixelScene {
                 else if (g.state == Fighter.PURPLE_CHANT) prog = Math.min(1, st / (float) (Tuning.CHANT_PHRASES * Tuning.CHANT_PHRASE));
             } else if (i == Controls.DOMAIN && w.domainTicks > 0) {
                 prog = w.domainTicks / (float) Tuning.DOMAIN_DURATION;
+            } else if (i == Controls.JUMP) { // 简易领域（v0.17）：按住时外圈走满开圈；开着时外圈是还剩几层
+                if (w.simpleDomainHold > 0) prog = w.simpleDomainHold / (float) Tuning.SIMPLE_DOMAIN_HOLD;
+                else if (w.simpleDomainRounds > 0) prog = w.simpleDomainRounds / (float) Tuning.SIMPLE_DOMAIN_ROUNDS;
             }
             if (full) prog = 1;
             if (prog > 0) t.shape(x, y, r + 3, r + 1, (float) (-Math.PI / 2), (float) (Math.PI * 2 * Math.min(1, prog)), full ? 0xFFFFFFFF : ring);
@@ -3420,6 +3479,12 @@ final class PixelScene {
             float step = ht.h[first] * 0.8f;
             for (int k = 0; k < ph; k++) hudCenter(t, first + k, cx, y - (ph - k) * step, dim);
             hudCenter(t, first + ph, cx, y - 4 * dp * Math.max(0, 1 - local * 6), withAlpha(bright, Math.min(1, local * 6)));
+        }
+        // 五条悟头上：刚开简易领域时的「简易领域」（0.6 秒，v0.17）
+        if (time - simpleOpenT < 0.6f && w.simpleDomainRounds > 0) {
+            float cx = Math.max(60 * dp, Math.min(laidW - 60 * dp, gojoSX * s));
+            float y = Math.max(l.hudTop + 44 * dp, (gojoSY - 62) * s - ht.h[HudText.SIMPLE_DOMAIN]);
+            hudCenter(t, HudText.SIMPLE_DOMAIN, cx, y, withAlpha(0xFFE6F4FF, Math.min(1, (0.6f - (time - simpleOpenT)) * 4)));
         }
         // 宿傩头上：世界斩的咏唱（念到哪段亮哪段）、召唤魔虚罗的咏唱；领域展延、反转术式、适应完成、顎吐、原身的小字
         Fighter k = w.sukuna;

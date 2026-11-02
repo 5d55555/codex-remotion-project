@@ -31,8 +31,14 @@ import java.util.concurrent.CountDownLatch;
  */
 final class BattleLoop implements Choreographer.FrameCallback {
     interface Host {
-        /** 要放领域展开的过场了（主线程）：kind 是 World.CUTSCENE_VOID（无量空处）或 CUTSCENE_SHRINE（伏魔御厨子）。 */
-        void startCutscene(int castId, int kind);
+        /**
+         * 要放领域展开的过场了（主线程）：kind 是 World.CUTSCENE_VOID（无量空处）或 CUTSCENE_SHRINE（伏魔御厨子）；
+         * counterStatus 是宿傩的过场里能不能长按反制（World.counterBlocker：0 能、1 冷却中、2 当前状态不能、3 不适用），cooldownSec 是冷却还剩几秒。
+         */
+        void startCutscene(int castId, int kind, int counterStatus, float cooldownSec);
+
+        /** 长按反制的结果（主线程）：accepted 就换成同时展开的过场，newCastId 是新的那一段。 */
+        void counterResult(int castId, boolean accepted, int newCastId);
 
         /** 分出胜负了：World.OUTCOME_WIN / OUTCOME_LOSE（主线程，只通知一次）。 */
         void battleOver(int outcome);
@@ -189,6 +195,15 @@ final class BattleLoop implements Choreographer.FrameCallback {
         });
     }
 
+    /** 宿傩的过场里长按成功（主线程调用）：在战斗线程上再校验一次，结果回主线程。 */
+    void tryCounter(int castId) {
+        handler.post(() -> {
+            boolean ok = world.tryCounterDomain(castId);
+            int nid = world.castId;
+            mainHandler.post(() -> host.counterResult(castId, ok, nid));
+        });
+    }
+
     void quit() {
         handler.post(() -> {
             try {
@@ -253,8 +268,9 @@ final class BattleLoop implements Choreographer.FrameCallback {
             // 按了领域展开：世界停住，这一帧剩下的时间不要了；画面停在这一帧，主线程盖上视频
             cutscenePaused = true;
             accNs = 0;
-            int id = world.castId, kind = world.cutsceneKind;
-            mainHandler.post(() -> host.startCutscene(id, kind));
+            int id = world.castId, kind = world.cutsceneKind, counter = world.counterBlocker();
+            float cd = world.domainCd / (float) Tuning.HZ;
+            mainHandler.post(() -> host.startCutscene(id, kind, counter, cd));
         }
         if (!resultPosted && world.outcome != World.OUTCOME_NONE && world.cine == World.CINE_NONE && world.tick - world.outcomeTick >= RESULT_DELAY) {
             resultPosted = true;
