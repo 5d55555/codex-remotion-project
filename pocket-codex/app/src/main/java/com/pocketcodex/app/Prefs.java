@@ -56,6 +56,24 @@ public final class Prefs {
         p.edit().putString("effort", e).apply();
     }
 
+    /** 速度：null = 标准，"priority" = 快速（用量更高）。 */
+    public String speed() {
+        return p.getString("speed", null);
+    }
+
+    public void setSpeed(String s) {
+        p.edit().putString("speed", s).apply();
+    }
+
+    /** 顶部的“聊天 / 工作”：true = 工作（Agent 在工作区里改文件跑命令）。 */
+    public boolean workMode() {
+        return p.getBoolean("work_mode", true);
+    }
+
+    public void setWorkMode(boolean b) {
+        p.edit().putBoolean("work_mode", b).apply();
+    }
+
     public boolean userCa() {
         return p.getBoolean("user_ca", false);
     }
@@ -78,6 +96,24 @@ public final class Prefs {
 
     public void setTheme(int t) {
         p.edit().putInt("theme", t).apply();
+    }
+
+    /** 开发工具包上次成功用的软件源（Toolkit.Repo.id）。 */
+    public String toolkitRepo() {
+        return p.getString("toolkitRepo", null);
+    }
+
+    public void setToolkitRepo(String id) {
+        p.edit().putString("toolkitRepo", id).apply();
+    }
+
+    /** 用户在移动网络下选了“以后再装”。 */
+    public boolean toolkitDeferred() {
+        return p.getBoolean("toolkitDeferred", false);
+    }
+
+    public void setToolkitDeferred(boolean v) {
+        p.edit().putBoolean("toolkitDeferred", v).apply();
     }
 
     public boolean introSeen() {

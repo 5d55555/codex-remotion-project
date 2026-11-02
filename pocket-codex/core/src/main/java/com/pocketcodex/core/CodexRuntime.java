@@ -34,6 +34,15 @@ public final class CodexRuntime {
         public final File caFile;        // PEM 证书
         public final File logDir;        // 登录输出等
         public final String systemShell; // /system/bin/sh
+        /** 开发工具包（node、git、bash……）；null 或没通过自检时 Agent 只有系统的 toybox 命令。 */
+        public Toolkit toolkit;
+        public boolean toolkitReady;
+        /** App 的数据目录（/data/user/0/包名），给 termux-exec 用。 */
+        public String appDataDir;
+
+        public boolean useToolkit() {
+            return toolkit != null && toolkitReady && toolkit.bin("bash").isFile();
+        }
 
         public Layout(File codexBin, File codexHome, File homeDir, File binDir, File tmpDir, File caFile, File logDir, String systemShell) {
             this.codexBin = codexBin;
@@ -54,6 +63,8 @@ public final class CodexRuntime {
     public static Map<String, String> env(Layout l, String proxyUrl, String basePath, String timeZone) {
         Map<String, String> e = new LinkedHashMap<>();
         String path = l.binDir.getAbsolutePath();
+        boolean tk = l.useToolkit();
+        if (tk) for (String d : l.toolkit.pathDirs(l.homeDir)) path += ":" + d;
         if (basePath != null && !basePath.isEmpty()) path += ":" + basePath;
         else path += ":/system/bin:/system/xbin:/vendor/bin";
         e.put("PATH", path);
@@ -82,6 +93,7 @@ public final class CodexRuntime {
             e.put("NO_PROXY", "localhost,127.0.0.1,::1");
             e.put("no_proxy", "localhost,127.0.0.1,::1");
         }
+        if (tk) e.putAll(l.toolkit.env(l.appDataDir != null ? l.appDataDir : "", l.homeDir, l.caFile != null && l.caFile.isFile() ? l.caFile : null));
         // 安卓自己的几个变量：toybox、mksh 等系统命令需要（白名单，不继承 LD_PRELOAD 之类）
         for (String k : new String[]{"ANDROID_ROOT", "ANDROID_DATA", "ANDROID_STORAGE", "EXTERNAL_STORAGE", "ANDROID_ART_ROOT",
                 "ANDROID_I18N_ROOT", "ANDROID_TZDATA_ROOT", "BOOTCLASSPATH", "ANDROID_ASSETS"}) {
@@ -99,13 +111,49 @@ public final class CodexRuntime {
         return c;
     }
 
-    /** 建目录、bash 兼容链接、config.toml。每次启动 codex 前调用（很快）。 */
+    /**
+     * 建目录、PATH 最前面的几个命令、config.toml。每次启动 codex 前调用（很快）。
+     * <ul>
+     * <li>bash：工具包可用时指向真的 bash，否则指向系统 shell（mksh）；</li>
+     * <li>codex：指向当前安装的 codex，Agent 里也能直接用 codex 命令；</li>
+     * <li>pkg / apt / apt-get：让 App 从 Termux 仓库装软件包（{@link Toolkit#PKG_SCRIPT}）。</li>
+     * </ul>
+     */
     public static void prepare(Layout l, Config cfg) throws IOException {
         for (File d : new File[]{l.codexHome, l.homeDir, l.binDir, l.tmpDir, l.logDir}) {
             if (!d.isDirectory() && !d.mkdirs()) throw new IOException("建目录失败：" + d);
         }
-        ensureLink(new File(l.binDir, "bash"), l.systemShell);
+        ensureLink(new File(l.binDir, "bash"), l.useToolkit() ? l.toolkit.bin("bash").getAbsolutePath() : l.systemShell);
+        if (l.codexBin != null) ensureLink(new File(l.binDir, "codex"), l.codexBin.getAbsolutePath());
+        for (String n : new String[]{"pkg", "apt", "apt-get"}) writeIfChanged(new File(l.binDir, n), Toolkit.PKG_SCRIPT, true);
+        if (l.useToolkit()) {
+            File gc = new File(l.homeDir, ".gitconfig");
+            if (!gc.exists()) writeIfChanged(gc, DEFAULT_GITCONFIG, false);
+        }
         writeConfig(l.codexHome, cfg);
+    }
+
+    /** 第一次有工具包时写到 HOME 的 git 配置（用户或 Agent 之后可以改）。 */
+    static final String DEFAULT_GITCONFIG = "# 口袋工坊生成的默认配置，可以随意修改。\n"
+            + "[user]\n\tname = Pocket Codex\n\temail = pocket-codex@localhost\n"
+            + "[safe]\n\t# 共享存储里的文件属于别的用户 ID，不加这一行 git 会拒绝操作\n\tdirectory = *\n"
+            + "[init]\n\tdefaultBranch = main\n"
+            + "[core]\n\tpager = cat\n"
+            + "[credential]\n\thelper = store\n";
+
+    static void writeIfChanged(File f, String content, boolean executable) throws IOException {
+        byte[] b = content.getBytes(StandardCharsets.UTF_8);
+        if (f.isFile() && !Files.isSymbolicLink(f.toPath()) && java.util.Arrays.equals(Files.readAllBytes(f.toPath()), b)) {
+            if (executable && !f.canExecute()) f.setExecutable(true, true);
+            return;
+        }
+        if (Files.isSymbolicLink(f.toPath())) Files.delete(f.toPath());
+        File tmp = new File(f.getPath() + ".tmp");
+        try (FileOutputStream o = new FileOutputStream(tmp)) {
+            o.write(b);
+        }
+        if (executable && !tmp.setExecutable(true, true)) throw new IOException("设置可执行权限失败：" + f);
+        if (!tmp.renameTo(f)) throw new IOException("写入失败：" + f);
     }
 
     /** 让 name 指向 target（已经对就不动）。 */

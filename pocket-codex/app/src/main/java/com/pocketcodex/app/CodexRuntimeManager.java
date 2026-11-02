@@ -11,6 +11,7 @@ import com.pocketcodex.core.DeviceLogin;
 import com.pocketcodex.core.Installer;
 import com.pocketcodex.core.Json;
 import com.pocketcodex.core.LocalProxy;
+import com.pocketcodex.core.Toolkit;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -87,6 +88,9 @@ public final class CodexRuntimeManager {
         public final String id, displayName, description, defaultEffort;
         public final List<String> efforts;
         public final boolean isDefault;
+        /** 可选的速度档（serviceTier id → 说明），一般只有 priority（快速）。 */
+        public final List<String> serviceTiers = new ArrayList<>();
+        public final List<String> serviceTierDescriptions = new ArrayList<>();
 
         ModelInfo(String id, String displayName, String description, String defaultEffort, List<String> efforts, boolean isDefault) {
             this.id = id;
@@ -361,12 +365,15 @@ public final class CodexRuntimeManager {
     private Map<String, String> prepareEnv(File codexBin) throws IOException {
         if (proxy == null) {
             proxy = new LocalProxy(LocalProxy.SYSTEM);
+            proxy.setLocalHandler(this::handleLocalCommand);
             proxy.start();
         }
+        checkToolkit();
         if (!paths.caFile.isFile() || System.currentTimeMillis() - paths.caFile.lastModified() > 24L * 3600_000) {
             Certs.export(paths.caFile, prefs.userCa());
         }
         CodexRuntime.Layout l = paths.layout(codexBin);
+        l.toolkitReady = toolkitUsable;
         CodexRuntime.Config cfg = new CodexRuntime.Config();
         cfg.approvalPolicy = prefs.mode();
         cfg.model = prefs.model();
@@ -386,6 +393,260 @@ public final class CodexRuntimeManager {
         } catch (Installer.InstallException e) {
             return null;
         }
+    }
+
+    /* ---------------- 开发工具包（node、npm、git、python……） ---------------- */
+
+    public enum ToolkitState { NONE, INSTALLING, READY, BROKEN, FAILED }
+
+    /** 主线程读的状态。 */
+    public ToolkitState toolkitState = ToolkitState.NONE;
+    public String toolkitStep, toolkitError;
+    public long toolkitDone = -1, toolkitTotal = -1;
+    public final Map<String, String> toolkitVersions = new java.util.LinkedHashMap<>();
+    /** worker 线程用：自检通过才把工具包放进 Agent 的环境。 */
+    private volatile boolean toolkitUsable;
+    private volatile boolean toolkitInstalling;
+    private volatile boolean toolkitCancel;
+    private boolean toolkitAutoTried, toolkitRestartWanted;
+    private final ExecutorService toolkitWorker = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "toolkit");
+        t.setDaemon(true);
+        return t;
+    });
+    private long toolkitLastUi;
+
+    private File toolkitMarker() {
+        return new File(paths.usr, "var/lib/pocket-pkg/selftest.json");
+    }
+
+    /** 这台设备 + 这次安装的标识：系统升级或工具包变了就重新自检。 */
+    private String toolkitStamp() {
+        Toolkit t = paths.toolkit();
+        File st = new File(paths.usr, "var/lib/pocket-pkg/status.json");
+        return android.os.Build.FINGERPRINT + "|" + st.lastModified() + "|" + (t == null ? "" : t.arch) + "|" + BuildConfig.VERSION_CODE;
+    }
+
+    /** worker 线程：读自检结果；没有或过期就现在自检（一两秒）。 */
+    private void checkToolkit() {
+        Toolkit t = paths.toolkit();
+        if (t == null || !t.installed()) {
+            toolkitUsable = false;
+            onMain(() -> {
+                if (toolkitState != ToolkitState.INSTALLING && toolkitState != ToolkitState.FAILED) toolkitState = ToolkitState.NONE;
+            });
+            return;
+        }
+        if (toolkitInstalling) return;
+        Map<String, String> versions = null;
+        boolean ok = false;
+        try {
+            Map<String, Object> m = Json.parseObject(new String(java.nio.file.Files.readAllBytes(toolkitMarker().toPath()), StandardCharsets.UTF_8));
+            if (toolkitStamp().equals(Json.str(m, "stamp")) && Json.bool(m, "ok", false)) {
+                ok = true;
+                versions = new java.util.LinkedHashMap<>();
+                for (Map.Entry<String, Object> e : Json.obj(m, "versions").entrySet()) versions.put(e.getKey(), String.valueOf(e.getValue()));
+            }
+        } catch (Exception ignored) {
+            // 没有自检记录
+        }
+        String err = null;
+        if (versions == null) {
+            try {
+                versions = toolkitSelfTest();
+                ok = versions != null;
+                if (!ok) err = "工具包自检没通过（bash 无法运行）";
+            } catch (IOException e) {
+                err = "工具包自检失败：" + e.getMessage();
+            }
+        }
+        toolkitUsable = ok;
+        final boolean fok = ok;
+        final Map<String, String> fv = versions;
+        final String ferr = err;
+        onMain(() -> {
+            if (toolkitState == ToolkitState.INSTALLING) return;
+            toolkitState = fok ? ToolkitState.READY : ToolkitState.BROKEN;
+            toolkitError = ferr;
+            toolkitVersions.clear();
+            if (fv != null) toolkitVersions.putAll(fv);
+            changed();
+        });
+    }
+
+    /** 用 Agent 的同一套环境跑一遍常用命令，记下版本。bash 都跑不起来返回 null。 */
+    private Map<String, String> toolkitSelfTest() throws IOException {
+        Toolkit t = paths.toolkit();
+        File bin = codexBin();
+        CodexRuntime.Layout l = paths.layout(bin);
+        l.toolkitReady = true;
+        Map<String, String> env = CodexRuntime.env(l, proxy == null ? null : proxy.url(), System.getenv("PATH"), TimeZone.getDefault().getID());
+        paths.home.mkdirs();
+        paths.tmp.mkdirs();
+        String script = "echo __pocket_ok__; for c in 'node -v' 'npm -v' 'git --version' 'python3 -V' 'pip -V' 'bash --version' 'rg --version' 'curl --version'; do "
+                + "printf '%s\\t%s\\n' \"${c%% *}\" \"$($c 2>&1 | head -n 1)\"; done";
+        ProcessBuilder pb = new ProcessBuilder(t.bin("bash").getAbsolutePath(), "-c", script);
+        pb.environment().clear();
+        pb.environment().putAll(env);
+        pb.directory(paths.home);
+        Object[] r = runWithTimeout(pb, null, 90_000);
+        String out = (String) r[1];
+        if (!out.contains("__pocket_ok__")) return null;
+        Map<String, String> v = new java.util.LinkedHashMap<>();
+        for (String line : out.split("\n")) {
+            int tab = line.indexOf('\t');
+            if (tab <= 0) continue;
+            String name = line.substring(0, tab), val = line.substring(tab + 1).trim();
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("v?(\\d+\\.\\d+(\\.\\d+)?)").matcher(val);
+            v.put(name, m.find() ? m.group(1) : "不可用");
+        }
+        Map<String, Object> mark = new java.util.LinkedHashMap<>();
+        mark.put("stamp", toolkitStamp());
+        mark.put("ok", true);
+        mark.put("versions", new java.util.LinkedHashMap<String, Object>(v));
+        File f = toolkitMarker();
+        f.getParentFile().mkdirs();
+        try (java.io.FileOutputStream o = new java.io.FileOutputStream(f)) {
+            o.write(Json.write(mark).getBytes(StandardCharsets.UTF_8));
+        }
+        return v;
+    }
+
+    /** 优先的软件源：上次成功的；没有时，codex 用国内镜像装的就先试中科大镜像。 */
+    private String preferredToolkitRepo() {
+        String r = prefs.toolkitRepo();
+        if (r != null) return r;
+        return "npmmirror".equals(prefs.source()) ? "ustc" : null;
+    }
+
+    /** 安装（或重装）开发工具包。下载约 57 MB、占用约 230 MB；装好自检，再让 Codex 重启用上。 */
+    public void startToolkitInstall() {
+        if (toolkitState == ToolkitState.INSTALLING) return;
+        final Toolkit t = paths.toolkit();
+        if (t == null) {
+            toolkitState = ToolkitState.FAILED;
+            toolkitError = "这台设备的处理器不支持开发工具包";
+            changed();
+            return;
+        }
+        toolkitCancel = false;
+        toolkitInstalling = true;
+        toolkitState = ToolkitState.INSTALLING;
+        toolkitError = null;
+        toolkitStep = "准备安装…";
+        toolkitDone = toolkitTotal = -1;
+        prefs.setToolkitDeferred(false);
+        changed();
+        toolkitWorker.execute(() -> {
+            String err = null;
+            Map<String, String> versions = null;
+            String repo = null;
+            try {
+                repo = t.installBase(preferredToolkitRepo(), new Toolkit.Progress() {
+                    @Override
+                    public void step(String text, long done, long total) {
+                        onMain(() -> {
+                            toolkitStep = text;
+                            toolkitDone = done;
+                            toolkitTotal = total;
+                            long now = SystemClock.elapsedRealtime();
+                            if (now - toolkitLastUi > 250) {
+                                toolkitLastUi = now;
+                                changed();
+                            }
+                        });
+                    }
+
+                    @Override
+                    public boolean cancelled() {
+                        return toolkitCancel;
+                    }
+                });
+                onMain(() -> {
+                    toolkitStep = "检查能不能运行…";
+                    changed();
+                });
+                versions = toolkitSelfTest();
+                if (versions == null) err = "装好了，但在这台设备上运行不起来（bash 自检失败）。可以在诊断里查看详情。";
+            } catch (Installer.InstallException e) {
+                err = e.kind == Installer.Kind.CANCELLED ? "已取消" : e.getMessage();
+            } catch (IOException e) {
+                err = "自检失败：" + e.getMessage();
+            }
+            toolkitInstalling = false;
+            toolkitUsable = err == null;
+            final String ferr = err, frepo = repo;
+            final Map<String, String> fv = versions;
+            onMain(() -> {
+                toolkitError = ferr;
+                toolkitVersions.clear();
+                if (fv != null) toolkitVersions.putAll(fv);
+                if (ferr == null) {
+                    toolkitState = ToolkitState.READY;
+                    if (frepo != null) prefs.setToolkitRepo(frepo);
+                    restartForToolkit();
+                } else {
+                    Toolkit tk = paths.toolkit();
+                    toolkitState = tk != null && tk.installed() && fv != null ? ToolkitState.READY : tk != null && tk.installed() ? ToolkitState.BROKEN : ToolkitState.FAILED;
+                }
+                changed();
+            });
+        });
+    }
+
+    public void cancelToolkitInstall() {
+        toolkitCancel = true;
+    }
+
+    /** 工具包变了：Codex 进程要重启才能拿到新的 PATH。正在跑的回合结束后再重启。 */
+    private void restartForToolkit() {
+        if (server == null) return;
+        if (runningThreadId != null || pendingApprovalCount() > 0) {
+            toolkitRestartWanted = true;
+            return;
+        }
+        toolkitRestartWanted = false;
+        stopServer();
+        startServer();
+    }
+
+    /** 连上 Codex 以后：没装过工具包就自动装（移动网络下先问）。 */
+    private void maybeAutoInstallToolkit() {
+        if (toolkitAutoTried) return;
+        toolkitAutoTried = true;
+        Toolkit t = paths.toolkit();
+        if (t == null || t.installed() || toolkitState == ToolkitState.INSTALLING) return;
+        android.net.ConnectivityManager cm = ctx.getSystemService(android.net.ConnectivityManager.class);
+        boolean metered = cm == null || cm.isActiveNetworkMetered();
+        if (!metered) startToolkitInstall();
+    }
+
+    /** 移动网络下：界面上显示“安装开发工具”卡片（没自动装）。 */
+    public boolean toolkitOffered() {
+        Toolkit t = paths.toolkit();
+        return t != null && !t.installed() && toolkitState == ToolkitState.NONE;
+    }
+
+    /** LocalProxy 的本机通道：PATH 里的 pkg/apt 命令走这里。 */
+    private int handleLocalCommand(String path, List<String> args, java.io.PrintStream out) {
+        if (!"/pkg".equals(path)) {
+            out.println("未知的本机命令：" + path);
+            return 2;
+        }
+        Toolkit t = paths.toolkit();
+        if (t == null) {
+            out.println("这台设备不支持开发工具包");
+            return 1;
+        }
+        if (toolkitInstalling) {
+            out.println("开发工具包正在安装，装好后再试（口袋工坊 → 设置 → 开发工具 可以看进度）。");
+            return 1;
+        }
+        if (!t.installed()) {
+            out.println("开发工具包还没装：请让用户在 口袋工坊 → 设置 → 开发工具 里安装。");
+            return 1;
+        }
+        return t.command(args, preferredToolkitRepo(), out, () -> toolkitCancel);
     }
 
     /* ---------------- 登录 ---------------- */
@@ -621,7 +882,9 @@ public final class CodexRuntimeManager {
                     accountPlan = plan;
                     accountType = type;
                     setStage(Stage.READY);
+                    maybeAutoInstallToolkit();
                     loadModels();
+                    loadCatalog();
                     refreshThreads();
                     refreshRateLimits();
                 });
@@ -743,8 +1006,15 @@ public final class CodexRuntimeManager {
                             String eff = Json.str(e, "reasoningEffort");
                             if (eff != null) efforts.add(eff);
                         }
-                        models.add(new ModelInfo(Json.str(o, "id", Json.str(o, "model", "?")), Json.str(o, "displayName", Json.str(o, "id", "?")),
-                                Json.str(o, "description", ""), Json.str(o, "defaultReasoningEffort"), efforts, Json.bool(o, "isDefault", false)));
+                        ModelInfo mi = new ModelInfo(Json.str(o, "id", Json.str(o, "model", "?")), Json.str(o, "displayName", Json.str(o, "id", "?")),
+                                Json.str(o, "description", ""), Json.str(o, "defaultReasoningEffort"), efforts, Json.bool(o, "isDefault", false));
+                        for (Object t : Json.arr(o, "serviceTiers")) {
+                            String tid = Json.str(t, "id");
+                            if (tid == null) continue;
+                            mi.serviceTiers.add(tid);
+                            mi.serviceTierDescriptions.add(Json.str(t, "description", ""));
+                        }
+                        models.add(mi);
                     }
                     changed();
                 });
@@ -754,6 +1024,82 @@ public final class CodexRuntimeManager {
             public void onError(AppServer.RpcError error) {
             }
         });
+    }
+
+    /** “@”和插件列表的数据（技能 + 已安装且启用的插件），READY 后加载。 */
+    public final List<Catalog> catalog = new ArrayList<>();
+
+    public void loadCatalog() {
+        if (server == null) return;
+        final List<Catalog> skills = new ArrayList<>(), plugins = new ArrayList<>();
+        String ws = prefs.workspace();
+        Map<String, Object> sp = Json.map("forceReload", false);
+        if (ws != null) {
+            List<Object> cw = new ArrayList<>();
+            cw.add(ws);
+            sp.put("cwds", cw);
+        }
+        server.request("skills/list", sp, new AppServer.Callback() {
+            @Override
+            public void onResult(Map<String, Object> r) {
+                java.util.Set<String> seen = new java.util.HashSet<>();
+                for (Object e : Json.arr(r, "data")) {
+                    for (Object sk : Json.arr(e, "skills")) {
+                        if (!Json.bool(sk, "enabled", true)) continue;
+                        String name = Json.str(sk, "name");
+                        if (name == null || !seen.add(name)) continue;
+                        Map<String, Object> itf = Json.obj(sk, "interface");
+                        skills.add(new Catalog(true, name, Json.str(itf, "displayName", name),
+                                Json.str(itf, "shortDescription", Json.str(sk, "shortDescription", Json.str(sk, "description", ""))),
+                                Json.str(itf, "iconSmallUrl"), Json.str(itf, "brandColor"), Json.str(sk, "path", "")));
+                    }
+                }
+                onMain(() -> publishCatalog(skills, null));
+            }
+
+            @Override
+            public void onError(AppServer.RpcError error) {
+            }
+        });
+        server.request("plugin/list", Json.map(), new AppServer.Callback() {
+            @Override
+            public void onResult(Map<String, Object> r) {
+                for (Object mk : Json.arr(r, "marketplaces")) {
+                    for (Object pl : Json.arr(mk, "plugins")) {
+                        if (!Json.bool(pl, "installed", false) || !Json.bool(pl, "enabled", false)) continue;
+                        Map<String, Object> itf = Json.obj(pl, "interface");
+                        String name = Json.str(pl, "name", Json.str(pl, "id", "?"));
+                        String display = Json.str(itf, "displayName", name);
+                        plugins.add(new Catalog(false, Json.str(pl, "id", name), display, Json.str(itf, "shortDescription", ""),
+                                Json.str(itf, "composerIconUrl", Json.str(itf, "logoUrl")), Json.str(itf, "brandColor"), "plugin://" + Json.str(pl, "id", name)));
+                    }
+                }
+                onMain(() -> publishCatalog(null, plugins));
+            }
+
+            @Override
+            public void onError(AppServer.RpcError error) {
+            }
+        });
+    }
+
+    private final List<Catalog> catSkills = new ArrayList<>(), catPlugins = new ArrayList<>();
+
+    private void publishCatalog(List<Catalog> skills, List<Catalog> plugins) {
+        if (skills != null) {
+            catSkills.clear();
+            catSkills.addAll(skills);
+        }
+        if (plugins != null) {
+            catPlugins.clear();
+            catPlugins.addAll(plugins);
+        }
+        catalog.clear();
+        // 创建图像放最前（ChatGPT 的顺序），然后插件，再其他技能
+        for (Catalog c : catSkills) if (c.id.equals("imagegen")) catalog.add(c);
+        catalog.addAll(catPlugins);
+        for (Catalog c : catSkills) if (!c.id.equals("imagegen")) catalog.add(c);
+        changed();
     }
 
     public ModelInfo currentModel() {
@@ -823,21 +1169,64 @@ public final class CodexRuntimeManager {
         return conversations.get(threadId);
     }
 
-    /** 给 Agent 的环境说明（安卓上的 shell 和工具）。 */
-    static String developerInstructions(String cwd) {
-        return "You are running inside Pocket Codex on an Android phone. The working directory is " + cwd + ". "
-                + "Shell commands run through Android's /system/bin/sh (mksh, invoked as bash) with Android toybox utilities "
-                + "(ls, cat, grep, sed, find, head, tail, wc, sort, tar, …). git, python, node, rg and compilers are NOT installed; "
-                + "do not try to install them. Prefer POSIX shell syntax. Edit files with apply_patch. "
-                + "There is no project-level sandbox: stay inside the working directory unless the user asks otherwise. "
-                + "Reply in the language the user writes in.";
+    /** 聊天模式的会话放在这个空目录里（不碰工作区）。 */
+    File chatDir() {
+        File d = new File(paths.root, "chat");
+        if (!d.isDirectory()) d.mkdirs();
+        return d;
+    }
+
+    boolean isChatCwd(String cwd) {
+        return cwd != null && cwd.equals(chatDir().getAbsolutePath());
+    }
+
+    static final String CHAT_INSTRUCTIONS = "You are in Pocket Codex's chat mode on an Android phone. This is a conversation, not a work session: "
+            + "answer the user's questions directly and helpfully. Do not run shell commands and do not create or modify files — such requests "
+            + "will be declined automatically. You may use web search when it helps. Reply in the language the user writes in.";
+
+    /** 给 Agent 的环境说明：安卓上的 shell、开发工具包里有什么、缺了怎么办（pkg install）、共享存储的限制。 */
+    String developerInstructions(String cwd) {
+        StringBuilder b = new StringBuilder();
+        b.append("You are running inside Pocket Codex on an Android phone (no root, no sudo). The working directory is ").append(cwd).append(". ");
+        if (toolkitUsable) {
+            Map<String, String> v = toolkitVersions;
+            b.append("Developer toolkit (Termux packages, installed under $PREFIX): GNU bash, coreutils, findutils, grep, sed, gawk, diffutils, patch, "
+                    + "tar, gzip, bzip2, xz, zstd, zip/unzip, curl, wget, ripgrep (rg), jq, make, tree, file, less, procps, sqlite3, openssl, ssh; ")
+                    .append("Node.js ").append(ver(v, "node")).append(" with npm ").append(ver(v, "npm")).append(" and npx; git ").append(ver(v, "git"))
+                    .append("; Python ").append(ver(v, "python3")).append(" with pip; and the `codex` CLI itself. ")
+                    .append("If a tool is missing, install it from the Termux repository with `pkg install <name>` (also `pkg search <term>`, `pkg show <name>`, "
+                            + "`pkg list-installed`; `apt`/`apt-get` are aliases), e.g. clang, cmake, golang, rust, openjdk-21, php, ruby, perl, ffmpeg, imagemagick. "
+                            + "Do not download binaries by hand. ")
+                    .append("Notes: npm global installs go to ~/.npm-global/bin (on PATH); `python -m venv .venv` works. "
+                            + "npm resolves native binaries for platform \"android\" — when a package has no Android build, prefer a pure-JS alternative or an older release. "
+                            + "Shared storage (/storage/emulated/0, /sdcard) cannot execute files or hold symlinks: there use `npm install --no-bin-links`, run tools through npx/node, "
+                            + "and expect git to need core.filemode=false; heavy builds work better in the app's private workspace. "
+                            + "Servers you start (e.g. a dev server on 127.0.0.1:<port>) can be opened in the phone's browser; run long-lived ones in the background (nohup … &) and tell the user the URL. "
+                            + "git has a placeholder identity (Pocket Codex); ask before pushing anywhere, and pushing needs the user's own token. ");
+        } else {
+            String why = toolkitState == ToolkitState.INSTALLING ? "is being installed right now" : toolkitState == ToolkitState.BROKEN ? "failed its self-test on this device" : "is not installed";
+            b.append("Shell commands run through Android's /system/bin/sh (mksh, invoked as bash) with toybox utilities only (ls, cat, grep, sed, find, head, tail, wc, sort, tar, …). ")
+                    .append("The developer toolkit (Node.js/npm/npx, git, Python/pip, bash, ripgrep, curl, …) ").append(why).append(". ")
+                    .append("If the task needs those tools, tell the user to open Pocket Codex → Settings → Developer tools to install it (about 57 MB), then retry; "
+                            + "do not try to download binaries yourself. Prefer POSIX shell syntax. ");
+        }
+        b.append("Edit files with apply_patch. There is no project-level sandbox: stay inside the working directory unless the user asks otherwise. "
+                + "Reply in the language the user writes in.");
+        return b.toString();
+    }
+
+    private static String ver(Map<String, String> v, String k) {
+        String x = v.get(k);
+        return x == null || x.equals("不可用") ? "" : x;
     }
 
     private Map<String, Object> threadParams(String cwd) {
-        Map<String, Object> m = Json.map("sandbox", "danger-full-access", "approvalPolicy", prefs.mode(), "approvalsReviewer", "user");
+        boolean chat = isChatCwd(cwd);
+        // 聊天模式一律“每步确认”，好让任何命令/改文件请求都被拦下来自动拒绝
+        Map<String, Object> m = Json.map("sandbox", "danger-full-access", "approvalPolicy", chat ? Prefs.MODE_CONFIRM : prefs.mode(), "approvalsReviewer", "user");
         if (cwd != null) {
             m.put("cwd", cwd);
-            m.put("developerInstructions", developerInstructions(cwd));
+            m.put("developerInstructions", chat ? CHAT_INSTRUCTIONS : developerInstructions(cwd));
         }
         ModelInfo mi = currentModel();
         if (prefs.model() != null && mi != null) m.put("model", mi.id);
@@ -962,6 +1351,10 @@ public final class CodexRuntimeManager {
 
     /** 发一轮。app-server 重启过的话先把这个会话 resume 回来。 */
     public void sendTurn(final Conversation c, final String text, final SendCallback cb) {
+        sendTurn(c, text, null, cb);
+    }
+
+    public void sendTurn(final Conversation c, final String text, final List<Attachment> atts, final SendCallback cb) {
         if (server == null) {
             cb.onSent("Codex 还没准备好");
             return;
@@ -977,7 +1370,7 @@ public final class CodexRuntimeManager {
                 public void onResult(Map<String, Object> r) {
                     onMain(() -> {
                         resumedIn.put(c.threadId, gen);
-                        sendTurn(c, text, cb);
+                        sendTurn(c, text, atts, cb);
                     });
                 }
 
@@ -993,16 +1386,45 @@ public final class CodexRuntimeManager {
             return;
         }
         String clientId = UUID.randomUUID().toString();
-        c.addLocalUserMessage(clientId, text);
+        List<String> images = new ArrayList<>(), mentions = new ArrayList<>();
+        StringBuilder full = new StringBuilder(text);
+        List<Object> extra = new ArrayList<>();
+        if (atts != null) {
+            for (Attachment a : atts) {
+                switch (a.kind) {
+                    case IMAGE:
+                        images.add(a.path);
+                        extra.add(Json.map("type", "localImage", "path", a.path));
+                        break;
+                    case FILE: // 文件：Codex 自己读，用路径引用
+                        full.append(full.length() > 0 ? "\n" : "").append("附件文件：").append(a.path);
+                        mentions.add(a.name);
+                        break;
+                    case SKILL:
+                        mentions.add(a.name);
+                        extra.add(Json.map("type", "skill", "name", a.id, "path", a.path));
+                        break;
+                    case PLUGIN:
+                        mentions.add(a.name);
+                        extra.add(Json.map("type", "mention", "name", a.name, "path", a.path));
+                        break;
+                }
+            }
+        }
+        c.addLocalUserMessage(clientId, text, images, mentions);
         Conversation.Update u = new Conversation.Update();
         u.structure = true;
         notifyConversation(c, u);
         List<Object> input = new ArrayList<>();
-        input.add(Json.map("type", "text", "text", text));
-        Map<String, Object> p = Json.map("threadId", c.threadId, "input", input, "clientUserMessageId", clientId, "approvalPolicy", prefs.mode());
+        if (full.length() > 0) input.add(Json.map("type", "text", "text", full.toString()));
+        input.addAll(extra);
+        boolean chat = isChatCwd(currentCwd(c));
+        Map<String, Object> p = Json.map("threadId", c.threadId, "input", input, "clientUserMessageId", clientId,
+                "approvalPolicy", chat ? Prefs.MODE_CONFIRM : prefs.mode());
         ModelInfo mi = currentModel();
         if (prefs.model() != null && mi != null) p.put("model", mi.id);
         if (prefs.effort() != null) p.put("effort", prefs.effort());
+        if (prefs.speed() != null && mi != null && mi.serviceTiers.contains(prefs.speed())) p.put("serviceTier", prefs.speed());
         runningThreadId = c.threadId;
         c.turnStatus = "inProgress";
         changed();
@@ -1178,6 +1600,7 @@ public final class CodexRuntimeManager {
             else if ("completed".equals(c.turnStatus)) RuntimeService.notifyTurnEnded(ctx, "任务已完成", title + " · 查看结果");
             refreshThreads();
             changed();
+            if (toolkitRestartWanted && runningThreadId == null && pendingApprovalCount() == 0) main.postDelayed(this::restartForToolkit, 1500);
         }
         if (u.any()) notifyConversation(c, u);
     }
@@ -1185,6 +1608,14 @@ public final class CodexRuntimeManager {
     private void handleServerRequest(Object id, String method, Map<String, Object> params) {
         String tid = Json.str(params, "threadId");
         Conversation c = tid == null ? null : conversations.get(tid);
+        if (c != null && isChatCwd(cwdOf.get(tid)) && !method.equals("item/tool/requestUserInput")
+                && (method.equals("item/commandExecution/requestApproval") || method.equals("item/fileChange/requestApproval"))) {
+            // 聊天模式不碰文件、不跑命令：自动拒绝，并在对话里说一声
+            if (server != null) server.respond(id, Json.map("decision", "decline"));
+            Conversation.Update u = c.apply("warning", Json.map("threadId", tid, "message", "聊天模式不会运行命令或修改文件，已自动拒绝。需要动手时切到“工作”。"));
+            notifyConversation(c, u);
+            return;
+        }
         if (c != null && Conversation.handles(method)) c.onServerRequest(id, method, params);
         if (c == null || !Conversation.handles(method)) {
             // 不认识的请求（或不属于打开的会话）：明确拒绝，不能让它永远挂着

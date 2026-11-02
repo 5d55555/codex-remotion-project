@@ -12,6 +12,8 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 dependencies {
+    // 解 Termux 的 .deb（data.tar.xz）
+    api("org.tukaani:xz:1.10")
     testImplementation("junit:junit:4.13.2")
 }
 
@@ -19,5 +21,7 @@ tasks.withType<Test>().configureEach {
     // 需要真实 codex 的集成测试：CODEX_BIN 指向 x64 版 codex（同目录要有 codex-code-mode-host），CODEX_AUTH 指向已登录的 auth.json
     System.getenv("CODEX_BIN")?.let { environment("CODEX_BIN", it) }
     System.getenv("CODEX_AUTH")?.let { environment("CODEX_AUTH", it) }
+    for (k in listOf("TOOLKIT_REAL_PREFIX", "TOOLKIT_REAL_ABI", "TOOLKIT_REAL_REPO")) System.getenv(k)?.let { environment(k, it) }
+    testLogging { showStandardStreams = System.getenv("TOOLKIT_REAL_PREFIX") != null }
     testLogging { exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }

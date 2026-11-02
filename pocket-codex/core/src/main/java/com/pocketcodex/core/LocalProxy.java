@@ -62,6 +62,22 @@ public final class LocalProxy implements Closeable {
         }
     };
 
+    /**
+     * 本机命令通道：经代理请求 http://pocket-codex.invalid/… 不转发，交给这里（例如 pkg 命令让 App 装软件包）。
+     * 同样要代理口令，所以只有拿到环境变量的 Agent 进程能用。
+     */
+    public interface LocalHandler {
+        /** path 形如 /install；args 是查询串里的 a=…（按顺序）。往 out 写纯文本，返回退出码。 */
+        int handle(String path, List<String> args, java.io.PrintStream out) throws Exception;
+    }
+
+    public static final String LOCAL_HOST = "pocket-codex.invalid";
+    private volatile LocalHandler localHandler;
+
+    public void setLocalHandler(LocalHandler h) {
+        localHandler = h;
+    }
+
     private static final int CONNECT_TIMEOUT_MS = 15_000;
     private static final int HEAD_LIMIT = 16 * 1024;
     /** 同时最多几条隧道（每条两个线程）；codex 平时只用几条。 */
@@ -178,6 +194,10 @@ public final class LocalProxy implements Closeable {
                 String host = colon > 0 ? hp.substring(0, colon) : hp;
                 int port = colon > 0 ? Integer.parseInt(hp.substring(colon + 1)) : 443;
                 if (host.startsWith("[") && host.endsWith("]")) host = host.substring(1, host.length() - 1);
+                if (host.equalsIgnoreCase(LOCAL_HOST)) {
+                    reply(cout, "400 Bad Request");
+                    return;
+                }
                 try {
                     remote = open(host, port);
                     live.add(remote);
@@ -194,6 +214,10 @@ public final class LocalProxy implements Closeable {
                 URI u = new URI(parts[1]);
                 if (u.getHost() == null || !"http".equalsIgnoreCase(u.getScheme())) {
                     reply(cout, "400 Bad Request");
+                    return;
+                }
+                if (u.getHost().equalsIgnoreCase(LOCAL_HOST)) {
+                    handleLocal(u, cout);
                     return;
                 }
                 int port = u.getPort() > 0 ? u.getPort() : 80;
@@ -229,6 +253,33 @@ public final class LocalProxy implements Closeable {
             live.remove(client);
             if (remote != null) live.remove(remote);
         }
+    }
+
+    private void handleLocal(URI u, OutputStream cout) throws IOException {
+        LocalHandler h = localHandler;
+        if (h == null) {
+            reply(cout, "503 Service Unavailable");
+            return;
+        }
+        java.util.List<String> args = new java.util.ArrayList<>();
+        String q = u.getRawQuery();
+        if (q != null) {
+            for (String kv : q.split("&")) {
+                if (kv.startsWith("a=")) args.add(java.net.URLDecoder.decode(kv.substring(2), "UTF-8"));
+            }
+        }
+        cout.write("HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1));
+        cout.flush();
+        java.io.PrintStream out = new java.io.PrintStream(cout, true, "UTF-8");
+        int code;
+        try {
+            code = h.handle(u.getPath() == null ? "/" : u.getPath(), args, out);
+        } catch (Exception e) {
+            out.println("错误：" + e.getMessage());
+            code = 1;
+        }
+        out.println("@@exit " + code);
+        out.flush();
     }
 
     private boolean authorized(String head) {

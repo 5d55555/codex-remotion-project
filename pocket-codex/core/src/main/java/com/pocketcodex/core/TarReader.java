@@ -5,21 +5,38 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
-/** 只读的 tar 流解析（ustar + GNU 长文件名 'L' + pax 'x' 的 path），够解 npm 包用。 */
+/** 只读的 tar 流解析（ustar + GNU 长文件名/长链接 'L'/'K' + pax 'x' 的 path/linkpath），解 npm 包和 .deb 用。 */
 final class TarReader {
     static final class Entry {
         final String name;
         final long size;
         final char type;
+        /** 符号链接 / 硬链接的目标（其他类型为空串）。 */
+        final String link;
+        final int mode;
 
-        Entry(String name, long size, char type) {
+        Entry(String name, long size, char type, String link, int mode) {
             this.name = name;
             this.size = size;
             this.type = type;
+            this.link = link;
+            this.mode = mode;
         }
 
         boolean isFile() {
             return type == '0' || type == '\0' || type == '7';
+        }
+
+        boolean isDir() {
+            return type == '5';
+        }
+
+        boolean isSymlink() {
+            return type == '2';
+        }
+
+        boolean isHardlink() {
+            return type == '1';
         }
     }
 
@@ -38,7 +55,7 @@ final class TarReader {
     Entry next() throws IOException {
         skipFully(remaining + padding);
         remaining = padding = 0;
-        String longName = null;
+        String longName = null, longLink = null;
         while (true) {
             if (!readBlock(header)) return null;
             if (allZero(header)) return null; // 结束标记
@@ -52,23 +69,30 @@ final class TarReader {
                 String prefix = str(header, 345, 155);
                 if (!prefix.isEmpty()) name = prefix + "/" + name;
             }
-            if (type == 'L' || type == 'x' || type == 'g') { // 元数据条目：读出来用于下一个条目
+            if (type == 'L' || type == 'K' || type == 'x' || type == 'g') { // 元数据条目：读出来用于下一个条目
                 if (size > (1 << 20)) throw new IOException("tar 元数据太大");
                 byte[] data = new byte[(int) size];
                 readFully(data);
                 skipFully(pad(size));
                 if (type == 'L') {
                     longName = cstr(data);
+                } else if (type == 'K') {
+                    longLink = cstr(data);
                 } else if (type == 'x') {
-                    String p = paxPath(data);
+                    String p = pax(data, "path");
                     if (p != null) longName = p;
+                    String l = pax(data, "linkpath");
+                    if (l != null) longLink = l;
                 }
                 continue;
             }
             if (longName != null) name = longName;
+            String link = longLink != null ? longLink : str(header, 157, 100);
+            int mode = (int) octal(header, 100, 8);
+            if (type == '1' || type == '2' || type == '5') size = 0; // 链接和目录没有数据
             remaining = size;
             padding = pad(size);
-            return new Entry(name, size, type);
+            return new Entry(name, size, type, link, mode);
         }
     }
 
@@ -166,8 +190,8 @@ final class TarReader {
         return v;
     }
 
-    /** pax 扩展头里的 path=…（格式 “长度 key=value\n”，长度按字节算）。 */
-    private static String paxPath(byte[] data) {
+    /** pax 扩展头里的 key=…（格式 “长度 key=value\n”，长度按字节算）。 */
+    private static String pax(byte[] data, String key) {
         int i = 0;
         String path = null;
         while (i < data.length) {
@@ -184,7 +208,7 @@ final class TarReader {
             int end = i + len; // 记录以 \n 结尾
             String rec = new String(data, sp + 1, end - sp - 1, StandardCharsets.UTF_8);
             if (rec.endsWith("\n")) rec = rec.substring(0, rec.length() - 1);
-            if (rec.startsWith("path=")) path = rec.substring(5);
+            if (rec.startsWith(key + "=")) path = rec.substring(key.length() + 1);
             i = end;
         }
         return path;

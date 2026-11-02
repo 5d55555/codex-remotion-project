@@ -76,6 +76,9 @@ public final class Conversation {
         public String status;                // inProgress / completed / failed / declined
         public List<Change> changes = Collections.emptyList();
         public String title;                 // 工具名、搜索词、提示的标题
+        /** 用户消息带的本地图片路径（缩略图）和提及的技能/插件/文件名。 */
+        public final List<String> images = new ArrayList<>();
+        public final List<String> mentions = new ArrayList<>();
         public String level;                 // NOTICE：warning / retry / error / info
         public long startedAtMs, completedAtMs;
         public boolean completed;
@@ -547,11 +550,14 @@ public final class Conversation {
         switch (it.kind) {
             case USER: {
                 StringBuilder b = new StringBuilder();
+                it.images.clear();
+                it.mentions.clear();
                 for (Object c : Json.arr(m, "content")) {
                     String t = Json.str(c, "type", "");
                     if (t.equals("text")) b.append(Json.str(c, "text", ""));
-                    else if (t.equals("localImage") || t.equals("image")) b.append(b.length() > 0 ? "\n" : "").append("[图片]");
-                    else if (t.equals("mention") || t.equals("skill")) b.append(" @").append(Json.str(c, "name", ""));
+                    else if (t.equals("localImage")) it.images.add(Json.str(c, "path", ""));
+                    else if (t.equals("image")) it.images.add(Json.str(c, "url", ""));
+                    else if (t.equals("mention") || t.equals("skill")) it.mentions.add(Json.str(c, "name", ""));
                 }
                 setText(it, b.toString());
                 break;
@@ -677,9 +683,15 @@ public final class Conversation {
 
     /** 用户刚发的消息先放上去（服务端的 userMessage item 到了会按 clientId 合并）。 */
     public Item addLocalUserMessage(String clientId, String text) {
+        return addLocalUserMessage(clientId, text, null, null);
+    }
+
+    public Item addLocalUserMessage(String clientId, String text, List<String> images, List<String> mentions) {
         Item it = new Item("local-" + clientId, Kind.USER, "userMessage");
         it.completed = true;
         it.startedAtMs = System.currentTimeMillis();
+        if (images != null) it.images.addAll(images);
+        if (mentions != null) it.mentions.addAll(mentions);
         setText(it, text);
         items.add(it);
         byId.put(it.id, it);
@@ -693,6 +705,8 @@ public final class Conversation {
         int i = indexOf(local);
         Item it = new Item(serverItemId, Kind.USER, "userMessage");
         it.text.append(local.text);
+        it.images.addAll(local.images);
+        it.mentions.addAll(local.mentions);
         it.completed = true;
         it.startedAtMs = local.startedAtMs;
         if (i >= 0) items.set(i, it);

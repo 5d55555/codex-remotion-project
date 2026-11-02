@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Build;
 import com.pocketcodex.core.CodexRuntime;
 import com.pocketcodex.core.Installer;
+import com.pocketcodex.core.Toolkit;
 import java.io.File;
 
 /**
@@ -17,10 +18,14 @@ import java.io.File;
  *   R/certs/ca.pem  导出的 CA 证书
  *   R/tmp/ R/logs/ R/downloads/
  *   R/workspaces/<名字>/   App 私有的工作区
+ *   R/usr/          开发工具包（Termux 仓库的 node、git、python……，见 Toolkit）
+ *   R/pkg/          工具包的索引缓存和下载
  * </pre>
  */
 public final class Paths {
-    public final File root, codexHome, home, shimBin, certs, caFile, tmp, logs, workspaces;
+    public final File root, codexHome, home, shimBin, certs, caFile, tmp, logs, workspaces, usr, pkgWork;
+    public final String appDataDir;
+    private Toolkit toolkit;
 
     public Paths(Context c) {
         root = new File(c.getNoBackupFilesDir(), "runtime");
@@ -32,6 +37,21 @@ public final class Paths {
         tmp = new File(root, "tmp");
         logs = new File(root, "logs");
         workspaces = new File(root, "workspaces");
+        usr = new File(root, "usr");
+        pkgWork = new File(root, "pkg");
+        appDataDir = c.getApplicationInfo().dataDir;
+    }
+
+    /** 开发工具包；处理器不支持时为 null。 */
+    public synchronized Toolkit toolkit() {
+        if (toolkit == null) {
+            try {
+                toolkit = new Toolkit(usr, pkgWork, abi());
+            } catch (Installer.InstallException e) {
+                return null;
+            }
+        }
+        return toolkit;
     }
 
     /** 测试用：假装成别的处理器。 */
@@ -51,7 +71,10 @@ public final class Paths {
     }
 
     public CodexRuntime.Layout layout(File codexBin) {
-        return new CodexRuntime.Layout(codexBin, codexHome, home, shimBin, tmp, caFile, logs, systemShell());
+        CodexRuntime.Layout l = new CodexRuntime.Layout(codexBin, codexHome, home, shimBin, tmp, caFile, logs, systemShell());
+        l.toolkit = toolkit();
+        l.appDataDir = appDataDir;
+        return l;
     }
 
     /** 安卓的 shell；极少数系统没有 /system/bin/sh 时退回 toybox 的 sh。 */

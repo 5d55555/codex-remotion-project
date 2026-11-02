@@ -50,6 +50,18 @@ final class Diagnostics {
         step(r, "bash 兼容链接（-lc）", run(listOf(new File(l.binDir, "bash").getAbsolutePath(), "-lc", "echo ok:$0; echo PATH=$PATH | head -c 200"), env, rt.paths.home, 10));
         step(r, "系统命令", run(listOf(new File(l.binDir, "bash").getAbsolutePath(), "-lc", "ls / | head -3; grep --version 2>&1 | head -1; sed --version 2>&1 | head -1"), env, rt.paths.home, 10));
         step(r, "写临时文件", run(listOf(new File(l.binDir, "bash").getAbsolutePath(), "-lc", "echo hi > \"$TMPDIR/diag.txt\" && cat \"$TMPDIR/diag.txt\" && rm \"$TMPDIR/diag.txt\""), env, rt.paths.home, 10));
+        // 开发工具包：node、npm、git、python、pkg（本机通道）
+        CodexRuntimeManager.ToolkitState ts = rt.toolkitState;
+        r.append("开发工具包：").append(ts == CodexRuntimeManager.ToolkitState.READY ? "可用" : ts == CodexRuntimeManager.ToolkitState.INSTALLING ? "正在安装" : ts == CodexRuntimeManager.ToolkitState.BROKEN ? "自检没通过" : ts == CodexRuntimeManager.ToolkitState.FAILED ? "安装失败" : "未安装")
+                .append(rt.toolkitError == null ? "" : "（" + rt.toolkitError + "）").append('\n');
+        if (ts == CodexRuntimeManager.ToolkitState.READY) {
+            String sh = new File(l.binDir, "bash").getAbsolutePath();
+            step(r, "node / npm / npx", run(listOf(sh, "-lc", "node -v && npm -v && npx -v"), env, rt.paths.home, 60));
+            step(r, "git", run(listOf(sh, "-lc", "git --version && git -C \"$TMPDIR\" init -q diag-git && rm -rf \"$TMPDIR/diag-git\" && echo init-ok"), env, rt.paths.home, 30));
+            step(r, "python3 / pip", run(listOf(sh, "-lc", "python3 -c 'import ssl,sqlite3,sys;print(sys.version.split()[0])' && pip -V | cut -c1-40"), env, rt.paths.home, 60));
+            step(r, "#!/usr/bin/env（termux-exec）", run(listOf(sh, "-lc", "printf '#!/usr/bin/env node\\nconsole.log(1+1)\\n' > \"$TMPDIR/d.js\" && chmod +x \"$TMPDIR/d.js\" && \"$TMPDIR/d.js\"; rm -f \"$TMPDIR/d.js\""), env, rt.paths.home, 30));
+            step(r, "pkg 命令（本机通道）", run(listOf(sh, "-lc", "pkg list-installed | wc -l"), env, rt.paths.home, 30));
+        }
         step(r, "Java 网络（chatgpt.com）", httpCheck("https://chatgpt.com/"));
         step(r, "CA 证书", rt.paths.caFile.isFile() ? new Result(0, rt.paths.caFile.length() / 1024 + " KB") : new Result(-1, "没有导出"));
         r.append("本地代理：").append(rt.proxyForDiagnostics() == null ? "未启动" : "端口 " + rt.proxyForDiagnostics().port()

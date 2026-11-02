@@ -56,7 +56,8 @@ public final class RuntimeService extends Service {
     /** 需要前台服务吗：安装中、登录中、启动中、有回合在跑、有审批等着。 */
     static boolean needed(CodexRuntimeManager rt) {
         return rt.stage == CodexRuntimeManager.Stage.INSTALLING || rt.stage == CodexRuntimeManager.Stage.LOGGING_IN
-                || rt.stage == CodexRuntimeManager.Stage.STARTING || rt.runningThreadId != null || rt.pendingApprovalCount() > 0;
+                || rt.stage == CodexRuntimeManager.Stage.STARTING || rt.runningThreadId != null || rt.pendingApprovalCount() > 0
+                || rt.toolkitState == CodexRuntimeManager.ToolkitState.INSTALLING;
     }
 
     /** 状态变了就调：按需启动/更新/停止服务。 */
@@ -154,7 +155,11 @@ public final class RuntimeService extends Service {
                 break;
             default: {
                 int approvals = rt.pendingApprovalCount();
-                if (approvals > 0) {
+                if (approvals == 0 && rt.runningThreadId == null && rt.toolkitState == CodexRuntimeManager.ToolkitState.INSTALLING) {
+                    b.setContentTitle("正在安装开发工具").setContentText(rt.toolkitStep == null ? "Node.js、Git、Python…" : rt.toolkitStep);
+                    if (rt.toolkitTotal > 0) b.setProgress(1000, (int) (rt.toolkitDone * 1000 / rt.toolkitTotal), false);
+                    else b.setProgress(0, 0, true);
+                } else if (approvals > 0) {
                     b.setContentTitle("等你确认").setContentText(approvals + " 个操作等待批准");
                 } else {
                     b.setContentTitle("Codex 正在工作").setContentText("在 " + Format.workspaceName(rt) + " 里修改文件、运行命令");
