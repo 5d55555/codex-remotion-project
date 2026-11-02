@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.PocketCodex" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorPrimaryContainer">@color/primary_soft</item>
+        <item name="colorOnPrimaryContainer">@color/text</item>
+        <item name="colorSecondary">@color/primary</item>
+        <item name="colorSecondaryContainer">@color/primary_soft</item>
+        <item name="colorOnSecondaryContainer">@color/text</item>
+        <item name="colorTertiary">@color/warning</item>
+        <item name="colorError">@color/error</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="colorSurface">@color/card</item>
+        <item name="colorSurfaceContainer">@color/card</item>
+        <item name="colorSurfaceContainerLow">@color/card</item>
+        <item name="colorSurfaceContainerHigh">@color/surface2</item>
+        <item name="colorSurfaceContainerHighest">@color/surface2</item>
+        <item name="colorOnSurface">@color/text</item>
+        <item name="colorOnSurfaceVariant">@color/text2</item>
+        <item name="colorOutline">@color/border</item>
+        <item name="colorOutlineVariant">@color/border</item>
+        <item name="colorControlNormal">@color/text2</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowLightStatusBar">@bool/light_bars</item>
+        <item name="android:windowLightNavigationBar">@bool/light_bars</item>
+        <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:textColorSecondary">@color/text2</item>
+        <item name="shapeAppearanceCornerSmall">@style/Shape.Small</item>
+        <item name="shapeAppearanceCornerMedium">@style/Shape.Medium</item>
+        <item name="shapeAppearanceCornerLarge">@style/Shape.Large</item>
+        <item name="materialButtonStyle">@style/Button.Primary</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.PocketCodex.BottomSheet</item>
+    </style>
+
+    <style name="Shape.Small" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
+
+    <style name="Shape.Medium" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
+    </style>
+
+    <style name="Shape.Large" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <style name="Button.Primary" parent="Widget.Material3.Button">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="shapeAppearance">@style/Shape.Medium</item>
+    </style>
+
+    <style name="Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="shapeAppearance">@style/Shape.Medium</item>
+        <item name="strokeColor">@color/border</item>
+    </style>
+
+    <style name="Button.Text" parent="Widget.Material3.Button.TextButton">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:letterSpacing">0</item>
+    </style>
+
+    <style name="ThemeOverlay.PocketCodex.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/BottomSheet</item>
+    </style>
+
+    <style name="BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="backgroundTint">@color/card</item>
+    </style>
+
+    <style name="Text.Title" parent="">
+        <item name="android:textSize">22sp</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="Text.Body" parent="">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:lineSpacingMultiplier">1.15</item>
+    </style>
+
+    <style name="Text.Caption" parent="">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/text2</item>
+        <item name="android:lineSpacingMultiplier">1.1</item>
+    </style>
+
+    <style name="Text.Section" parent="">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/primary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="Text.Mono" parent="">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:fontFamily">monospace</item>
+    </style>
+</resources>

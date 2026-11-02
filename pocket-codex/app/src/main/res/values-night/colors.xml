@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#101318</color>
+    <color name="card">#191E26</color>
+    <color name="surface2">#232B36</color>
+    <color name="text">#E8EDF4</color>
+    <color name="text2">#A9B6C6</color>
+    <color name="border">#344150</color>
+    <color name="primary">#65D8C3</color>
+    <color name="on_primary">#00382F</color>
+    <color name="primary_soft">#173A35</color>
+    <color name="error">#FFB4AB</color>
+    <color name="error_soft">#3D2428</color>
+    <color name="warning">#F0C66A</color>
+    <color name="warning_soft">#3A3020</color>
+    <color name="diff_add">#15372B</color>
+    <color name="diff_del">#3D2428</color>
+    <color name="diff_add_text">#9BE2B4</color>
+    <color name="diff_del_text">#FFB4AB</color>
+    <color name="code_bg">#1D242E</color>
+    <color name="scrim">#99000000</color>
+</resources>

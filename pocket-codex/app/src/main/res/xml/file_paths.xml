@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 只开放分享专用的缓存目录：要分享的文件先复制到这里（运行时目录、凭据永远不会被分享） -->
+<paths>
+    <cache-path name="share" path="share/" />
+</paths>
