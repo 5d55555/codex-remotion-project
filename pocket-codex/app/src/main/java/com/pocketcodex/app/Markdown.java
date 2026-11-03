@@ -19,13 +19,21 @@ final class Markdown {
     private Markdown() {
     }
 
+    /** 主线程共用的实例（聊天卡片）。只在主线程用：表格插件有内部状态，不能多线程同时渲染。 */
     static synchronized Markwon get(Context c) {
         // 深浅色切换后颜色要跟着变
         int key = c.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
         if (instance == null || key != themeKey) {
             themeKey = key;
-            final Context app = c.getApplicationContext();
-            instance = Markwon.builder(c)
+            instance = create(c);
+        }
+        return instance;
+    }
+
+    /** 新建一个独立实例：要在后台线程渲染的地方（文件预览）用自己的，不和聊天共用。 */
+    static Markwon create(Context c) {
+        final Context app = c.getApplicationContext();
+        return Markwon.builder(c)
                     .usePlugin(StrikethroughPlugin.create())
                     .usePlugin(TablePlugin.create(c))
                     .usePlugin(TaskListPlugin.create(c))
@@ -61,8 +69,6 @@ final class Markdown {
                         }
                     })
                     .build();
-        }
-        return instance;
     }
 
     static Spanned render(Context c, String md) {

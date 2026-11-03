@@ -878,7 +878,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         modelChip.setContentDescription("模型和推理：" + modelChip.getText() + "，点按更改");
         // 聊天模式固定用套餐默认模型（见 CodexRuntimeManager.planModel），没有可选的：标签藏起来，和 ChatGPT 的输入框一样
         modelChip.setVisibility(chatMode ? View.GONE : View.VISIBLE);
-        input.setHint(running ? "追加指令…" : chatMode ? "问问 ChatGPT" : "用 Codex 工作");
+        input.setHint(chatMode ? "问问 ChatGPT" : running ? "追加指令…" : "用 Codex 工作");
         // 计划
         if (conv != null && !conv.plan.isEmpty()) {
             int done = 0;
@@ -913,7 +913,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
             setSend(R.drawable.ic_stop_square, R.color.primary, R.color.on_primary, !stopping, "停止", v -> stopTurn());
         } else if (hasContent) {
             boolean can = ready && !sending && !otherRunning;
-            setSend(R.drawable.ic_arrow_up, can ? R.color.accent : R.color.icon_circle, can ? R.color.on_accent : R.color.text3, can, running ? "追加" : "发送", v -> onSend());
+            setSend(R.drawable.ic_arrow_up, can ? R.color.accent : R.color.icon_circle, can ? R.color.on_accent : R.color.text3, can, running && !chatMode ? "追加" : "发送", v -> onSend());
         } else {
             setSend(R.drawable.ic_wave, ready ? R.color.accent : R.color.icon_circle, ready ? R.color.on_accent : R.color.text3, ready, "语音输入并发送", v -> dictate(true));
         }
@@ -921,7 +921,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         if (!ready) hint = rt.stage == CodexRuntimeManager.Stage.ERROR ? "Codex 没有运行，到会话页重试" : "正在启动 Codex…";
         else if (otherRunning) hint = "另一个会话正在运行，结束后可以发送";
         else if (sending) hint = "正在提交…";
-        else if (running) hint = hasContent ? "追加的内容会加入正在进行的这一轮" : "";
+        else if (running && !chatMode) hint = hasContent ? "追加的内容会加入正在进行的这一轮" : ""; // 聊天里发出去的是交给 ChatGPT，不是追加
         else if (conv != null && "interrupted".equals(conv.turnStatus)) hint = "已发生的文件改动会保留";
         else hint = "";
         bindComposer();
@@ -1583,13 +1583,24 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
     }
 
     private void handOff(String text, boolean search, boolean files, boolean web) {
+        boolean passed; // 内容真的带过去了才清空输入框
         if (web) {
-            ChatGpt.openWeb(this, text, search);
-        } else if (!ChatGpt.openApp(this, text)) {
-            ChatGpt.openStore(this);
-            return; // 还没装：文字留在输入框里
+            passed = text.isEmpty() || ChatGpt.fitsUrl(text, search);
+            ChatGpt.openWeb(this, passed ? text : null, search);
+            if (!passed) {
+                ChatGpt.copy(this, text);
+                Toast.makeText(this, "内容太长，已复制，在 ChatGPT 里粘贴就行", Toast.LENGTH_LONG).show();
+            }
+        } else {
+            int r = ChatGpt.openApp(this, text);
+            if (r == ChatGpt.NOT_INSTALLED) {
+                ChatGpt.openStore(this);
+                return; // 还没装：文字留在输入框里
+            }
+            passed = r == ChatGpt.SENT || text.isEmpty();
         }
         if (files) Toast.makeText(this, "图片和文件请在 ChatGPT 里重新添加", Toast.LENGTH_LONG).show();
+        if (!passed) return; // 走了剪贴板：输入框里的草稿留着
         input.setText("");
         attachments.clear();
         renderAttachments();

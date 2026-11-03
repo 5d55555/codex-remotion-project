@@ -128,6 +128,34 @@ public class ScreensTest {
         rt.stage = CodexRuntimeManager.Stage.READY;
     }
 
+    /* ---------------- 聊天交给官方 ChatGPT 的几个小函数 ---------------- */
+
+    @Test
+    public void chatGptHandOffHelpers() {
+        // 网址编码：空格 %20、换行 %0A、中文 UTF-8；网页搜索带 hints=search
+        assertEquals("https://chatgpt.com/?q=%E4%BD%A0%E5%A5%BD", ChatGpt.url("你好", false));
+        assertEquals("https://chatgpt.com/?hints=search&q=a%20b%0Ac", ChatGpt.url("a b\nc", true));
+        assertEquals("https://chatgpt.com/", ChatGpt.url("  ", false));
+        // 太长的内容不进网址（改用剪贴板）
+        StringBuilder longText = new StringBuilder();
+        for (int i = 0; i < 10_000; i++) longText.append('字');
+        assertFalse(ChatGpt.fitsUrl(longText.toString(), false));
+        assertTrue(ChatGpt.fitsUrl("你好", true));
+        // 上传：只放行别的应用的 content://，挡住 file:// 和本应用自己的 Provider
+        String pkg = "com.pocketcodex.app";
+        assertFalse(ChatGptWebActivity.safeUpload(android.net.Uri.parse("file:///data/data/com.pocketcodex.app/files/codex/auth.json"), pkg));
+        assertFalse(ChatGptWebActivity.safeUpload(android.net.Uri.parse("content://com.pocketcodex.app.files/share/x.txt"), pkg));
+        assertTrue(ChatGptWebActivity.safeUpload(android.net.Uri.parse("content://com.android.providers.media.documents/document/image%3A12"), pkg));
+        assertFalse(ChatGptWebActivity.safeUpload(null, pkg));
+        // 留在网页里的只有 OpenAI 自己的站点和登录要用的几家；冒名的域名不算
+        assertTrue(ChatGptWebActivity.staysInside("chatgpt.com"));
+        assertTrue(ChatGptWebActivity.staysInside("auth.openai.com"));
+        assertTrue(ChatGptWebActivity.staysInside("login.microsoftonline.com"));
+        assertFalse(ChatGptWebActivity.staysInside("evil-openai.com"));
+        assertFalse(ChatGptWebActivity.staysInside("chatgpt.com.example.net"));
+        assertFalse(ChatGptWebActivity.staysInside("accounts.google.com"));
+    }
+
     /* ---------------- 首次设置 ---------------- */
 
     @Test

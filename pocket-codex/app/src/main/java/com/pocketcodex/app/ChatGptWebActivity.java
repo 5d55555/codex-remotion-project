@@ -139,8 +139,23 @@ public final class ChatGptWebActivity extends AppCompatActivity {
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
         if (req != REQ_UPLOAD || uploadCb == null) return;
-        uploadCb.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(res, data));
+        // 选择器返回的地址不能直接信：只放行别的应用提供的 content:// 文件，挡住 file:// 和本应用自己的 Provider
+        //（否则一个不怀好意的文件选择器可以让网页上传口袋工坊的私有文件，例如登录凭据）
+        Uri[] picked = WebChromeClient.FileChooserParams.parseResult(res, data);
+        java.util.List<Uri> ok = new java.util.ArrayList<>();
+        if (picked != null) for (Uri u : picked) if (safeUpload(u, getPackageName())) ok.add(u);
+        if (picked != null && ok.size() < picked.length) {
+            android.widget.Toast.makeText(this, "有文件不能从这里上传，已跳过", android.widget.Toast.LENGTH_LONG).show();
+        }
+        uploadCb.onReceiveValue(ok.isEmpty() ? null : ok.toArray(new Uri[0]));
         uploadCb = null;
+    }
+
+    /** 能交给网页上传的文件：别的应用通过 content:// 提供的；不能是 file://，也不能是本应用自己的 Provider。 */
+    static boolean safeUpload(Uri u, String pkg) {
+        if (u == null || !"content".equalsIgnoreCase(u.getScheme())) return false;
+        String auth = u.getAuthority();
+        return auth != null && !auth.equals(pkg) && !auth.startsWith(pkg + ".");
     }
 
     @Override

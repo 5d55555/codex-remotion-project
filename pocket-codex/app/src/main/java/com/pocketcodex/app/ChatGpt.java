@@ -35,6 +35,23 @@ final class ChatGpt {
         }
     }
 
+    /** 网址的长度上限：q 参数太长会被服务器或 CDN 拒绝（414），超过就改用剪贴板。 */
+    static final int MAX_URL = 6000;
+    /** 交给 App 的文字上限：Intent 要经过 Binder，太大会失败，超过就改用剪贴板。 */
+    static final int MAX_SHARE_CHARS = 100_000;
+
+    static boolean fitsUrl(String text, boolean search) {
+        return url(text, search).length() <= MAX_URL;
+    }
+
+    static void copy(Context c, String text) {
+        ClipboardManager cm = c.getSystemService(ClipboardManager.class);
+        if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("ChatGPT", text));
+    }
+
+    /** {@link #openApp} 的结果：没装 / 文字已经带过去 / 只打开了 App（文字在剪贴板里）。 */
+    static final int NOT_INSTALLED = 0, SENT = 1, OPENED = 2;
+
     static boolean appInstalled(Context c) {
         return c.getPackageManager().getLaunchIntentForPackage(PKG) != null;
     }
@@ -44,25 +61,24 @@ final class ChatGpt {
     }
 
     /**
-     * 打开官方 App：能用“分享给 ChatGPT”就把文字带过去；不能的话只打开 App，文字放进剪贴板。
-     * 没装 App 返回 false。
+     * 打开官方 App：能用“分享给 ChatGPT”就把文字带过去（返回 SENT）；不能、或文字太长，就只打开 App，
+     * 文字放进剪贴板（返回 OPENED）。没装 App 返回 NOT_INSTALLED。
      */
-    static boolean openApp(Activity a, String text) {
+    static int openApp(Activity a, String text) {
         PackageManager pm = a.getPackageManager();
         Intent launch = pm.getLaunchIntentForPackage(PKG);
-        if (launch == null) return false;
+        if (launch == null) return NOT_INSTALLED;
         if (text != null && !text.isEmpty()) {
             Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text).setPackage(PKG);
-            if (send.resolveActivity(pm) != null) {
+            if (text.length() <= MAX_SHARE_CHARS && send.resolveActivity(pm) != null) {
                 a.startActivity(send);
-                return true;
+                return SENT;
             }
-            ClipboardManager cm = a.getSystemService(ClipboardManager.class);
-            if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("ChatGPT", text));
+            copy(a, text);
             Toast.makeText(a, "已复制，在 ChatGPT 里粘贴就行", Toast.LENGTH_LONG).show();
         }
         a.startActivity(launch);
-        return true;
+        return OPENED;
     }
 
     /** 应用商店里的 ChatGPT（没装 App 时）。 */

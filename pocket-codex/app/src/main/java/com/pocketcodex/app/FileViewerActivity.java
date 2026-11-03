@@ -47,6 +47,10 @@ public final class FileViewerActivity extends AppCompatActivity {
     private List<String> lines;
     /** Markdown 预览（后台解析好的结果）。 */
     private android.text.Spanned rendered;
+    /** 这个页面自己的 Markwon：要在后台线程解析，不能和聊天共用全局实例（表格插件有内部状态）。 */
+    private io.noties.markwon.Markwon md;
+    /** 正在准备分享：不接受重复点击（否则后一次会删掉前一次正在分享的文件）。 */
+    private boolean sharing;
     private boolean diff, preview;
     private FrameLayout body;
     private TextView info;
@@ -225,7 +229,8 @@ public final class FileViewerActivity extends AppCompatActivity {
             tv.setPadding(Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 32));
             sv.addView(tv);
             body.addView(sv);
-            final io.noties.markwon.Markwon mw = Markdown.get(this);
+            if (md == null) md = Markdown.create(this);
+            final io.noties.markwon.Markwon mw = md;
             if (rendered != null) {
                 mw.setParsedMarkdown(tv, rendered);
                 return;
@@ -298,18 +303,32 @@ public final class FileViewerActivity extends AppCompatActivity {
     }
 
     private void share() {
-        if (file == null) return;
+        if (file == null || sharing) return;
+        sharing = true;
         final File src = file;
         Toast.makeText(this, "正在准备分享…", Toast.LENGTH_SHORT).show();
         io.execute(() -> { // 判断路径、复制整个文件都在后台
+            try {
+                shareInBackground(src);
+            } finally {
+                post(() -> sharing = false);
+            }
+        });
+    }
+
+    private void shareInBackground(File src) {
+        {
             if (sensitive(this, src)) {
                 post(() -> Toast.makeText(this, "这个文件属于应用的运行目录，不能分享", Toast.LENGTH_LONG).show());
                 return;
             }
             try {
-                // 复制一份到分享专用的缓存目录再分享：FileProvider 只开放这个目录。每次一个新子目录，旧的先清掉
+                // 复制一份到分享专用的缓存目录再分享：FileProvider 只开放这个目录。
+                // 每次一个新子目录；只清一小时前的旧副本——刚发出去的分享，接收的应用可能还没读完
                 File root = new File(getCacheDir(), "share");
-                Installer_deleteTree(root);
+                File[] old = root.listFiles();
+                long cutoff = System.currentTimeMillis() - 3600_000L;
+                if (old != null) for (File o : old) if (o.lastModified() < cutoff) Installer_deleteTree(o);
                 File dir = new File(root, String.valueOf(System.currentTimeMillis()));
                 dir.mkdirs();
                 File copy = new File(dir, src.getName());
@@ -331,7 +350,7 @@ public final class FileViewerActivity extends AppCompatActivity {
                 final String m = e.getMessage();
                 post(() -> Toast.makeText(this, "无法分享：" + m, Toast.LENGTH_LONG).show());
             }
-        });
+        }
     }
 
     private static void Installer_deleteTree(File f) {
