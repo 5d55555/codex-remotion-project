@@ -248,32 +248,77 @@ public final class CodexRuntime {
         if (!tmp.renameTo(f)) throw new IOException("写 config.toml 失败");
     }
 
-    /** 返回应该写入的内容：用户自己的文件原样返回。 */
+    /** v0.3 第二行说明。 */
+    static final String LEGACY_V03_2 = "# 之后的内容（你或 Agent 加的配置，例如 [mcp_servers.*]）会原样保留。";
+
+    /**
+     * 返回应该写入的内容：用户自己的文件原样返回。
+     * 旧版口袋工坊写的文件只删能确认是我们写的行：开头那一两行说明、第一个表之前我们管的单行键、
+     * [features] 里的 shell_snapshot = false 和 [shell_environment_policy] 里的 inherit = "all"（删空了连表头一起删）。
+     * 多行字符串里的内容一律不动；用户在后面加的东西（MCP 等）全部保留。删掉的设置每次启动都用 -c 传，效果不变。
+     */
     static String migrateConfig(String old) {
         if (old == null) return HEADER;
-        if (old.startsWith(LEGACY_V02)) {
-            // v0.2 的文件每次启动都被整份覆盖，里面不会有用户能留下的东西
-            return HEADER;
-        }
-        if (!old.startsWith(LEGACY_V03)) return old;
-        // v0.3：去掉开头的说明和我们写的顶层键（只在第一个表之前），其余原样保留
-        StringBuilder b = new StringBuilder(HEADER);
-        boolean inTables = false, skippingHeader = true;
+        if (!old.startsWith(LEGACY_V02) && !old.startsWith(LEGACY_V03)) return old;
+        List<String> out = new ArrayList<>();
+        String table = null;       // 当前表头（null = 顶层）
+        int tableAt = -1;          // 当前表头在 out 里的位置
+        boolean tableHasContent = false, header = true;
+        String ml = null;          // 正在多行字符串里：它的定界符
         for (String line : old.split("\n", -1)) {
             String t = line.trim();
-            if (!inTables && t.startsWith("[")) inTables = true;
-            if (!inTables) {
-                if (skippingHeader && t.startsWith("#")) continue;
-                skippingHeader = false;
-                int eq = t.indexOf('=');
-                if (eq > 0 && V03_KEYS.contains(t.substring(0, eq).trim())) continue;
-                if (t.isEmpty()) continue;
+            if (ml != null) {      // 多行字符串里：原样保留
+                out.add(line);
+                if (t.contains(ml)) ml = null;
+                continue;
             }
-            b.append(line).append('\n');
+            if (header) {
+                if (t.equals(LEGACY_V02) || t.equals(LEGACY_V03) || t.equals(LEGACY_V03_2)) continue;
+                header = false;
+            }
+            if (t.startsWith("[")) {
+                if (table != null && !tableHasContent && isOurTable(table)) dropTable(out, tableAt);
+                table = t.replace(" ", "");
+                tableAt = out.size();
+                tableHasContent = false;
+                out.add(line);
+                continue;
+            }
+            int eq = t.startsWith("#") ? -1 : t.indexOf('=');
+            String key = eq > 0 ? t.substring(0, eq).trim() : null;
+            String value = eq > 0 ? t.substring(eq + 1).trim() : "";
+            String opens = value.startsWith("\"\"\"") ? "\"\"\"" : value.startsWith("'''") ? "'''" : null;
+            if (opens != null && !value.substring(3).contains(opens)) {
+                ml = opens;        // 多行字符串开始：这一行和后面的都不动
+                out.add(line);
+                if (table != null) tableHasContent = true;
+                continue;
+            }
+            if (key != null && opens == null) {
+                if (table == null && V03_KEYS.contains(key)) continue;
+                if ("[features]".equals(table) && key.equals("shell_snapshot") && value.equals("false")) continue;
+                if ("[shell_environment_policy]".equals(table) && key.equals("inherit") && value.equals("\"all\"")) continue;
+            }
+            if (table == null && t.isEmpty() && out.isEmpty()) continue; // 开头的空行
+            if (table != null && !t.isEmpty()) tableHasContent = true;
+            out.add(line);
         }
+        if (table != null && !tableHasContent && isOurTable(table)) dropTable(out, tableAt);
+        StringBuilder b = new StringBuilder(HEADER);
+        for (String line : out) b.append(line).append('\n');
         String r = b.toString();
         while (r.endsWith("\n\n")) r = r.substring(0, r.length() - 1);
         return r;
+    }
+
+    private static boolean isOurTable(String table) {
+        return table.equals("[features]") || table.equals("[shell_environment_policy]");
+    }
+
+    /** 删掉 from 开始的表头和它后面的空行/注释（这个表只剩我们删过的东西）。 */
+    private static void dropTable(List<String> out, int from) {
+        while (out.size() > from) out.remove(out.size() - 1);
+        while (!out.isEmpty() && out.get(out.size() - 1).trim().isEmpty()) out.remove(out.size() - 1);
     }
 
     static String tomlString(String s) {

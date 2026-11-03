@@ -52,6 +52,7 @@ public class ToolkitTest {
     private KeyPair kp;
     private List<OpenPgp.Key> keys;
     private final AtomicInteger hits = new AtomicInteger();
+    private String jdkVersion = "1.0";
 
     @Before
     public void setUp() throws Exception {
@@ -206,6 +207,81 @@ public class ToolkitTest {
         assertTrue(new File(prefix, "bin/extra").isFile());
     }
 
+    /**
+     * update-alternatives 的链接：新装时建；升级同一个包时不能被“删掉新版本里没有的旧文件”顺手删掉；
+     * 旧版（没处理 alternatives）装的同版本包，再装一次只读 .deb 开头的 postinst 补建，不重装。
+     */
+    @Test
+    public void alternativesSurviveUpgradeAndOldInstallsGetRepaired() throws Exception {
+        buildRepo(false);
+        File prefix = new File(tmp.getRoot(), "runtime/usr");
+        Toolkit t = toolkit(prefix, Collections.singletonList(repo()));
+        t.installBase(null, progress(new ArrayList<>()));
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintStream ps = new PrintStream(out, true, "UTF-8");
+        assertEquals(0, t.command(Arrays.asList("install", "-y", "jdk"), null, ps, () -> false));
+        File java = new File(prefix, "bin/java");
+        assertEquals("../lib/jvm/java-21-openjdk/bin/java", Files.readSymbolicLink(java.toPath()).toString());
+        assertTrue(t.status().get("jdk").files.contains("bin/java"));
+        assertTrue(t.status().get("jdk").alt);
+
+        // 升级到 1.1：链接还在，而且仍记在包的文件清单里
+        jdkVersion = "1.1";
+        buildRepo(false);
+        assertEquals(0, t.command(Collections.singletonList("update"), null, ps, () -> false)); // 索引有缓存：先刷新
+        out.reset();
+        assertEquals(out.toString("UTF-8"), 0, t.command(Arrays.asList("install", "-y", "jdk"), null, ps, () -> false));
+        assertEquals("1.1", t.status().get("jdk").version);
+        assertTrue("升级后 java 命令不能消失", java.exists());
+        assertTrue(new String(Files.readAllBytes(java.toPath()), StandardCharsets.UTF_8).contains("java 1.1"));
+        assertTrue(t.status().get("jdk").files.contains("bin/java"));
+        // 再升级一次也一样（清单里有链接，不会被当成旧文件删）
+        jdkVersion = "1.2";
+        buildRepo(false);
+        assertEquals(0, t.command(Collections.singletonList("update"), null, ps, () -> false));
+        assertEquals(0, t.command(Arrays.asList("install", "-y", "jdk"), null, ps, () -> false));
+        assertTrue(java.exists());
+
+        // 模拟 v0.3 装的：没有 alt 标记，也没有 bin/java
+        Map<String, Toolkit.Installed> st = Toolkit.readStatus(prefix);
+        Toolkit.Installed j = st.get("jdk");
+        List<String> files = new ArrayList<>(j.files);
+        files.remove("bin/java");
+        st.put("jdk", new Toolkit.Installed("jdk", j.version, j.explicit, files, false));
+        Toolkit.writeStatus(prefix, st, repo().url);
+        Files.delete(java.toPath());
+        // 别的包占着的有效链接不能被抢
+        Files.createSymbolicLink(new File(prefix, "bin/javac").toPath(), new File("hello").toPath());
+        out.reset();
+        hits.set(0);
+        assertEquals(0, t.command(Arrays.asList("install", "-y", "jdk"), null, ps, () -> false));
+        String log = out.toString("UTF-8");
+        assertTrue(log, log.contains("补建了 1 个命令链接"));
+        assertFalse("版本没变，不重装", log.contains("将安装"));
+        assertTrue(java.exists());
+        assertEquals("hello", Files.readSymbolicLink(new File(prefix, "bin/javac").toPath()).toString());
+        assertTrue(t.status().get("jdk").alt);
+        assertTrue(t.status().get("jdk").files.contains("bin/java"));
+        // 之后再装就什么都不做了
+        out.reset();
+        assertEquals(0, t.command(Arrays.asList("install", "-y", "jdk"), null, ps, () -> false));
+        assertTrue(out.toString("UTF-8"), out.toString("UTF-8").contains("都已经装好了"));
+
+        // App 启动时的后台补建（不经过 pkg install）：同样只补一次
+        st = Toolkit.readStatus(prefix);
+        j = st.get("jdk");
+        files = new ArrayList<>(j.files);
+        files.remove("bin/java");
+        st.put("jdk", new Toolkit.Installed("jdk", j.version, j.explicit, files, false));
+        Toolkit.writeStatus(prefix, st, repo().url);
+        Files.delete(java.toPath());
+        assertTrue(t.needsAlternativesRepair());
+        assertEquals(1, t.repairOldInstalls(null, progress(new ArrayList<>())));
+        assertTrue(java.exists());
+        assertFalse(t.needsAlternativesRepair());
+        assertEquals(0, t.repairOldInstalls(null, progress(new ArrayList<>())));
+    }
+
     @Test
     public void corruptDebKeepsOldToolkit() throws Exception {
         buildRepo(false);
@@ -298,6 +374,12 @@ public class ToolkitTest {
         tar(t4, p + "share/skipme/readme", '0', 0644, "", "s".getBytes(StandardCharsets.UTF_8));
         t4.write(new byte[1024]);
         byte[] skipme = deb(t4.toByteArray());
+        // jdk：程序在 lib/jvm 里，bin/java 由 postinst 的 update-alternatives 建（和 Termux 的 openjdk-21 一样）
+        ByteArrayOutputStream t5 = new ByteArrayOutputStream();
+        tar(t5, p + "lib/jvm/java-21-openjdk/bin/java", '0', 0755, "", ("#!/bin/sh\necho java " + jdkVersion + "\n").getBytes(StandardCharsets.UTF_8));
+        t5.write(new byte[1024]);
+        byte[] jdk = deb(t5.toByteArray(), AlternativesTest.POSTINST);
+        Files.write(new File(pool, "jdk-" + jdkVersion + ".deb").toPath(), jdk);
         Files.write(new File(pool, "hello.deb").toPath(), hello);
         Files.write(new File(pool, "libfoo.deb").toPath(), libfoo);
         Files.write(new File(pool, "extra.deb").toPath(), extra);
@@ -308,6 +390,7 @@ public class ToolkitTest {
         stanza(pk, "extra", "2.0", "pool/extra.deb", extra, "hello | nothing", "Extra things");
         stanza(pk, "skipme", "0.1", "pool/skipme.deb", skipme, "missing-dep", "Depends on something not in the repo");
         stanza(pk, "termux-tools", "1", "pool/none.deb", new byte[1], null, "Should be skipped");
+        stanza(pk, "jdk", jdkVersion, "pool/jdk-" + jdkVersion + ".deb", jdk, null, "Java");
         ByteArrayOutputStream gz = new ByteArrayOutputStream();
         try (GZIPOutputStream z = new GZIPOutputStream(gz)) {
             z.write(pk.toString().getBytes(StandardCharsets.UTF_8));
@@ -397,13 +480,21 @@ public class ToolkitTest {
     }
 
     private static byte[] deb(byte[] dataTar) throws Exception {
+        return deb(dataTar, null);
+    }
+
+    /** postinst 不为 null 时放进 control.tar.gz。 */
+    private static byte[] deb(byte[] dataTar, String postinst) throws Exception {
         ByteArrayOutputStream xz = new ByteArrayOutputStream();
         try (XZOutputStream z = new XZOutputStream(xz, new LZMA2Options(1))) {
             z.write(dataTar);
         }
+        ByteArrayOutputStream ctlTar = new ByteArrayOutputStream();
+        if (postinst != null) tar(ctlTar, "./postinst", '0', 0755, "", postinst.getBytes(StandardCharsets.UTF_8));
+        ctlTar.write(new byte[1024]);
         ByteArrayOutputStream ctl = new ByteArrayOutputStream();
         try (GZIPOutputStream z = new GZIPOutputStream(ctl)) {
-            z.write(new byte[1024]);
+            z.write(ctlTar.toByteArray());
         }
         ByteArrayOutputStream ar = new ByteArrayOutputStream();
         ar.write("!<arch>\n".getBytes(StandardCharsets.US_ASCII));

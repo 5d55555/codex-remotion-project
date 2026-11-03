@@ -535,8 +535,9 @@ public final class TerminalActivity extends AppCompatActivity implements CodexRu
         TextView sub = Ui.text(this, "点一条放进输入框；尖括号里的内容换成你自己的。", 13, R.color.text3);
         sub.setPadding(dp(24), 0, dp(24), dp(6));
         sheet.addView(sub);
-        ScrollView sv = new ScrollView(this);
+        // 列表直接放进面板：面板外面已经有一层滚动（Overlay.addSheet），里面再套一层同方向的会抢手势
         LinearLayout list = Ui.vbox(this);
+        list.setPadding(0, 0, 0, dp(16));
         for (Commands.Group g : Commands.GROUPS) {
             list.addView(Overlay.header(this, g.title));
             for (String[] it : g.items) {
@@ -560,9 +561,7 @@ public final class TerminalActivity extends AppCompatActivity implements CodexRu
                 list.addView(row);
             }
         }
-        sv.addView(list);
-        int maxH = Math.round(ov.layerHeight() * 0.72f);
-        sheet.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxH));
+        sheet.addView(list);
         ov.addSheet(sheet);
         ov.show();
     }

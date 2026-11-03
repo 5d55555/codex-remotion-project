@@ -220,12 +220,15 @@ public final class Toolkit {
         public final String name, version;
         public final boolean explicit;
         final List<String> files;
+        /** 包里 postinst 的 update-alternatives 链接已经处理过（v0.3.1 以前装的包没有处理，见 {@link #repairAlternatives}）。 */
+        final boolean alt;
 
-        Installed(String name, String version, boolean explicit, List<String> files) {
+        Installed(String name, String version, boolean explicit, List<String> files, boolean alt) {
             this.name = name;
             this.version = version;
             this.explicit = explicit;
             this.files = files;
+            this.alt = alt;
         }
     }
 
@@ -253,7 +256,7 @@ public final class Toolkit {
                 List<Object> fl = Json.arr(v, "files");
                 if (fl != null) for (Object o : fl) if (o instanceof String) files.add((String) o);
                 String ver = Json.str(v, "version", "");
-                out.put(e.getKey(), new Installed(e.getKey(), ver, Json.bool(v, "explicit", false), files));
+                out.put(e.getKey(), new Installed(e.getKey(), ver, Json.bool(v, "explicit", false), files, Json.bool(v, "alt", false)));
             }
         } catch (Exception ignored) {
             // 状态坏了：当作空的（重装工具包能修好）
@@ -268,6 +271,7 @@ public final class Toolkit {
             v.put("version", i.version);
             v.put("explicit", i.explicit);
             v.put("files", new ArrayList<Object>(i.files));
+            v.put("alt", i.alt);
             pk.put(i.name, v);
         }
         Map<String, Object> root = new LinkedHashMap<>();
@@ -666,22 +670,23 @@ public final class Toolkit {
             Map<String, Installed> st = readStatus(prefix);
             List<String> missing = new ArrayList<>();
             List<Pkg> plan = resolve(idx, names, st.keySet(), missing);
-            List<Pkg> todo = new ArrayList<>();
+            List<Pkg> todo = new ArrayList<>(), repair = new ArrayList<>();
             for (Pkg k : plan) {
                 Installed i = st.get(k.name);
                 if (i == null || !i.version.equals(k.version)) todo.add(k);
+                else if (!i.alt) repair.add(k); // 旧版装的、版本没变：不重装，只补 alternatives 链接
             }
             // 已经装了的显式包：只标记 explicit
             boolean changed = false;
             for (String n : names) {
                 Installed i = st.get(n);
                 if (i != null && !i.explicit && explicit) {
-                    st.put(n, new Installed(n, i.version, true, i.files));
+                    st.put(n, new Installed(n, i.version, true, i.files, i.alt));
                     changed = true;
                 }
             }
             if (log != null && !missing.isEmpty()) log.println("提示：仓库里没有这些依赖，已跳过：" + String.join(" ", missing));
-            if (todo.isEmpty()) {
+            if (todo.isEmpty() && repair.isEmpty()) {
                 if (changed) saveStatus(st, idx);
                 return todo;
             }
@@ -690,15 +695,21 @@ public final class Toolkit {
                 dl += k.size;
                 inst += k.installedKb;
             }
-            if (log != null) {
+            if (log != null && !todo.isEmpty()) {
                 StringBuilder sb = new StringBuilder("将安装 " + todo.size() + " 个包（下载 " + mb(dl) + "，占用约 " + mb(inst * 1024) + "）：");
                 for (Pkg k : todo) sb.append(' ').append(k.name);
                 log.println(sb);
             }
             Set<String> explicitSet = new HashSet<>();
             if (explicit) explicitSet.addAll(names);
-            installInto(idx, todo, prefix, st, explicitSet, p);
-            postInstall(prefix);
+            if (!todo.isEmpty()) {
+                installInto(idx, todo, prefix, st, explicitSet, p);
+                postInstall(prefix);
+            }
+            if (!repair.isEmpty()) {
+                int n = repairAlternatives(idx, repair, st, p);
+                if (log != null && n > 0) log.println("补建了 " + n + " 个命令链接（java、javac、keytool、vi 之类）");
+            }
             saveStatus(st, idx);
             clearDebs();
             return todo;
@@ -751,9 +762,7 @@ public final class Toolkit {
         debs.mkdirs();
         long total = 0, done = 0;
         for (Pkg k : plan) total += k.size;
-        List<String> bases = new ArrayList<>();
-        bases.add(idx.repoUrl);
-        for (Repo r : repos) if (!bases.contains(r.url)) bases.add(r.url);
+        List<String> bases = mirrors(idx);
         int i = 0;
         for (Pkg k : plan) {
             i++;
@@ -786,7 +795,12 @@ public final class Toolkit {
                 } catch (IOException ignored) {
                     // 没有 control.tar 或读不了：没有 alternatives
                 }
-                for (String l : applyAlternatives(postinst, dest)) if (!files.contains(l)) files.add(l);
+                // 升级时这个包以前建的链接可以换成新的；新版本自己带的文件不动
+                Installed before = st.get(k.name);
+                Set<String> mine = new HashSet<>();
+                if (before != null && dest.equals(prefix)) mine.addAll(before.files);
+                mine.removeAll(files);
+                for (String l : applyAlternatives(postinst, dest, mine, null)) if (!files.contains(l)) files.add(l);
             } catch (InstallException e) {
                 throw e;
             } catch (IOException e) {
@@ -801,7 +815,7 @@ public final class Toolkit {
                 for (String f : old.files) if (!keep.contains(f)) new File(dest, f).delete();
             }
             boolean ex = explicit.contains(k.name) || (old != null && old.explicit);
-            st.put(k.name, new Installed(k.name, k.version, ex, files));
+            st.put(k.name, new Installed(k.name, k.version, ex, files, true));
         }
     }
 
@@ -809,11 +823,139 @@ public final class Toolkit {
         Installer.deleteTree(new File(work, "debs"));
     }
 
+    /** 下载 .deb 用的地址：索引所在的源在前，其余源备用。 */
+    private List<String> mirrors(Index idx) {
+        List<String> bases = new ArrayList<>();
+        bases.add(idx.repoUrl);
+        for (Repo r : repos) if (!bases.contains(r.url)) bases.add(r.url);
+        return bases;
+    }
+
+    /**
+     * v0.3.1 以前装的包没处理 postinst 里的 update-alternatives（所以装了 OpenJDK 却没有 java 命令）。
+     * 版本没变的包不用重新下载：只读 .deb 开头的 control.tar（Range 请求，几 KB），按 postinst 补建链接，
+     * 并且只链接到这个包自己装过的文件。读不到的包下次安装时再试。返回新建的链接数。
+     */
+    private int repairAlternatives(Index idx, List<Pkg> pkgs, Map<String, Installed> st, Progress p) throws InstallException {
+        final List<String> bases = mirrors(idx);
+        // 每个包一次小请求（主要是 TLS 握手的时间）：几个一起取
+        java.util.concurrent.ExecutorService ex = java.util.concurrent.Executors.newFixedThreadPool(Math.min(6, pkgs.size()), r -> {
+            Thread t = new Thread(r, "pkg-postinst");
+            t.setDaemon(true);
+            return t;
+        });
+        int made = 0;
+        try {
+            List<java.util.concurrent.Future<String[]>> fs = new ArrayList<>();
+            for (final Pkg k : pkgs) fs.add(ex.submit(() -> new String[]{fetchPostinst(bases, k.filename)}));
+            for (int i = 0; i < pkgs.size(); i++) {
+                Pkg k = pkgs.get(i);
+                if (p.cancelled()) throw new InstallException(Kind.CANCELLED, "已取消", null);
+                p.step("检查命令链接：" + k.name + "（" + (i + 1) + "/" + pkgs.size() + "）", i + 1, pkgs.size());
+                String postinst;
+                try {
+                    postinst = fs.get(i).get()[0];
+                } catch (java.util.concurrent.ExecutionException e) {
+                    continue; // 网络问题：保持未处理，下次再试
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new InstallException(Kind.CANCELLED, "已取消", e);
+                }
+                Installed old = st.get(k.name);
+                if (old == null) continue;
+                Set<String> owned = new HashSet<>(old.files);
+                List<String> files = new ArrayList<>(old.files);
+                for (String l : applyAlternatives(postinst, prefix, owned, owned)) {
+                    if (!files.contains(l)) {
+                        files.add(l);
+                        made++;
+                    }
+                }
+                st.put(k.name, new Installed(k.name, old.version, old.explicit, files, true));
+            }
+        } finally {
+            ex.shutdownNow();
+        }
+        return made;
+    }
+
+    /** 有没有 v0.3.1 以前装的、还没处理 alternatives 的包（只读状态文件，不联网）。 */
+    public boolean needsAlternativesRepair() {
+        if (!installed()) return false;
+        for (Installed i : readStatus(prefix).values()) if (!i.alt) return true;
+        return false;
+    }
+
+    /**
+     * 给旧版装的包补 alternatives 链接（例如 v0.3 装的 OpenJDK 没有 java、javac，vim 没有 vim 命令）。
+     * 只补版本和索引一致的包（这样 .deb 文件名对得上）；版本不同的包下次升级时自然会处理。返回新建的链接数。
+     */
+    public int repairOldInstalls(String preferredRepoId, Progress p) throws InstallException {
+        synchronized (lock) {
+            Map<String, Installed> st = readStatus(prefix);
+            List<String> want = new ArrayList<>();
+            for (Installed i : st.values()) if (!i.alt) want.add(i.name);
+            if (want.isEmpty()) return 0;
+            Index idx = freshIndex(preferredRepoId, p, 24L * 3600 * 1000);
+            List<Pkg> todo = new ArrayList<>();
+            for (String n : want) {
+                Pkg k = idx.find(n);
+                if (k != null && k.version.equals(st.get(n).version)) todo.add(k);
+            }
+            if (todo.isEmpty()) return 0;
+            int n = repairAlternatives(idx, todo, st, p);
+            saveStatus(st, idx);
+            return n;
+        }
+    }
+
+    /** 只取 .deb 开头（ar 里 control.tar 排在 data.tar 前面）读出 postinst；包里没有 postinst 返回 null。所有源都失败抛异常。 */
+    String fetchPostinst(List<String> bases, String filename) throws IOException {
+        try {
+            return fetchPostinst(bases, filename, 32 << 10);
+        } catch (EOFException e) {
+            return fetchPostinst(bases, filename, CONTROL_HEAD); // control.tar 比较大：多取一些
+        }
+    }
+
+    private String fetchPostinst(List<String> bases, String filename, int head) throws IOException {
+        IOException last = null;
+        for (String b : bases) {
+            HttpURLConnection c = null;
+            try {
+                c = open(b + "/" + filename, 0);
+                c.setRequestProperty("Range", "bytes=0-" + (head - 1));
+                int code = c.getResponseCode();
+                if (code != 200 && code != 206) throw new IOException("HTTP " + code);
+                try (InputStream in = new Bounded(new BufferedInputStream(c.getInputStream(), 16 * 1024), head)) {
+                    return Deb.controlFile(in, "postinst");
+                }
+            } catch (EOFException e) {
+                throw e;           // 取的太少，不是源的问题
+            } catch (IOException e) {
+                last = e;
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }
+        throw last != null ? last : new IOException("没有可用的软件源");
+    }
+
+    /** 读 control.tar 最多取 .deb 开头这么多字节。 */
+    static final int CONTROL_HEAD = 256 << 10;
+
+    static List<String> applyAlternatives(String postinst, File dest) {
+        return applyAlternatives(postinst, dest, Collections.<String>emptySet(), null);
+    }
+
     /**
      * 按 postinst 里的 update-alternatives（Termux 自动生成的格式：--install "链接" "名字" "目标" 优先级，--slave "链接" "名字" "目标"）
-     * 建相对路径的符号链接。目标不存在（例如被我们省略的手册页）或链接已经指向有效文件的不动。返回新建的链接（相对前缀）。
+     * 建相对路径的符号链接。返回这个包应当拥有的链接（相对前缀）：新建的，以及本来就指向同一目标的（升级、重复安装时要算进文件清单，
+     * 不然升级清理会把它删掉）。
+     * 不动的：目标不存在（例如被我们省略的手册页）、真文件、别的包的有效链接。mine 里的（这个包以前建的）链接可以替换；
+     * targets 不为 null 时只链接到其中的文件。
      */
-    static List<String> applyAlternatives(String postinst, File dest) {
+    static List<String> applyAlternatives(String postinst, File dest, Set<String> mine, Set<String> targets) {
         List<String> made = new ArrayList<>();
         if (postinst == null || !postinst.contains("update-alternatives")) return made;
         String joined = postinst.replace("\\\n", " ");
@@ -823,15 +965,25 @@ public final class Toolkit {
             String link = m.group(1), target = m.group(3);
             if (!link.startsWith(pre) || !target.startsWith(pre)) continue;
             String lr = link.substring(pre.length()), tr = target.substring(pre.length());
-            if (!safeRel(lr) || !safeRel(tr) || dropped(lr)) continue;
+            if (!safeRel(lr) || !safeRel(tr) || dropped(lr) || made.contains(lr)) continue;
+            if (targets != null && !targets.contains(tr)) continue;
             File lf = new File(dest, lr), tf = new File(dest, tr);
             if (!tf.exists()) continue;
+            File dir = lf.getParentFile();
             try {
-                if (lf.exists()) continue;                // 已经有了（别的包提供的，或者是真文件）
-                if (isSymlink(lf)) Files.delete(lf.toPath()); // 断掉的旧链接
-                File dir = lf.getParentFile();
+                java.nio.file.Path rel = dir.toPath().relativize(tf.toPath());
+                if (isSymlink(lf)) {
+                    if (Files.readSymbolicLink(lf.toPath()).equals(rel)) {
+                        made.add(lr);                     // 已经是这个链接
+                        continue;
+                    }
+                    if (lf.exists() && !mine.contains(lr)) continue; // 别的包的有效链接
+                    Files.delete(lf.toPath());             // 断掉的，或者是这个包旧版本的
+                } else if (lf.exists()) {
+                    continue;                              // 真文件
+                }
                 if (!dir.isDirectory() && !dir.mkdirs()) continue;
-                Files.createSymbolicLink(lf.toPath(), dir.toPath().relativize(tf.toPath()));
+                Files.createSymbolicLink(lf.toPath(), rel);
                 made.add(lr);
             } catch (IOException | UnsupportedOperationException ignored) {
                 // 建不了就算了：程序本身还在原位置
@@ -1481,7 +1633,7 @@ public final class Toolkit {
                 long size = parseLong(new String(h, 48, 10, StandardCharsets.US_ASCII));
                 if (size < 0 || size > (4L << 30)) throw new IOException(".deb 成员大小不对");
                 if (name.startsWith("control.tar")) {
-                    InputStream body = new Bounded(in, size);
+                    InputStream body = new Bounded(in, size, true); // 只取了 .deb 开头时，control.tar 不完整要报出来（不能当成“没有 postinst”）
                     InputStream tarIn = name.endsWith(".xz") ? new org.tukaani.xz.XZInputStream(body, 64 << 20)
                             : name.endsWith(".gz") ? new GZIPInputStream(body, 16 * 1024) : body;
                     TarReader t = new TarReader(tarIn);
@@ -1530,10 +1682,17 @@ public final class Toolkit {
     /** 只读 n 个字节的流。 */
     static final class Bounded extends FilterInputStream {
         private long left;
+        /** 底层流在 n 个字节之前就结束了：抛 EOFException（而不是当成正常结束）。 */
+        private final boolean strict;
 
         Bounded(InputStream in, long n) {
+            this(in, n, false);
+        }
+
+        Bounded(InputStream in, long n, boolean strict) {
             super(in);
             left = n;
+            this.strict = strict;
         }
 
         @Override
@@ -1541,14 +1700,17 @@ public final class Toolkit {
             if (left <= 0) return -1;
             int c = super.read();
             if (c >= 0) left--;
+            else if (strict) throw new EOFException("数据不完整");
             return c;
         }
 
         @Override
         public int read(byte[] b, int off, int len) throws IOException {
             if (left <= 0) return -1;
+            if (len == 0) return 0;
             int n = super.read(b, off, (int) Math.min(len, left));
             if (n > 0) left -= n;
+            else if (n < 0 && strict) throw new EOFException("数据不完整");
             return n;
         }
 

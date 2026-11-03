@@ -528,6 +528,43 @@ public final class CodexRuntimeManager {
             if (fv != null) toolkitVersions.putAll(fv);
             changed();
         });
+        // v0.3.1 以前装的包少了 update-alternatives 的命令（java、javac、keytool、vim……）：后台补一次，不挡 Codex 启动
+        if (ok && !toolkitRepairTried && t.needsAlternativesRepair()) {
+            toolkitRepairTried = true;
+            toolkitWorker.execute(this::repairOldToolkit);
+        }
+    }
+
+    private volatile boolean toolkitRepairTried;
+
+    /** toolkit 线程：给旧版装的包补命令链接。失败（没网等）就算了，下次启动再试。 */
+    private void repairOldToolkit() {
+        Toolkit t = paths.toolkit();
+        if (t == null || toolkitInstalling) return;
+        try {
+            int n = t.repairOldInstalls(preferredToolkitRepo(), new Toolkit.Progress() {
+                @Override
+                public void step(String text, long done, long total) {
+                }
+
+                @Override
+                public boolean cancelled() {
+                    return false;
+                }
+            });
+            if (n <= 0) return;
+            android.util.Log.i("PocketCodex", "补建了 " + n + " 个命令链接");
+            final Map<String, String> v = toolkitSelfTest();
+            onMain(() -> {
+                if (v != null) {
+                    toolkitVersions.clear();
+                    toolkitVersions.putAll(v);
+                }
+                changed();
+            });
+        } catch (Exception e) {
+            android.util.Log.w("PocketCodex", "补建命令链接失败：" + e.getMessage());
+        }
     }
 
     /** 用 Agent 的同一套环境跑一遍常用命令，记下版本。bash 都跑不起来返回 null。 */
@@ -686,19 +723,29 @@ public final class CodexRuntimeManager {
                 if (!t.installed()) {
                     repo = t.installBase(preferredToolkitRepo(), pr);
                     baseNew = true;
+                    // 基础包先单独自检：后面工具集下载失败或取消，基础包照样能用（并且会重启 Codex 用上）
+                    onMain(() -> {
+                        toolkitStep = "检查基础工具能不能运行…";
+                        changed();
+                    });
+                    versions = toolkitSelfTest();
+                    if (versions == null) err = "基础工具包装好了，但在这台设备上运行不起来（bash 自检失败）。可以在诊断里查看详情。";
+                    else toolkitUsable = true;
                 }
-                Toolkit.Index idx = t.fetchIndex(preferredToolkitRepo(), pr);
-                for (Toolkit.Repo r : Toolkit.REPOS) if (r.url.equals(idx.repoUrl)) repo = r.id;
-                t.install(b.packages, true, idx, pr, null);
-                onMain(() -> {
-                    toolkitStep = "检查能不能运行…";
-                    changed();
-                });
-                versions = toolkitSelfTest();
-                if (versions == null) err = "装好了，但自检没通过（bash 无法运行）";
-                else {
-                    String miss = missingCommands(com.pocketcodex.core.ToolBundles.commands(id));
-                    if (!miss.isEmpty()) err = "装好了，但这些命令运行不了：" + miss + "（可以到 自检与诊断 查看）";
+                if (err == null) {
+                    Toolkit.Index idx = t.fetchIndex(preferredToolkitRepo(), pr);
+                    for (Toolkit.Repo r : Toolkit.REPOS) if (r.url.equals(idx.repoUrl)) repo = r.id;
+                    t.install(b.packages, true, idx, pr, null);
+                    onMain(() -> {
+                        toolkitStep = "检查能不能运行…";
+                        changed();
+                    });
+                    versions = toolkitSelfTest();
+                    if (versions == null) err = "装好了，但自检没通过（bash 无法运行）";
+                    else {
+                        String miss = missingCommands(com.pocketcodex.core.ToolBundles.commands(id));
+                        if (!miss.isEmpty()) err = "装好了，但这些命令运行不了：" + miss + "（可以到 自检与诊断 查看）";
+                    }
                 }
             } catch (Installer.InstallException e) {
                 err = e.kind == Installer.Kind.CANCELLED ? "已取消" : e.getMessage();
@@ -706,7 +753,8 @@ public final class CodexRuntimeManager {
                 err = "自检失败：" + e.getMessage();
             }
             toolkitInstalling = false;
-            if (t.installed()) toolkitUsable = versions != null || (toolkitUsable && err != null && !err.startsWith("装好了，但自检"));
+            // versions：最后一次自检的结果（工具集失败时是基础包那次的）
+            if (t.installed()) toolkitUsable = versions != null || (toolkitUsable && err != null && !err.startsWith("装好了，但自检") && !err.startsWith("基础工具包装好了"));
             final java.util.Set<String> pk = new java.util.HashSet<>(t.status().keySet());
             final String ferr = err, frepo = repo;
             final Map<String, String> fv = versions;
