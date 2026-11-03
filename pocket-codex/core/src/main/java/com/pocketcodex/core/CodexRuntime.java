@@ -264,19 +264,22 @@ public final class CodexRuntime {
         String table = null;       // 当前表头（null = 顶层）
         int tableAt = -1;          // 当前表头在 out 里的位置
         boolean tableHasContent = false, header = true;
-        String ml = null;          // 正在多行字符串里：它的定界符
+        TomlScan sc = new TomlScan();
         for (String line : old.split("\n", -1)) {
             String t = line.trim();
-            if (ml != null) {      // 多行字符串里：原样保留
+            boolean free = sc.ml == null && sc.depth == 0;   // 这一行从顶层开始（不在字符串、数组、内联表里）
+            sc.scan(line);
+            boolean complete = sc.ml == null && sc.depth == 0; // 这一行结束时也回到顶层
+            if (!free) {           // 多行字符串、跨行数组的内容：原样保留
                 out.add(line);
-                if (t.contains(ml)) ml = null;
+                if (table != null) tableHasContent = true;
                 continue;
             }
             if (header) {
                 if (t.equals(LEGACY_V02) || t.equals(LEGACY_V03) || t.equals(LEGACY_V03_2)) continue;
                 header = false;
             }
-            if (t.startsWith("[")) {
+            if (t.startsWith("[") && complete) {
                 if (table != null && !tableHasContent && isOurTable(table)) dropTable(out, tableAt);
                 table = t.replace(" ", "");
                 tableAt = out.size();
@@ -285,16 +288,8 @@ public final class CodexRuntime {
                 continue;
             }
             int eq = t.startsWith("#") ? -1 : t.indexOf('=');
-            String key = eq > 0 ? t.substring(0, eq).trim() : null;
-            String value = eq > 0 ? t.substring(eq + 1).trim() : "";
-            String opens = value.startsWith("\"\"\"") ? "\"\"\"" : value.startsWith("'''") ? "'''" : null;
-            if (opens != null && !value.substring(3).contains(opens)) {
-                ml = opens;        // 多行字符串开始：这一行和后面的都不动
-                out.add(line);
-                if (table != null) tableHasContent = true;
-                continue;
-            }
-            if (key != null && opens == null) {
+            if (eq > 0 && complete) {
+                String key = t.substring(0, eq).trim(), value = t.substring(eq + 1).trim();
                 if (table == null && V03_KEYS.contains(key)) continue;
                 if ("[features]".equals(table) && key.equals("shell_snapshot") && value.equals("false")) continue;
                 if ("[shell_environment_policy]".equals(table) && key.equals("inherit") && value.equals("\"all\"")) continue;
@@ -309,6 +304,77 @@ public final class CodexRuntime {
         String r = b.toString();
         while (r.endsWith("\n\n")) r = r.substring(0, r.length() - 1);
         return r;
+    }
+
+    /**
+     * 逐行扫 TOML 用的跨行状态：是否在多行字符串里（定界符）、方括号/花括号的深度。
+     * 处理基本字符串里的转义（\" 和 \"""不算结束）、字面量字符串（没有转义）、注释。
+     */
+    static final class TomlScan {
+        String ml;
+        int depth;
+
+        void scan(String line) {
+            int i = 0, n = line.length();
+            while (i < n) {
+                if (ml != null) {
+                    if (ml.equals("\"\"\"")) {
+                        char c = line.charAt(i);
+                        if (c == '\\') {
+                            i += 2;                     // 转义：下一个字符（包括引号）不算
+                            continue;
+                        }
+                        if (line.startsWith("\"\"\"", i)) {
+                            i += 3;
+                            while (i < n && line.charAt(i) == '"') i++; // 结束符前最多可以再有两个引号
+                            ml = null;
+                            continue;
+                        }
+                        i++;
+                    } else {
+                        int j = line.indexOf("\'\'\'", i);
+                        if (j < 0) return;
+                        i = j + 3;
+                        while (i < n && line.charAt(i) == '\'') i++;
+                        ml = null;
+                    }
+                    continue;
+                }
+                char c = line.charAt(i);
+                if (c == '#') return;                   // 注释到行尾
+                if (line.startsWith("\"\"\"", i)) {
+                    ml = "\"\"\"";
+                    i += 3;
+                    continue;
+                }
+                if (line.startsWith("\'\'\'", i)) {
+                    ml = "\'\'\'";
+                    i += 3;
+                    continue;
+                }
+                if (c == '"') {                         // 单行基本字符串
+                    i++;
+                    while (i < n) {
+                        char d = line.charAt(i);
+                        if (d == '\\') {
+                            i += 2;
+                            continue;
+                        }
+                        i++;
+                        if (d == '"') break;
+                    }
+                    continue;
+                }
+                if (c == '\'') {                        // 单行字面量字符串
+                    int j = line.indexOf('\'', i + 1);
+                    i = j < 0 ? n : j + 1;
+                    continue;
+                }
+                if (c == '[' || c == '{') depth++;
+                else if ((c == ']' || c == '}') && depth > 0) depth--;
+                i++;
+            }
+        }
     }
 
     private static boolean isOurTable(String table) {

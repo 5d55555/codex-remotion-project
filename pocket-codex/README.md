@@ -8,7 +8,7 @@
 
 - **设置精简成几个入口**（照 ChatGPT“我的 ChatGPT：个性化 / 记忆 / 插件 ›”）：首页只剩 账户、外观/强调色、“我的口袋工坊”（模型与权限、开发工具 ›、技能与插件 ›、工作区 ›）、通用 ›、Codex CLI ›、关于 ›；工具集、终端、常用命令、软件源都收进“开发工具”子页，技能、插件、MCP 收进“技能与插件”子页。搜索仍能搜到所有子页里的项。
 - **顶栏、底栏改成渐隐过渡**：设置、文件、对话页、会话抽屉，内容滚到顶栏/搜索栏/输入框下面时淡出，不再一刀切。
-- **config.toml 完全交给你和 Agent**：口袋工坊自己的设置（模型、推理、沙箱、凭据存储……）每次启动用 `codex -c` 传；旧版写进文件的内容只删能确认是我们写的那几行（多行字符串、用户加的表和 MCP 一律保留），改前留 `config.toml.bak`。
+- **config.toml 完全交给你和 Agent**：口袋工坊自己的设置（模型、推理、沙箱、凭据存储……）每次启动用 `codex -c` 传；旧版写进文件的内容只删能确认是我们写的那几行（按 TOML 规则逐字扫描：多行字符串（含转义的三引号）、跨行数组、内联表、用户加的表和 MCP 一律保留），改前留 `config.toml.bak`。
 - **命令链接（update-alternatives）**：Termux 的 OpenJDK（java、javac、keytool……）、vim（vim、ex、view）等命令是包的安装脚本建的链接，我们不执行脚本，改为自己按 postinst 建。升级同一个包时链接不会被清掉；v0.3 装的包启动时在后台自动补建（只读每个 .deb 开头几 KB，不重新下载）；`JAVA_HOME` 自动设好。
 - **工具集**：补了 rizin、lldb、upx、protoc、dtc、hexyl、vips、exiftool、WebP/AVIF/HEIF、pycairo、git-absorb/cliff/sizer、tig、gitui、jj、difftastic、just、miller 等，新增“网络调试与压测”（socat、nmap、wrk、vegeta、testssl.sh）；装完逐个检查必需命令，缺了会写明。第一次通过工具集装基础包时，基础包先单独自检，工具集失败也能用上基础包。
 - 其他：已有对话里切换工作区会开新对话；设置页旋转屏幕保留所在子页、搜索词和滚动位置；新对话草稿旋转不丢；底部面板只保留一层滚动（常用命令列表不再和面板抢手势）。
@@ -105,7 +105,7 @@ codex app-server（musl 静态程序，子进程）
 ## 构建与测试
 
 ```bash
-./gradlew :core:test                      # 纯 Java（51 个，4 个要真实环境会跳过）：JSON、设备码、代理、安装器、tar、验签、工具包安装/升级/命令链接补建、config.toml 迁移、app-server 客户端、会话归并
+./gradlew :core:test                      # 纯 Java（53 个，4 个要真实环境会跳过）：JSON、设备码、代理、安装器、tar、验签、工具包安装/升级/命令链接补建、config.toml 迁移、app-server 客户端、会话归并
 CODEX_BIN=<x64 codex> CODEX_AUTH=~/.codex/auth.json ./gradlew :core:test --tests '*CodexIntegrationTest*'
                                           # 真实 codex 0.166 经 LocalProxy：设备码拿到代码、app-server 开会话、每步确认下批准命令、文件真的写了
 ./gradlew :smoke:testDebugUnitTest        # Robolectric 真实 Activity 跑一遍各个状态并截图（smoke/shots/，浅色和深色）

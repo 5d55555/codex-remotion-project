@@ -549,7 +549,8 @@ public final class CodexRuntimeManager {
 
                 @Override
                 public boolean cancelled() {
-                    return false;
+                    // 用户点了安装（toolkitInstalling 在主线程先置位，安装任务排在这个后面）：马上让出，下次启动再补
+                    return toolkitInstalling;
                 }
             });
             if (n <= 0) return;

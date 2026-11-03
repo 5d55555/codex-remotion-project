@@ -703,14 +703,21 @@ public final class Toolkit {
             Set<String> explicitSet = new HashSet<>();
             if (explicit) explicitSet.addAll(names);
             if (!todo.isEmpty()) {
-                installInto(idx, todo, prefix, st, explicitSet, p);
-                postInstall(prefix);
+                try {
+                    installInto(idx, todo, prefix, st, explicitSet, p);
+                    postInstall(prefix);
+                } finally {
+                    saveStatus(st, idx); // 中途取消或失败也记下已经装好的包（文件已经在前缀里了）
+                }
             }
             if (!repair.isEmpty()) {
-                int n = repairAlternatives(idx, repair, st, p);
-                if (log != null && n > 0) log.println("补建了 " + n + " 个命令链接（java、javac、keytool、vi 之类）");
+                try {
+                    int n = repairAlternatives(idx, repair, st, p);
+                    if (log != null && n > 0) log.println("补建了 " + n + " 个命令链接（java、javac、keytool、vi 之类）");
+                } finally {
+                    saveStatus(st, idx); // 补链接时取消：已经补好的也记下
+                }
             }
-            saveStatus(st, idx);
             clearDebs();
             return todo;
         }
@@ -844,22 +851,34 @@ public final class Toolkit {
             t.setDaemon(true);
             return t;
         });
-        int made = 0;
+        int made = 0, failed = 0;
         try {
             List<java.util.concurrent.Future<String[]>> fs = new ArrayList<>();
             for (final Pkg k : pkgs) fs.add(ex.submit(() -> new String[]{fetchPostinst(bases, k.filename)}));
             for (int i = 0; i < pkgs.size(); i++) {
                 Pkg k = pkgs.get(i);
-                if (p.cancelled()) throw new InstallException(Kind.CANCELLED, "已取消", null);
                 p.step("检查命令链接：" + k.name + "（" + (i + 1) + "/" + pkgs.size() + "）", i + 1, pkgs.size());
-                String postinst;
-                try {
-                    postinst = fs.get(i).get()[0];
-                } catch (java.util.concurrent.ExecutionException e) {
-                    continue; // 网络问题：保持未处理，下次再试
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new InstallException(Kind.CANCELLED, "已取消", e);
+                String postinst = null;
+                boolean ok = false;
+                while (true) {
+                    if (p.cancelled()) throw new InstallException(Kind.CANCELLED, "已取消", null); // finally 里 shutdownNow
+                    try {
+                        postinst = fs.get(i).get(200, java.util.concurrent.TimeUnit.MILLISECONDS)[0];
+                        ok = true;
+                        break;
+                    } catch (java.util.concurrent.TimeoutException e) {
+                        // 还在下载：再看一眼是否取消
+                    } catch (java.util.concurrent.ExecutionException e) {
+                        break;
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new InstallException(Kind.CANCELLED, "已取消", e);
+                    }
+                }
+                if (!ok) {
+                    // 网络问题：保持未处理，下次再试；连着几个都不行就别再等剩下的了
+                    if (++failed >= 3) break;
+                    continue;
                 }
                 Installed old = st.get(k.name);
                 if (old == null) continue;
@@ -903,9 +922,11 @@ public final class Toolkit {
                 if (k != null && k.version.equals(st.get(n).version)) todo.add(k);
             }
             if (todo.isEmpty()) return 0;
-            int n = repairAlternatives(idx, todo, st, p);
-            saveStatus(st, idx);
-            return n;
+            try {
+                return repairAlternatives(idx, todo, st, p);
+            } finally {
+                saveStatus(st, idx); // 取消时已经补好的也记下
+            }
         }
     }
 

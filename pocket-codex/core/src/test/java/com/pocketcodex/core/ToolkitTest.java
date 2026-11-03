@@ -282,6 +282,50 @@ public class ToolkitTest {
         assertEquals(0, t.repairOldInstalls(null, progress(new ArrayList<>())));
     }
 
+    /** Astra 第三轮：同一次安装里先装了新包、再补旧包的链接时取消——新包的状态不能丢。 */
+    @Test
+    public void cancelDuringRepairKeepsInstalledStatus() throws Exception {
+        buildRepo(false);
+        File prefix = new File(tmp.getRoot(), "runtime/usr");
+        Toolkit t = toolkit(prefix, Collections.singletonList(repo()));
+        t.installBase(null, progress(new ArrayList<>()));
+        PrintStream ps = new PrintStream(new ByteArrayOutputStream(), true, "UTF-8");
+        assertEquals(0, t.command(Arrays.asList("install", "-y", "jdk"), null, ps, () -> false));
+        // 模拟 v0.3 装的 jdk
+        Map<String, Toolkit.Installed> st = Toolkit.readStatus(prefix);
+        Toolkit.Installed j = st.get("jdk");
+        List<String> files = new ArrayList<>(j.files);
+        files.remove("bin/java");
+        st.put("jdk", new Toolkit.Installed("jdk", j.version, j.explicit, files, false));
+        Toolkit.writeStatus(prefix, st, repo().url);
+        Files.delete(new File(prefix, "bin/java").toPath());
+        Toolkit.Index idx = t.fetchIndex(null, progress(new ArrayList<>()));
+        final boolean[] cancel = {false};
+        Toolkit.Progress p = new Toolkit.Progress() {
+            @Override
+            public void step(String text, long done, long total) {
+                if (text.startsWith("检查命令链接")) cancel[0] = true;
+            }
+
+            @Override
+            public boolean cancelled() {
+                return cancel[0];
+            }
+        };
+        try {
+            t.install(Arrays.asList("extra", "jdk"), true, idx, p, null);
+            fail("应该被取消");
+        } catch (Installer.InstallException e) {
+            assertEquals(Installer.Kind.CANCELLED, e.kind);
+        }
+        assertTrue("extra 已经装好，状态要记下", t.status().containsKey("extra"));
+        assertTrue(new File(prefix, "bin/extra").isFile());
+        assertFalse("没补完的 jdk 保持未处理，下次再补", t.status().get("jdk").alt);
+        assertTrue(t.needsAlternativesRepair());
+        assertEquals(1, t.repairOldInstalls(null, progress(new ArrayList<>())));
+        assertTrue(new File(prefix, "bin/java").exists());
+    }
+
     @Test
     public void corruptDebKeepsOldToolkit() throws Exception {
         buildRepo(false);

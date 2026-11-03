@@ -90,6 +90,25 @@ public class ConfigOverridesTest {
         assertFalse(out, out.contains("cli_auth_credentials_store"));
     }
 
+    /** Astra 第三轮：多行基本字符串里转义的三引号不是结束符；跨行数组、内联表里的行也不能当成顶层键。 */
+    @Test
+    public void migrationUnderstandsEscapesArraysAndInlineTables() {
+        String v03 = "# 由口袋工坊生成：下面几行每次启动会重写；\n# 之后的内容（你或 Agent 加的配置，例如 [mcp_servers.*]）会原样保留。\n"
+                + "model = \"gpt-6-luna\"\n"
+                + "developer_instructions = \"\"\"\n示例中的三引号：\\\"\"\"\nmodel = keep_this_instruction\n\"\"\"\n"
+                + "notes = [\n  \"\"\"\n  sandbox_mode = keep_in_array\n  \"\"\",\n]\n"
+                + "profile = {\n  web_search = \"keep_in_inline\" }\n"
+                + "quoted = \"has \\\" quote and \\\"\\\"\\\" inside\"\nweb_search = \"live\"\n";
+        String out = CodexRuntime.migrateConfig(v03);
+        assertTrue(out, out.contains("示例中的三引号：\\\"\"\"\nmodel = keep_this_instruction\n\"\"\"\n"));
+        assertTrue(out, out.contains("  sandbox_mode = keep_in_array\n"));
+        assertTrue(out, out.contains("  web_search = \"keep_in_inline\" }\n"));
+        assertTrue(out, out.contains("quoted = "));
+        assertFalse(out, out.contains("gpt-6-luna"));
+        assertFalse("单行字符串里的转义引号之后的顶层键照样迁移", out.contains("web_search = \"live\""));
+        assertEquals(out, CodexRuntime.migrateConfig(out));
+    }
+
     /** v0.3 写的文件（开头是我们的键，后面是用户/REA 加的 MCP）：去掉我们的键，MCP 留下，再迁移一次不变。 */
     @Test
     public void migratesV03FileKeepingMcp() {
