@@ -217,11 +217,11 @@ public class ScreensTest {
         idle();
         assertTrue(hasText(root, "文件放在哪里？"));
         shot("08_workspace", a);
-        // 创建并进入 → 主界面
+        // 创建并进入 → 直接进新对话（和 ChatGPT 一样，会话列表在抽屉里）
         findText(root, "创建并进入").performClick();
         Intent main = shadowOf(a).getNextStartedActivity();
         assertNotNull(main);
-        assertEquals(MainActivity.class.getName(), main.getComponent().getClassName());
+        assertEquals(ChatActivity.class.getName(), main.getComponent().getClassName());
         assertTrue(new File(rt.prefs.workspace()).isDirectory());
         assertTrue(a.isFinishing());
     }
@@ -252,26 +252,58 @@ public class ScreensTest {
         new File(ws, "notes").mkdirs();
         write(new File(ws, "trip.md"), "# 行程\n\n- 11月3日 东京\n- 11月5日 京都\n");
         write(new File(ws, "budget.csv"), "日期,项目,金额\n11-03,酒店,800\n");
-        ActivityController<MainActivity> c = Robolectric.buildActivity(MainActivity.class).setup();
+        rt.prefs.setPinned(java.util.Collections.singletonList("t3"));
+        // 对话页左边拉出的抽屉：置顶、聊天、底部“新对话”和设置
+        ChatActivity chat = Robolectric.buildActivity(ChatActivity.class, new Intent(RuntimeEnvironment.getApplication(), ChatActivity.class)
+                .putExtra(ChatActivity.EXTRA_CWD, rt.prefs.workspace())).setup().get();
         settle();
-        MainActivity a = c.get();
-        View root = a.getWindow().getDecorView();
-        assertFalse("主界面不应跳回设置", a.isFinishing());
-        assertTrue(hasText(root, "整理旅行清单"));
-        assertTrue(hasText(root, "新对话"));
-        shot("10_sessions", a);
+        layout(chat);
+        chat.openDrawer();
+        idle();
+        layout(chat);
+        View cr = chat.getWindow().getDecorView();
+        assertTrue(hasText(cr, "整理旅行清单"));
+        assertTrue(hasText(cr, "置顶"));
+        assertTrue(hasText(cr, "新对话"));
+        assertTrue(hasText(cr, "开发工具"));
+        shot("10_drawer", chat);
         // 文件页
-        com.google.android.material.bottomnavigation.BottomNavigationView nav = findNav(root);
-        nav.setSelectedItemId(MainActivity.TAB_FILES);
-        idle();
+        MainActivity fa = Robolectric.buildActivity(MainActivity.class, new Intent(RuntimeEnvironment.getApplication(), MainActivity.class)
+                .putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_FILES)).setup().get();
+        settle();
+        View root = fa.getWindow().getDecorView();
+        assertFalse("文件页不应跳回设置", fa.isFinishing());
         assertTrue(hasText(root, "trip.md"));
-        shot("11_files", a);
+        assertTrue(hasText(root, "notes"));
+        layout(fa);
+        shot("11_files", fa);
         // 设置页
-        nav.setSelectedItemId(MainActivity.TAB_SETTINGS);
-        idle();
-        assertTrue(hasText(root, "每步确认"));
+        MainActivity a = Robolectric.buildActivity(MainActivity.class, new Intent(RuntimeEnvironment.getApplication(), MainActivity.class)
+                .putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_SETTINGS)).setup().get();
+        settle();
+        root = a.getWindow().getDecorView();
+        assertTrue(hasText(root, "账户"));
+        assertTrue(hasText(root, "用量与限额"));
+        assertTrue(hasText(root, "强调色"));
         assertTrue(hasText(root, "安装开发工具"));
+        layout(a);
         shot("12_settings", a);
+        // 外观下拉
+        tap(root, "外观");
+        assertTrue(hasText(root, "深色"));
+        shot("12b_settings_dropdown", a);
+        a.getOnBackPressedDispatcher().onBackPressed();
+        idle();
+        // 搜索设置
+        android.widget.EditText search = (android.widget.EditText) field(a, "searchBox");
+        search.setText("终端");
+        idle();
+        assertTrue(hasText(root, "直接运行 node"));
+        assertFalse(findText(root, "强调色").isShown());
+        layout(a);
+        shot("12c_settings_search", a);
+        search.setText("");
+        idle();
         // 开发工具：装好以后显示各工具版本；进度变化只刷新那张卡片
         rt.toolkitState = CodexRuntimeManager.ToolkitState.READY;
         rt.toolkitVersions.put("node", "24.11.1");
@@ -282,12 +314,28 @@ public class ScreensTest {
         rt.toolkitVersions.put("bash", "5.3.3");
         rt.toolkitVersions.put("rg", "15.1.0");
         rt.toolkitVersions.put("curl", "8.17.0");
+        rt.toolkitVersions.put("ffmpeg", "9.0.2");
+        rt.toolkitPackages.addAll(java.util.Arrays.asList("bash", "nodejs-lts", "git", "ffmpeg", "imagemagick", "graphicsmagick", "sox", "mediainfo", "gifsicle", "gifski",
+                "librsvg", "python-pillow", "python-numpy", "fontconfig-utils", "ttf-dejavu"));
         rt.setStageForTest(CodexRuntimeManager.Stage.READY);
         idle();
         assertTrue(hasText(root, "开发工具已就绪"));
         assertTrue(hasText(root, "Node.js 24.11.1"));
+        assertTrue(hasText(root, "逆向分析"));
+        assertTrue(hasText(root, "已安装")); // 剪辑与程序化动画
+        layout(a);
         scrollTo(root, "开发工具已就绪");
         shot("13_settings_devtools", a);
+        scrollTo(root, "更多编程语言");
+        shot("13b_settings_bundles", a);
+        // 用量与限额（底部面板）
+        rt.lastRateLimits = Json.parseObject("{\"rateLimits\":{\"primary\":{\"usedPercent\":37,\"windowDurationMins\":300,\"resetsAt\":1793733725},"
+                + "\"secondary\":{\"usedPercent\":76,\"windowDurationMins\":10080,\"resetsAt\":1793785825}}}");
+        UsageDialog.show(a, rt, null);
+        idle();
+        assertTrue(hasText(root, "每周"));
+        layout(a);
+        shot("19_usage", a);
         // 打开文本查看
         Intent i = new Intent(a, FileViewerActivity.class).putExtra(FileViewerActivity.EXTRA_PATH, new File(ws, "trip.md").getAbsolutePath());
         FileViewerActivity fv = Robolectric.buildActivity(FileViewerActivity.class, i).setup().get();
@@ -498,9 +546,19 @@ public class ScreensTest {
         // 新对话：顶部“聊天 / 工作”，输入卡片里“6.1 Sol 中”
         assertTrue(hasText(root, "聊天"));
         assertTrue(hasText(root, "工作"));
-        assertTrue(hasText(root, "6.1 Sol 中"));
+        // 收起时是一行（＋ 输入框 麦克风 语音），模型标签藏起来；点输入框展开
+        assertFalse(hasText(root, "6.1 Sol 中"));
+        assertTrue(hasText(root, "语音"));
         assertTrue(hasText(root, "今天要做点什么？"));
         shot("23_chat_new_work", a);
+        android.widget.EditText in0 = (android.widget.EditText) field(a, "input");
+        in0.requestFocus();
+        idle();
+        layout(a);
+        assertTrue(hasText(root, "6.1 Sol 中"));
+        shot("23b_chat_focused", a);
+        ((View) field(a, "frame")).requestFocus();
+        idle();
         // 切到聊天
         tap(root, "聊天");
         assertFalse(rt.prefs.workMode());

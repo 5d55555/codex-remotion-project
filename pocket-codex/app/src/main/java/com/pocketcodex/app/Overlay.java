@@ -199,6 +199,68 @@ final class Overlay {
         return row;
     }
 
+    /* ---------------- 下拉卡片 ---------------- */
+
+    /** 下拉里的一项。pick 为 null 且 enabled 时只关闭。 */
+    static final class Opt {
+        final String title, sub;
+        final boolean checked, enabled;
+        final Runnable pick;
+
+        Opt(String title, String sub, boolean checked, boolean enabled, Runnable pick) {
+            this.title = title;
+            this.sub = sub;
+            this.checked = checked;
+            this.enabled = enabled;
+            this.pick = pick;
+        }
+
+        Opt(String title, String sub, boolean checked, Runnable pick) {
+            this(title, sub, checked, true, pick);
+        }
+    }
+
+    /**
+     * ChatGPT 的下拉卡片：右边和 anchor 对齐；preferBelow 时出现在 anchor 下方（放不下就到上方），否则在上方。
+     * 选了一项先关卡片再执行 pick，最后执行 after。chevron 不为 null 时打开期间转 180°。
+     */
+    static Overlay dropdown(AppCompatActivity a, View anchor, java.util.List<Opt> opts, boolean preferBelow, android.widget.ImageView chevron, Runnable after) {
+        Overlay dd = new Overlay(a, false);
+        LinearLayout card = card(a, 28);
+        card.setPadding(0, Ui.dp(a, 8), 0, Ui.dp(a, 8));
+        android.widget.ScrollView sv = new android.widget.ScrollView(a);
+        LinearLayout list = Ui.vbox(a);
+        for (Opt o : opts) {
+            list.addView(optionRow(a, o.title, o.sub, o.checked, o.enabled, x -> {
+                dd.close();
+                if (o.pick != null) o.pick.run();
+                if (after != null) after.run();
+            }), Ui.matchWrap());
+        }
+        sv.addView(list);
+        card.addView(sv);
+        int[] b = dd.boundsOf(anchor);
+        int w = Math.max(Ui.dp(a, 220), Math.round(dd.layerWidth() * 0.58f));
+        card.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        int want = card.getMeasuredHeight();
+        int margin = Ui.dp(a, 12);
+        int spaceBelow = dd.layerHeight() - b[3] - margin, spaceAbove = b[1] - margin;
+        boolean below = preferBelow ? spaceBelow >= Math.min(want, Ui.dp(a, 220)) || spaceBelow >= spaceAbove : spaceAbove < Math.min(want, Ui.dp(a, 220)) && spaceBelow > spaceAbove;
+        int h = Math.min(want, Math.max(Ui.dp(a, 120), below ? spaceBelow : spaceAbove));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(w, h, android.view.Gravity.TOP | android.view.Gravity.START);
+        lp.leftMargin = Math.max(margin, Math.min(b[2], dd.layerWidth() - margin) - w);
+        lp.topMargin = below ? b[3] - Ui.dp(a, 4) : Math.max(margin, b[1] - h + Ui.dp(a, 6));
+        card.setPivotX(w);
+        card.setPivotY(below ? 0 : h);
+        dd.add(card, lp);
+        if (chevron != null) {
+            chevron.setRotation(180);
+            dd.onClose(() -> chevron.setRotation(0));
+        }
+        dd.show();
+        return dd;
+    }
+
     /** 加粗的大号文字（面板标题等）。 */
     static TextView strong(Context c, String s, float sp) {
         TextView t = Ui.text(c, s, sp, R.color.text);

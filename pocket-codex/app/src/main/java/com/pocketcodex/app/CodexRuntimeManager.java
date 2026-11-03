@@ -372,6 +372,7 @@ public final class CodexRuntimeManager {
             proxy.start();
         }
         checkToolkit();
+        installBundledSkills();
         if (!paths.caFile.isFile() || System.currentTimeMillis() - paths.caFile.lastModified() > 24L * 3600_000) {
             Certs.export(paths.caFile, prefs.userCa());
         }
@@ -383,6 +384,43 @@ public final class CodexRuntimeManager {
         cfg.reasoningEffort = prefs.effort();
         CodexRuntime.prepare(l, cfg);
         return CodexRuntime.env(l, proxy.url(), System.getenv("PATH"), TimeZone.getDefault().getID());
+    }
+
+    /**
+     * 随 App 带的技能（assets/skills/pocket-*）复制到 $HOME/.agents/skills/（Codex 的用户级技能目录）。
+     * 只管 pocket- 开头的目录，内容没变不重写；用户自己装的技能不碰。在 worker 线程调用。
+     */
+    void installBundledSkills() {
+        File dest = new File(paths.home, ".agents/skills");
+        try {
+            String[] names = ctx.getAssets().list("skills");
+            if (names == null) return;
+            for (String n : names) if (n.startsWith("pocket-")) copyAssetTree("skills/" + n, new File(dest, n));
+        } catch (IOException e) {
+            android.util.Log.w("PocketCodex", "技能复制失败：" + e.getMessage());
+        }
+    }
+
+    private void copyAssetTree(String asset, File to) throws IOException {
+        String[] kids = ctx.getAssets().list(asset);
+        if (kids != null && kids.length > 0) {
+            if (!to.isDirectory() && !to.mkdirs()) throw new IOException("建目录失败：" + to);
+            for (String k : kids) copyAssetTree(asset + "/" + k, new File(to, k));
+            return;
+        }
+        byte[] data;
+        try (java.io.InputStream in = ctx.getAssets().open(asset); java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream()) {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+            data = bo.toByteArray();
+        }
+        if (to.isFile() && java.util.Arrays.equals(data, java.nio.file.Files.readAllBytes(to.toPath()))) return;
+        File tmp = new File(to.getPath() + ".tmp");
+        try (java.io.FileOutputStream o = new java.io.FileOutputStream(tmp)) {
+            o.write(data);
+        }
+        if (!tmp.renameTo(to)) throw new IOException("写入失败：" + to);
     }
 
     /** 证书设置变了：下次启动重新导出。 */
@@ -407,6 +445,10 @@ public final class CodexRuntimeManager {
     public String toolkitStep, toolkitError;
     public long toolkitDone = -1, toolkitTotal = -1;
     public final Map<String, String> toolkitVersions = new java.util.LinkedHashMap<>();
+    /** 已装的软件包名（主线程读）；工具集“已安装”按这个判断。 */
+    public final java.util.Set<String> toolkitPackages = new java.util.HashSet<>();
+    /** 正在装的工具集 id（null = 装的是基础包或没在装）。 */
+    public String bundleInstalling;
     /** worker 线程用：自检通过才把工具包放进 Agent 的环境。 */
     private volatile boolean toolkitUsable;
     private volatile boolean toolkitInstalling;
@@ -467,7 +509,10 @@ public final class CodexRuntimeManager {
         final boolean fok = ok;
         final Map<String, String> fv = versions;
         final String ferr = err;
+        final java.util.Set<String> pk = new java.util.HashSet<>(t.status().keySet());
         onMain(() -> {
+            toolkitPackages.clear();
+            toolkitPackages.addAll(pk);
             if (toolkitState == ToolkitState.INSTALLING) return;
             toolkitState = fok ? ToolkitState.READY : ToolkitState.BROKEN;
             toolkitError = ferr;
@@ -486,7 +531,10 @@ public final class CodexRuntimeManager {
         Map<String, String> env = CodexRuntime.env(l, proxy == null ? null : proxy.url(), System.getenv("PATH"), TimeZone.getDefault().getID());
         paths.home.mkdirs();
         paths.tmp.mkdirs();
-        String script = "echo __pocket_ok__; for c in 'node -v' 'npm -v' 'git --version' 'python3 -V' 'pip -V' 'bash --version' 'rg --version' 'curl --version'; do "
+        // 后面几个是工具集里的（装了才测）
+        String script = "echo __pocket_ok__; for c in 'node -v' 'npm -v' 'git --version' 'python3 -V' 'pip -V' 'bash --version' 'rg --version' 'curl --version' "
+                + "'ffmpeg -version' 'java -version' 'adb version' 'gh --version' 'r2 -v' 'magick -version'; do "
+                + "command -v \"${c%% *}\" >/dev/null 2>&1 || continue; "
                 + "printf '%s\\t%s\\n' \"${c%% *}\" \"$($c 2>&1 | head -n 1)\"; done";
         ProcessBuilder pb = new ProcessBuilder(t.bin("bash").getAbsolutePath(), "-c", script);
         pb.environment().clear();
@@ -580,7 +628,11 @@ public final class CodexRuntimeManager {
             toolkitUsable = err == null;
             final String ferr = err, frepo = repo;
             final Map<String, String> fv = versions;
+            final java.util.Set<String> pk = new java.util.HashSet<>(t.installed() ? t.status().keySet() : java.util.Collections.<String>emptySet());
             onMain(() -> {
+                bundleInstalling = null;
+                toolkitPackages.clear();
+                toolkitPackages.addAll(pk);
                 toolkitError = ferr;
                 toolkitVersions.clear();
                 if (fv != null) toolkitVersions.putAll(fv);
@@ -597,8 +649,118 @@ public final class CodexRuntimeManager {
         });
     }
 
+    /** 装一个工具集（基础包没装就先装基础包）。下载量见 {@link com.pocketcodex.core.ToolBundles}。 */
+    public void startBundleInstall(final String id) {
+        final com.pocketcodex.core.ToolBundles.Bundle b = com.pocketcodex.core.ToolBundles.find(id);
+        if (b == null || toolkitState == ToolkitState.INSTALLING) return;
+        final Toolkit t = paths.toolkit();
+        if (t == null) {
+            toolkitState = ToolkitState.FAILED;
+            toolkitError = "这台设备的处理器不支持开发工具包";
+            changed();
+            return;
+        }
+        toolkitCancel = false;
+        toolkitInstalling = true;
+        toolkitState = ToolkitState.INSTALLING;
+        bundleInstalling = id;
+        toolkitError = null;
+        toolkitStep = "准备安装“" + b.title + "”…";
+        toolkitDone = toolkitTotal = -1;
+        changed();
+        toolkitWorker.execute(() -> {
+            String err = null;
+            Map<String, String> versions = null;
+            boolean baseNew = false;
+            String repo = null;
+            Toolkit.Progress pr = toolkitProgress();
+            try {
+                if (!t.installed()) {
+                    repo = t.installBase(preferredToolkitRepo(), pr);
+                    baseNew = true;
+                }
+                Toolkit.Index idx = t.fetchIndex(preferredToolkitRepo(), pr);
+                for (Toolkit.Repo r : Toolkit.REPOS) if (r.url.equals(idx.repoUrl)) repo = r.id;
+                t.install(b.packages, true, idx, pr, null);
+                onMain(() -> {
+                    toolkitStep = "检查能不能运行…";
+                    changed();
+                });
+                versions = toolkitSelfTest();
+                if (versions == null) err = "装好了，但自检没通过（bash 无法运行）";
+            } catch (Installer.InstallException e) {
+                err = e.kind == Installer.Kind.CANCELLED ? "已取消" : e.getMessage();
+            } catch (IOException e) {
+                err = "自检失败：" + e.getMessage();
+            }
+            toolkitInstalling = false;
+            if (versions != null) toolkitUsable = true;
+            final java.util.Set<String> pk = new java.util.HashSet<>(t.status().keySet());
+            final String ferr = err, frepo = repo;
+            final Map<String, String> fv = versions;
+            final boolean fbase = baseNew;
+            onMain(() -> {
+                bundleInstalling = null;
+                toolkitPackages.clear();
+                toolkitPackages.addAll(pk);
+                toolkitError = ferr;
+                if (fv != null) {
+                    toolkitVersions.clear();
+                    toolkitVersions.putAll(fv);
+                }
+                if (frepo != null) prefs.setToolkitRepo(frepo);
+                if (ferr == null) {
+                    java.util.Set<String> bs = prefs.bundles();
+                    bs.add(id);
+                    prefs.setBundles(bs);
+                }
+                toolkitState = t.installed() ? (toolkitUsable ? ToolkitState.READY : ToolkitState.BROKEN) : ToolkitState.FAILED;
+                if (ferr != null && t.installed() && toolkitUsable) toolkitState = ToolkitState.READY; // 工具集没装成，基础包还能用
+                if (fbase && ferr == null) restartForToolkit();
+                changed();
+            });
+        });
+    }
+
+    /** 工具集是否装齐了。 */
+    public boolean bundleInstalled(String id) {
+        com.pocketcodex.core.ToolBundles.Bundle b = com.pocketcodex.core.ToolBundles.find(id);
+        return b != null && !toolkitPackages.isEmpty() && toolkitPackages.containsAll(b.packages);
+    }
+
+    private Toolkit.Progress toolkitProgress() {
+        return new Toolkit.Progress() {
+            @Override
+            public void step(String text, long done, long total) {
+                onMain(() -> {
+                    toolkitStep = text;
+                    toolkitDone = done;
+                    toolkitTotal = total;
+                    long now = SystemClock.elapsedRealtime();
+                    if (now - toolkitLastUi > 250) {
+                        toolkitLastUi = now;
+                        changed();
+                    }
+                });
+            }
+
+            @Override
+            public boolean cancelled() {
+                return toolkitCancel;
+            }
+        };
+    }
+
     public void cancelToolkitInstall() {
         toolkitCancel = true;
+    }
+
+    /** 设置里的“重启 Codex”：加了 MCP 服务、技能之后用。正在跑的回合结束后再重启。 */
+    public boolean restartCodex() {
+        if (runningThreadId != null || pendingApprovalCount() > 0) return false;
+        stopServer();
+        startServer();
+        return true;
     }
 
     /** 工具包变了：Codex 进程要重启才能拿到新的 PATH。正在跑的回合结束后再重启。 */
@@ -1279,6 +1441,13 @@ public final class CodexRuntimeManager {
                             + "and expect git to need core.filemode=false; heavy builds work better in the app's private workspace. "
                             + "Servers you start (e.g. a dev server on 127.0.0.1:<port>) can be opened in the phone's browser; run long-lived ones in the background (nohup … &) and tell the user the URL. "
                             + "git has a placeholder identity (Pocket Codex); ask before pushing anywhere, and pushing needs the user's own token. ");
+            StringBuilder bs = new StringBuilder();
+            for (com.pocketcodex.core.ToolBundles.Bundle tb : com.pocketcodex.core.ToolBundles.ALL) {
+                if (!tb.id.equals("recommended") && toolkitPackages.containsAll(tb.packages)) bs.append(bs.length() > 0 ? "; " : "").append(tb.id).append(": ").append(String.join(" ", tb.packages));
+            }
+            b.append(bs.length() > 0 ? "Extra tool bundles installed — " + bs + ". " : "")
+                    .append("More bundles (code/Git extras, APK build & test, reverse engineering, CLI video & procedural animation, CJK fonts, C/C++, Gradle/Kotlin, more languages) "
+                            + "can be installed by the user in Pocket Codex → Settings → Developer tools, or package by package with pkg install. ");
         } else {
             String why = toolkitState == ToolkitState.INSTALLING ? "is being installed right now" : toolkitState == ToolkitState.BROKEN ? "failed its self-test on this device" : "is not installed";
             b.append("Shell commands run through Android's /system/bin/sh (mksh, invoked as bash) with toybox utilities only (ls, cat, grep, sed, find, head, tail, wc, sort, tar, …). ")
@@ -1286,6 +1455,10 @@ public final class CodexRuntimeManager {
                     .append("If the task needs those tools, tell the user to open Pocket Codex → Settings → Developer tools to install it (about 57 MB), then retry; "
                             + "do not try to download binaries yourself. Prefer POSIX shell syntax. ");
         }
+        b.append("Skills for this phone are in ~/.agents/skills: $pocket-toolkit (environment, pkg, MCP), $pocket-apk-build, $pocket-apk-test "
+                + "(test APKs on this same phone via wireless-debugging adb), $pocket-reverse (apktool/jadx/radare2, leanrea, REA, r2mcp), $pocket-media (ffmpeg, animation); "
+                + "read the relevant SKILL.md before such tasks. MCP servers you add under [mcp_servers.*] in $CODEX_HOME/config.toml are kept across restarts "
+                + "(only the first managed lines are rewritten); a restart of Codex is needed to load them. ");
         b.append("Edit files with apply_patch. There is no project-level sandbox: stay inside the working directory unless the user asks otherwise. "
                 + "Reply in the language the user writes in.");
         return b.toString();

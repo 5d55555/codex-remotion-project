@@ -134,6 +134,126 @@ final class Ui {
         return b;
     }
 
+    /* ---------------- ChatGPT 风格的设置卡片 ---------------- */
+
+    /** 强调色（设置 → 外观 → 强调色）：发送键、开关、链接。 */
+    static final String[] ACCENT_NAMES = {"蓝色", "绿色", "紫色", "橙色", "粉色", "黑色"};
+    static final int[] ACCENTS_LIGHT = {0xFF2F6BF2, 0xFF10A37F, 0xFF7C4DFF, 0xFFF26B1D, 0xFFE8457C, 0xFF0D0D0D};
+    static final int[] ACCENTS_DARK = {0xFF3B7BFF, 0xFF19C37D, 0xFF9C7BFF, 0xFFFF8A3D, 0xFFFF6B9A, 0xFFECECEC};
+
+    static boolean night(Context c) {
+        return (c.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    static int accent(Context c) {
+        int i = Math.max(0, Math.min(ACCENT_NAMES.length - 1, new Prefs(c).accent()));
+        return night(c) ? ACCENTS_DARK[i] : ACCENTS_LIGHT[i];
+    }
+
+    /** 强调色上的文字/图标颜色（黑色强调色在深色模式下是浅色，要配深色字）。 */
+    static int onAccent(Context c) {
+        int i = new Prefs(c).accent();
+        return i == ACCENT_NAMES.length - 1 && night(c) ? 0xFF0D0D0D : 0xFFFFFFFF;
+    }
+
+    static GradientDrawable circleColor(int color) {
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(color);
+        return d;
+    }
+
+    /** 分组卡片：大圆角 + 细边，里面一行一行。 */
+    static LinearLayout group(Context c) {
+        LinearLayout l = vbox(c);
+        GradientDrawable bg = round(c, R.color.card, 0, 28);
+        bg.setStroke(Math.max(1, dp(c, 1) / 2 + 1), color(c, R.color.border));
+        l.setBackground(bg);
+        l.setClipToOutline(true);
+        return l;
+    }
+
+    static LinearLayout.LayoutParams groupParams(Context c) {
+        LinearLayout.LayoutParams lp = matchWrap();
+        lp.leftMargin = lp.rightMargin = dp(c, 16);
+        lp.bottomMargin = dp(c, 14);
+        return lp;
+    }
+
+    /** 分组标题（卡片上方的灰字）。 */
+    static TextView groupTitle(Context c, String s) {
+        TextView t = text(c, s, 15, R.color.text3);
+        t.setPadding(dp(c, 32), dp(c, 14), dp(c, 32), dp(c, 8));
+        return t;
+    }
+
+    /** 卡片里的一行：图标 + 标题（可选说明）+ 右边的值 + 箭头/下拉符号。trailing：0 无，1 “›”，2 “⌄”。 */
+    static LinearLayout groupRow(Context c, int icon, CharSequence title, CharSequence sub, CharSequence value, int trailing, View.OnClickListener l) {
+        LinearLayout row = hbox(c);
+        row.setMinimumHeight(dp(c, sub == null ? 64 : 76));
+        row.setPadding(dp(c, icon == 0 ? 24 : 20), dp(c, 10), dp(c, 18), dp(c, 10));
+        if (icon != 0) {
+            ImageView ic = icon(c, icon, R.color.text, 24);
+            LinearLayout.LayoutParams il = (LinearLayout.LayoutParams) ic.getLayoutParams();
+            il.rightMargin = dp(c, 18);
+            row.addView(ic, il);
+        }
+        LinearLayout tx = vbox(c);
+        TextView t = text(c, title, 17, R.color.text);
+        tx.addView(t);
+        if (sub != null) {
+            TextView s = text(c, sub, 13, R.color.text3);
+            tx.addView(s, matchWrap(c, 2));
+        }
+        row.addView(tx, weight1());
+        if (value != null) {
+            TextView v = text(c, value, 16, R.color.text3);
+            v.setSingleLine();
+            v.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            v.setMaxWidth(dp(c, 190));
+            v.setTag("value");
+            LinearLayout.LayoutParams vl = wrap();
+            vl.leftMargin = dp(c, 12);
+            row.addView(v, vl);
+        }
+        if (trailing != 0) {
+            ImageView ch = icon(c, trailing == 1 ? R.drawable.ic_chevron_right : R.drawable.ic_chev_down, R.color.text2, trailing == 1 ? 22 : 20);
+            LinearLayout.LayoutParams cl = (LinearLayout.LayoutParams) ch.getLayoutParams();
+            cl.leftMargin = dp(c, 8);
+            ch.setTag("chevron");
+            row.addView(ch, cl);
+        }
+        row.setContentDescription(title + (value == null ? "" : "：" + value));
+        if (l != null) {
+            ripple(row, false);
+            row.setOnClickListener(l);
+        }
+        return row;
+    }
+
+    /** 卡片里行与行之间的细线（左边让开图标）。 */
+    static View groupDivider(Context c, boolean afterIcon) {
+        View v = new View(c);
+        v.setBackgroundColor(color(c, R.color.border));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, dp(c, 1) / 2 + 1));
+        lp.leftMargin = dp(c, afterIcon ? 62 : 24);
+        lp.rightMargin = dp(c, 18);
+        v.setLayoutParams(lp);
+        return v;
+    }
+
+    /** ChatGPT 那种黑色胶囊开关。 */
+    static com.google.android.material.materialswitch.MaterialSwitch toggle(Context c, boolean on, android.widget.CompoundButton.OnCheckedChangeListener l) {
+        com.google.android.material.materialswitch.MaterialSwitch s = new com.google.android.material.materialswitch.MaterialSwitch(c);
+        int[][] states = {{android.R.attr.state_checked}, {}};
+        s.setTrackTintList(new ColorStateList(states, new int[]{color(c, R.color.primary), color(c, R.color.border)}));
+        s.setThumbTintList(new ColorStateList(states, new int[]{color(c, R.color.on_primary), color(c, R.color.card)}));
+        s.setTrackDecorationTintList(ColorStateList.valueOf(0x00000000));
+        s.setChecked(on);
+        s.setOnCheckedChangeListener(l);
+        return s;
+    }
+
     static LinearLayout vbox(Context c) {
         LinearLayout l = new LinearLayout(c);
         l.setOrientation(LinearLayout.VERTICAL);

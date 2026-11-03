@@ -153,7 +153,7 @@ public final class SetupActivity extends AppCompatActivity implements CodexRunti
             case READY:
                 if (rt.prefs.workspace() == null) show("workspace");
                 else {
-                    startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
+                    startActivity(new Intent(this, ChatActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
                     finish();
                 }
                 break;
@@ -713,7 +713,7 @@ public final class SetupActivity extends AppCompatActivity implements CodexRunti
             }
             rt.prefs.setWorkspace(path);
             Workspaces.remember(this, path);
-            startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
+            startActivity(new Intent(this, ChatActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
             finish();
         }), Ui.matchWrap());
     }

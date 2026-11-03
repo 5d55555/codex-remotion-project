@@ -74,6 +74,37 @@ public final class Prefs {
         p.edit().putBoolean("work_mode", b).apply();
     }
 
+    /** 强调色（Ui.ACCENT_NAMES 的下标）。 */
+    public int accent() {
+        return p.getInt("accent", 0);
+    }
+
+    public void setAccent(int i) {
+        p.edit().putInt("accent", i).apply();
+    }
+
+    /** 抽屉里置顶的会话（换行分隔的 thread id）。 */
+    public java.util.List<String> pinned() {
+        java.util.List<String> l = new java.util.ArrayList<>();
+        for (String s : p.getString("pinned", "").split("\n")) if (!s.isEmpty()) l.add(s);
+        return l;
+    }
+
+    public void setPinned(java.util.List<String> ids) {
+        p.edit().putString("pinned", String.join("\n", ids)).apply();
+    }
+
+    /** 开发工具：用户选装的工具集（逗号分隔的 id）。 */
+    public java.util.Set<String> bundles() {
+        java.util.Set<String> s = new java.util.LinkedHashSet<>();
+        for (String x : p.getString("bundles", "").split(",")) if (!x.isEmpty()) s.add(x);
+        return s;
+    }
+
+    public void setBundles(java.util.Set<String> s) {
+        p.edit().putString("bundles", String.join(",", s)).apply();
+    }
+
     public boolean userCa() {
         return p.getBoolean("user_ca", false);
     }

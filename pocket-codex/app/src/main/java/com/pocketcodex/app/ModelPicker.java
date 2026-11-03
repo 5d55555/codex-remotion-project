@@ -4,10 +4,8 @@ import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -292,41 +290,18 @@ final class ModelPicker {
         }
     }
 
-    /** 下拉卡片：右对齐、底边贴着这一行的上沿；太高就滚动。 */
+    /** 下拉卡片：右对齐、在这一行上方（ChatGPT 的模型面板就是往上弹）。 */
     private static void openDropdown(Overlay sheetOv, View row, ImageView chev, List<Option> opts, Runnable picked, String label) {
         AppCompatActivity a = sheetOv.a;
-        Overlay dd = new Overlay(a, false);
-        LinearLayout card = Overlay.card(a, 28);
-        card.setPadding(0, Ui.dp(a, 8), 0, Ui.dp(a, 8));
-        ScrollView sv = new ScrollView(a);
-        LinearLayout list = Ui.vbox(a);
+        List<Overlay.Opt> l = new ArrayList<>();
         for (Option o : opts) {
-            list.addView(Overlay.optionRow(a, o.title, o.sub, o.checked, o.enabled, x -> {
-                dd.close();
-                if (o.pick == null && "权限".equals(label)) { // 完全自动：先确认
-                    confirmAuto(a, picked);
-                    return;
-                }
-                if (o.pick != null) o.pick.run();
+            Runnable r = o.pick == null && "权限".equals(label) ? () -> confirmAuto(a, picked) : o.pick == null ? null : () -> {
+                o.pick.run();
                 picked.run();
-            }), Ui.matchWrap());
+            };
+            l.add(new Overlay.Opt(o.title, o.sub, o.checked, o.enabled, r));
         }
-        sv.addView(list);
-        card.addView(sv);
-        int[] b = dd.boundsOf(row);
-        int w = Math.max(Ui.dp(a, 230), Math.round(dd.layerWidth() * 0.62f));
-        int maxH = Math.max(Ui.dp(a, 160), b[1] - Ui.dp(a, 24));
-        card.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-        int h = Math.min(card.getMeasuredHeight(), maxH);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(w, h, Gravity.TOP | Gravity.START);
-        lp.leftMargin = Math.max(Ui.dp(a, 12), b[2] - w);
-        lp.topMargin = Math.max(Ui.dp(a, 12), b[1] - h + Ui.dp(a, 6));
-        card.setPivotX(w);
-        card.setPivotY(h);
-        dd.add(card, lp);
-        chev.setRotation(180);
-        dd.onClose(() -> chev.setRotation(0));
-        dd.show();
+        Overlay.dropdown(a, row, l, false, chev, null);
     }
 
     private static void confirmAuto(AppCompatActivity a, Runnable picked) {

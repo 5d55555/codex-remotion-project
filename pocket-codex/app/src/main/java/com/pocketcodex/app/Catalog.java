@@ -51,6 +51,16 @@ final class Catalog {
                     return R.drawable.ic_sparkle;
                 case "skill-installer":
                     return R.drawable.ic_download;
+                case "pocket-apk-build":
+                    return R.drawable.ic_android_line;
+                case "pocket-apk-test":
+                    return R.drawable.ic_bug_line;
+                case "pocket-reverse":
+                    return R.drawable.ic_code_line;
+                case "pocket-media":
+                    return R.drawable.ic_film_line;
+                case "pocket-toolkit":
+                    return R.drawable.ic_box_line;
                 default:
                     break;
             }

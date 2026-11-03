@@ -56,11 +56,17 @@ public final class OpenPgp {
 
     private static List<Key> builtin;
 
+    /** 诊断用：内置公钥能不能读出来（发布版出过资源路径的问题）。 */
+    public static int builtinKeyCount() throws IOException {
+        return builtinKeys().size();
+    }
+
     static synchronized List<Key> builtinKeys() throws IOException {
         if (builtin == null) {
             List<Key> keys = new ArrayList<>();
             for (String name : KEYRING) {
-                try (InputStream in = OpenPgp.class.getResourceAsStream("keyring/" + name + ".gpg")) {
+                // 绝对路径：发布版经过 R8，这个类会被改名换包，相对路径就找不到资源了（v0.2 真机报“缺少内置公钥”）
+                try (InputStream in = OpenPgp.class.getResourceAsStream("/com/pocketcodex/core/keyring/" + name + ".gpg")) {
                     if (in == null) throw new IOException("缺少内置公钥 " + name);
                     keys.addAll(parseKeys(Installer.readAll(in, 1 << 20)));
                 }

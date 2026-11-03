@@ -1,0 +1,6 @@
+interface:
+  display_name: "剪辑与动画"
+  short_description: "ffmpeg 剪辑、字幕、GIF，逐帧生成动画"
+  default_prompt: "用 $pocket-media 把这段视频剪短并加上中文字幕。"
+policy:
+  allow_implicit_invocation: true

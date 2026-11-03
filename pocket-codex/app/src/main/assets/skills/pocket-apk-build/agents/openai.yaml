@@ -1,0 +1,6 @@
+interface:
+  display_name: "构建 APK"
+  short_description: "aapt2 + d8 + apksigner，或 Gradle 覆盖 aapt2"
+  default_prompt: "用 $pocket-apk-build 把这个项目打包成可安装的 APK。"
+policy:
+  allow_implicit_invocation: true

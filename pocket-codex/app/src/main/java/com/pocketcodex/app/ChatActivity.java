@@ -55,8 +55,8 @@ import java.util.concurrent.Executors;
  * </ul>
  * 新对话第一次发送时才创建 thread。回合运行中：空输入时发送键变成“停止”，有内容时是“追加”（turn/steer）。审批用底部弹窗。
  */
-public final class ChatActivity extends AppCompatActivity implements CodexRuntimeManager.Listener, CodexRuntimeManager.ConversationListener {
-    static final String EXTRA_THREAD = "thread", EXTRA_CWD = "cwd", EXTRA_DRAFT = "draft";
+public final class ChatActivity extends AppCompatActivity implements CodexRuntimeManager.Listener, CodexRuntimeManager.ConversationListener, SessionDrawer.Host {
+    static final String EXTRA_THREAD = "thread", EXTRA_CWD = "cwd", EXTRA_DRAFT = "draft", EXTRA_OPEN_DRAWER = "openDrawer";
     private static final int REQ_CAMERA = 11, REQ_PHOTOS = 12, REQ_FILE = 13, REQ_VOICE = 14, REQ_VOICE_SEND = 15;
 
     private CodexRuntimeManager rt;
@@ -82,8 +82,16 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
     private HorizontalScrollView attachScroll;
     private EditText input;
     private TextView modelChip;
-    private ImageView plusBtn, micBtn, sendIcon;
-    private FrameLayout sendBtn;
+    private ImageView plusBtn, micBtn, sendIcon, plusMini, micMini;
+    private FrameLayout sendBtn, voicePill;
+    private ImageView voiceIcon;
+    private TextView voiceText;
+    private LinearLayout bottomRow;
+    private FrameLayout frame;
+    // 左边拉出的会话抽屉
+    private androidx.drawerlayout.widget.DrawerLayout drawerLayout;
+    private SessionDrawer drawer;
+    private androidx.activity.OnBackPressedCallback drawerBack;
     private final List<Attachment> attachments = new ArrayList<>();
     // “@”面板（不拦截输入框的触摸）
     private FrameLayout mentionLayer;
@@ -123,6 +131,9 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
             String saved = getSharedPreferences("drafts", MODE_PRIVATE).getString(threadId, null);
             if (saved != null && draft == null) input.setText(saved);
         }
+        frame.requestFocus();
+        bindComposer();
+        if (b == null && getIntent().getBooleanExtra(EXTRA_OPEN_DRAWER, false)) drawerLayout.post(this::openDrawer);
     }
 
     @Override
@@ -168,8 +179,10 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
     /* ---------------- 布局 ---------------- */
 
     private View build() {
-        FrameLayout frame = new FrameLayout(this);
+        frame = new FrameLayout(this);
         frame.setFitsSystemWindows(true);
+        // 一进来不让输入框抢焦点：ChatGPT 的输入框收起时是一行，点了才展开
+        frame.setFocusableInTouchMode(true);
         // 很淡的从上到下的渐变（ChatGPT 空白页那种底部发灰）
         frame.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{color(R.color.bg), color(R.color.bg), color(R.color.bg_low)}));
         LinearLayout root = Ui.vbox(this);
@@ -276,7 +289,79 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         statusText.setGravity(Gravity.CENTER);
         statusText.setPadding(dp(16), 0, dp(16), dp(8));
         root.addView(statusText, Ui.matchWrap());
-        return frame;
+
+        drawerLayout = new androidx.drawerlayout.widget.DrawerLayout(this);
+        drawerLayout.addView(frame, new androidx.drawerlayout.widget.DrawerLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        drawer = new SessionDrawer(this, rt, this);
+        int dw = Math.min(dp(340), Math.round(getResources().getDisplayMetrics().widthPixels * 0.84f));
+        drawerLayout.addView(drawer.root, new androidx.drawerlayout.widget.DrawerLayout.LayoutParams(dw, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START));
+        drawerLayout.setScrimColor(color(R.color.scrim));
+        drawerBack = new androidx.activity.OnBackPressedCallback(false) {
+            @Override
+            public void handleOnBackPressed() {
+                closeDrawer();
+            }
+        };
+        getOnBackPressedDispatcher().addCallback(this, drawerBack);
+        drawerLayout.addDrawerListener(new androidx.drawerlayout.widget.DrawerLayout.SimpleDrawerListener() {
+            @Override
+            public void onDrawerOpened(View v) {
+                drawerBack.setEnabled(true);
+            }
+
+            @Override
+            public void onDrawerClosed(View v) {
+                drawerBack.setEnabled(false);
+            }
+
+            @Override
+            public void onDrawerStateChanged(int state) {
+                if (state != androidx.drawerlayout.widget.DrawerLayout.STATE_IDLE && !drawerLayout.isDrawerOpen(Gravity.START)) {
+                    hideKeyboard();
+                    hideMention();
+                    rt.refreshThreads();
+                    drawer.bind();
+                }
+            }
+        });
+        return drawerLayout;
+    }
+
+    /* ---------------- 抽屉（SessionDrawer.Host） ---------------- */
+
+    void openDrawer() {
+        hideKeyboard();
+        hideMention();
+        rt.refreshThreads();
+        drawer.bind();
+        drawerLayout.openDrawer(Gravity.START, Overlay.animate);
+        drawerBack.setEnabled(true);
+    }
+
+    @Override
+    public void closeDrawer() {
+        drawerLayout.closeDrawer(Gravity.START, Overlay.animate);
+        drawerBack.setEnabled(false);
+    }
+
+    @Override
+    public void openThread(CodexRuntimeManager.ThreadSummary t) {
+        startActivity(new Intent(this, ChatActivity.class).putExtra(EXTRA_THREAD, t.id).putExtra(EXTRA_CWD, t.cwd));
+        overridePendingTransition(0, 0);
+        finish();
+    }
+
+    @Override
+    public void newChat() {
+        if (fresh() && attachments.isEmpty() && input.getText().length() == 0) return;
+        startActivity(new Intent(this, ChatActivity.class).putExtra(EXTRA_CWD, rt.prefs.workspace()));
+        overridePendingTransition(0, 0);
+        finish();
+    }
+
+    @Override
+    public String currentThreadId() {
+        return threadId;
     }
 
     private LinearLayout.LayoutParams composerParams() {
@@ -289,7 +374,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
 
     private View buildTopBar() {
         FrameLayout bar = new FrameLayout(this);
-        ImageView menu = Ui.roundButton(this, R.drawable.ic_menu, "会话列表", v -> openSessions());
+        ImageView menu = Ui.roundButton(this, R.drawable.ic_menu, "会话列表", v -> openDrawer());
         FrameLayout.LayoutParams ml = new FrameLayout.LayoutParams(dp(46), dp(46), Gravity.START | Gravity.CENTER_VERTICAL);
         ml.leftMargin = dp(14);
         bar.addView(menu, ml);
@@ -376,15 +461,19 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         attachScroll.addView(attachRow);
         attachScroll.setVisibility(View.GONE);
         composer.addView(attachScroll, Ui.matchWrap());
+        // 第一行：收起时是“＋ 输入框 麦克风 语音”，展开时只剩输入框
+        LinearLayout topRow = Ui.hbox(this);
+        plusMini = Ui.plainIcon(this, R.drawable.ic_plus, R.color.text, 46, "添加照片、文件和插件", v -> plusMenu());
+        plusMini.setPadding(dp(10), dp(10), dp(10), dp(10));
+        LinearLayout.LayoutParams pml = (LinearLayout.LayoutParams) plusMini.getLayoutParams();
+        pml.leftMargin = dp(8);
+        topRow.addView(plusMini, pml);
         input = new EditText(this);
         input.setTextSize(17);
-        input.setMinLines(1);
-        input.setMaxLines(8);
-        input.setMinHeight(dp(48));
+        input.setMinHeight(dp(52));
         input.setTextColor(color(R.color.text));
         input.setHintTextColor(color(R.color.text3));
         input.setBackground(null);
-        input.setPadding(dp(20), dp(16), dp(20), dp(2));
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         input.addTextChangedListener(new TextWatcher() {
             @Override
@@ -409,36 +498,113 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
             }
             return false;
         });
-        composer.addView(input, Ui.matchWrap());
-        LinearLayout row = Ui.hbox(this);
-        row.setPadding(dp(8), dp(2), dp(10), dp(10));
+        input.setOnFocusChangeListener((v, has) -> bindComposer());
+        topRow.addView(input, Ui.weight1());
+        micMini = Ui.plainIcon(this, R.drawable.ic_mic, R.color.text, 46, "语音输入", v -> dictate(false));
+        micMini.setPadding(dp(11), dp(11), dp(11), dp(11));
+        topRow.addView(micMini);
+        voicePill = new FrameLayout(this);
+        LinearLayout vp = Ui.hbox(this);
+        vp.setGravity(Gravity.CENTER);
+        voiceIcon = new ImageView(this);
+        vp.addView(voiceIcon, new LinearLayout.LayoutParams(dp(22), dp(22)));
+        voiceText = Ui.text(this, "语音", 16, R.color.text);
+        voiceText.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        LinearLayout.LayoutParams vtl = Ui.wrap();
+        vtl.leftMargin = dp(6);
+        vp.addView(voiceText, vtl);
+        voicePill.addView(vp, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
+        voicePill.setPadding(dp(14), 0, dp(16), 0);
+        Ui.ripple(voicePill, false);
+        LinearLayout.LayoutParams vpl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44));
+        vpl.leftMargin = dp(4);
+        vpl.rightMargin = dp(8);
+        topRow.addView(voicePill, vpl);
+        LinearLayout.LayoutParams trl = Ui.matchWrap();
+        trl.topMargin = trl.bottomMargin = dp(4);
+        composer.addView(topRow, trl);
+        // 第二行（展开时）：＋ …… 模型标签 麦克风 发送
+        bottomRow = Ui.hbox(this);
+        bottomRow.setPadding(dp(8), 0, dp(10), dp(10));
         plusBtn = Ui.plainIcon(this, R.drawable.ic_plus, R.color.text, 46, "添加照片、文件和插件", v -> plusMenu());
         plusBtn.setPadding(dp(10), dp(10), dp(10), dp(10));
-        row.addView(plusBtn);
+        bottomRow.addView(plusBtn);
         // 占位要给固定高度：WRAP_CONTENT 的空 View 在 AT_MOST 下会撑满全部高度
-        row.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+        bottomRow.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
         modelChip = Overlay.strong(this, "", 15);
         modelChip.setPadding(dp(12), dp(8), dp(10), dp(8));
         modelChip.setGravity(Gravity.CENTER_VERTICAL);
         modelChip.setCompoundDrawablePadding(dp(4));
-        modelChip.setBackground(Ui.round(this, android.R.color.transparent, 0, 18));
         Ui.ripple(modelChip, false);
         modelChip.setOnClickListener(v -> openModelSheet());
-        row.addView(modelChip);
+        bottomRow.addView(modelChip);
         micBtn = Ui.plainIcon(this, R.drawable.ic_mic, R.color.text, 46, "语音输入", v -> dictate(false));
         micBtn.setPadding(dp(11), dp(11), dp(11), dp(11));
         LinearLayout.LayoutParams mcl = (LinearLayout.LayoutParams) micBtn.getLayoutParams();
         mcl.leftMargin = dp(2);
-        row.addView(micBtn, mcl);
+        bottomRow.addView(micBtn, mcl);
         sendBtn = new FrameLayout(this);
         sendIcon = new ImageView(this);
         sendBtn.addView(sendIcon, new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
         Ui.ripple(sendBtn, true);
         LinearLayout.LayoutParams sbl = new LinearLayout.LayoutParams(dp(42), dp(42));
         sbl.leftMargin = dp(6);
-        row.addView(sendBtn, sbl);
-        composer.addView(row, Ui.matchWrap());
+        bottomRow.addView(sendBtn, sbl);
+        composer.addView(bottomRow, Ui.matchWrap());
+        // 键盘收起、输入框是空的：把焦点还给页面，输入框收回一行
+        composer.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+            if (!input.hasFocus() || input.getText().length() > 0 || !attachments.isEmpty()) return;
+            androidx.core.view.WindowInsetsCompat ins = androidx.core.view.ViewCompat.getRootWindowInsets(composer);
+            if (ins != null && imeWasVisible && !ins.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())) {
+                imeWasVisible = false;
+                frame.requestFocus();
+            } else if (ins != null && ins.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())) {
+                imeWasVisible = true;
+            }
+        });
         return composer;
+    }
+
+    private boolean imeWasVisible;
+
+    /** 输入框收起（一行，ChatGPT 未聚焦时的样子）还是展开（两行，带模型标签和发送键）。 */
+    private boolean expanded() {
+        return input.hasFocus() || input.getText().length() > 0 || !attachments.isEmpty();
+    }
+
+    private void bindComposer() {
+        if (bottomRow == null) return;
+        boolean ex = expanded();
+        bottomRow.setVisibility(ex ? View.VISIBLE : View.GONE);
+        plusMini.setVisibility(ex ? View.GONE : View.VISIBLE);
+        micMini.setVisibility(ex ? View.GONE : View.VISIBLE);
+        voicePill.setVisibility(ex ? View.GONE : View.VISIBLE);
+        input.setMaxLines(ex ? 8 : 1);
+        input.setPadding(dp(ex ? 20 : 6), dp(ex ? 14 : 6), dp(ex ? 20 : 4), dp(ex ? 2 : 6));
+        // 收起时右边的胶囊：空闲 = 语音（说完直接发送）；运行中 = 停止
+        boolean running = conv != null && conv.running();
+        boolean ready = rt.stage == CodexRuntimeManager.Stage.READY;
+        if (running) {
+            voicePill.setBackground(Ui.round(this, R.color.primary, 0, 22));
+            voiceIcon.setImageResource(R.drawable.ic_stop_square);
+            voiceIcon.setImageTintList(android.content.res.ColorStateList.valueOf(color(R.color.on_primary)));
+            voiceText.setText("停止");
+            voiceText.setTextColor(color(R.color.on_primary));
+            voicePill.setContentDescription("停止");
+            voicePill.setOnClickListener(stopping ? null : v -> stopTurn());
+        } else {
+            GradientDrawable d = new GradientDrawable();
+            d.setColor(ready ? Ui.accent(this) : color(R.color.icon_circle));
+            d.setCornerRadius(dp(22));
+            voicePill.setBackground(d);
+            int fg = ready ? Ui.onAccent(this) : color(R.color.text3);
+            voiceIcon.setImageResource(R.drawable.ic_wave);
+            voiceIcon.setImageTintList(android.content.res.ColorStateList.valueOf(fg));
+            voiceText.setText("语音");
+            voiceText.setTextColor(fg);
+            voicePill.setContentDescription("语音输入并发送");
+            voicePill.setOnClickListener(ready ? v -> dictate(true) : null);
+        }
     }
 
     /* ---------------- 生命周期 ---------------- */
@@ -448,7 +614,9 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         super.onStart();
         rt.addListener(this);
         rt.addConversationListener(this);
-        if (rt.stage == CodexRuntimeManager.Stage.CHECKING) rt.check();
+        if (rt.stage == CodexRuntimeManager.Stage.CHECKING || rt.stage == CodexRuntimeManager.Stage.ERROR && !rt.serverAlive()) rt.check();
+        else if (rt.stage == CodexRuntimeManager.Stage.READY) rt.refreshThreads();
+        if (needsSetup()) return;
         attach();
         bindAll();
         if (conv != null) { // 回到页面：还挂着的审批/提问重新弹出来
@@ -498,8 +666,22 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         showPending(true);
     }
 
+    /** 没装好、没登录、没选工作区：去首次设置（App 现在一打开就是新对话，所以这里也要判断）。 */
+    private boolean needsSetup() {
+        CodexRuntimeManager.Stage s = rt.stage;
+        if (s == CodexRuntimeManager.Stage.NOT_INSTALLED || s == CodexRuntimeManager.Stage.NEED_LOGIN || s == CodexRuntimeManager.Stage.INSTALL_FAILED
+                || rt.prefs.workspace() == null) {
+            startActivity(new Intent(this, SetupActivity.class));
+            finish();
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public void onRuntimeChanged() {
+        if (needsSetup()) return;
+        if (drawer != null && drawerLayout.isDrawerOpen(Gravity.START)) drawer.bind();
         attach();
         bindStatus();
         if (mentionStart >= 0) renderMention(); // 技能/插件列表可能刚加载好
@@ -698,6 +880,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         else if (running) hint = hasContent ? "追加的内容会加入正在进行的这一轮" : "点 ■ 可以随时停止";
         else if (conv != null && "interrupted".equals(conv.turnStatus)) hint = "已发生的文件改动会保留";
         else hint = "";
+        bindComposer();
         if (!loading) statusText.setText(hint);
         statusText.setVisibility(statusText.getText().length() == 0 ? View.GONE : View.VISIBLE);
         if (suggestScroll != null && suggestScroll.getVisibility() == View.VISIBLE && (hasContent || !fresh)) suggestScroll.setVisibility(View.GONE);
@@ -711,9 +894,9 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
     }
 
     private void setSend(int icon, int bgRes, int tintRes, boolean enabled, String desc, View.OnClickListener l) {
-        sendBtn.setBackground(Ui.circle(this, bgRes));
+        sendBtn.setBackground(bgRes == R.color.accent ? Ui.circleColor(Ui.accent(this)) : Ui.circle(this, bgRes));
         sendIcon.setImageResource(icon);
-        sendIcon.setImageTintList(android.content.res.ColorStateList.valueOf(color(tintRes)));
+        sendIcon.setImageTintList(android.content.res.ColorStateList.valueOf(tintRes == R.color.on_accent ? Ui.onAccent(this) : color(tintRes)));
         sendBtn.setEnabled(enabled);
         sendBtn.setContentDescription(desc);
         sendBtn.setOnClickListener(enabled ? l : null);
@@ -780,7 +963,8 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         bindAll();
     }
 
-    private void chooseWorkspace() {
+    @Override
+    public void chooseWorkspace() {
         final List<String> l = Workspaces.list(this);
         String cur = rt.prefs.workspace();
         if (cur != null && !l.contains(cur)) l.add(0, cur);
@@ -1326,13 +1510,6 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         bindStatus();
     }
 
-    private void openSessions() {
-        Intent i = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_SESSIONS);
-        startActivity(i);
-        finish();
-    }
-
     private void rename() {
         if (threadId == null) return;
         final EditText et = new EditText(this);
@@ -1359,8 +1536,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         card.setPadding(0, dp(8), 0, dp(8));
         card.addView(Overlay.iconRow(this, R.drawable.ic_compose, "新对话", R.color.text, v -> {
             ov.close();
-            startActivity(new Intent(this, ChatActivity.class).putExtra(EXTRA_CWD, rt.prefs.workspace()));
-            finish();
+            newChat();
         }));
         if (threadId != null) card.addView(Overlay.iconRow(this, R.drawable.ic_pen, "重命名", R.color.text, v -> {
             ov.close();

@@ -51,6 +51,13 @@ final class Diagnostics {
         step(r, "系统命令", run(listOf(new File(l.binDir, "bash").getAbsolutePath(), "-lc", "ls / | head -3; grep --version 2>&1 | head -1; sed --version 2>&1 | head -1"), env, rt.paths.home, 10));
         step(r, "写临时文件", run(listOf(new File(l.binDir, "bash").getAbsolutePath(), "-lc", "echo hi > \"$TMPDIR/diag.txt\" && cat \"$TMPDIR/diag.txt\" && rm \"$TMPDIR/diag.txt\""), env, rt.paths.home, 10));
         // 开发工具包：node、npm、git、python、pkg（本机通道）
+        Result keys;
+        try {
+            keys = new Result(0, com.pocketcodex.core.OpenPgp.builtinKeyCount() + " 把");
+        } catch (Exception e) {
+            keys = new Result(-1, String.valueOf(e.getMessage()));
+        }
+        step(r, "软件源签名公钥（内置）", keys);
         CodexRuntimeManager.ToolkitState ts = rt.toolkitState;
         r.append("开发工具包：").append(ts == CodexRuntimeManager.ToolkitState.READY ? "可用" : ts == CodexRuntimeManager.ToolkitState.INSTALLING ? "正在安装" : ts == CodexRuntimeManager.ToolkitState.BROKEN ? "自检没通过" : ts == CodexRuntimeManager.ToolkitState.FAILED ? "安装失败" : "未安装")
                 .append(rt.toolkitError == null ? "" : "（" + rt.toolkitError + "）").append('\n');
@@ -61,6 +68,8 @@ final class Diagnostics {
             step(r, "python3 / pip", run(listOf(sh, "-lc", "python3 -c 'import ssl,sqlite3,sys;print(sys.version.split()[0])' && pip -V | cut -c1-40"), env, rt.paths.home, 60));
             step(r, "#!/usr/bin/env（termux-exec）", run(listOf(sh, "-lc", "printf '#!/usr/bin/env node\\nconsole.log(1+1)\\n' > \"$TMPDIR/d.js\" && chmod +x \"$TMPDIR/d.js\" && \"$TMPDIR/d.js\"; rm -f \"$TMPDIR/d.js\""), env, rt.paths.home, 30));
             step(r, "pkg 命令（本机通道）", run(listOf(sh, "-lc", "pkg list-installed | wc -l"), env, rt.paths.home, 30));
+            step(r, "工具集里的命令", run(listOf(sh, "-lc", "for c in java ffmpeg adb apktool jadx r2 gh magick; do command -v $c >/dev/null && printf '%s ' $c; done; echo"), env, rt.paths.home, 20));
+            step(r, "技能（~/.agents/skills）", run(listOf(sh, "-lc", "ls \"$HOME/.agents/skills\" 2>/dev/null | tr '\\n' ' '"), env, rt.paths.home, 10));
         }
         step(r, "Java 网络（chatgpt.com）", httpCheck("https://chatgpt.com/"));
         step(r, "CA 证书", rt.paths.caFile.isFile() ? new Result(0, rt.paths.caFile.length() / 1024 + " KB") : new Result(-1, "没有导出"));

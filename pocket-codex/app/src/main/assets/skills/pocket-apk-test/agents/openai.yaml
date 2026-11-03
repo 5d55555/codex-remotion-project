@@ -1,0 +1,6 @@
+interface:
+  display_name: "测试 APK"
+  short_description: "无线调试自连 adb：安装、截图、点击、抓崩溃"
+  default_prompt: "用 $pocket-apk-test 把刚构建的 APK 装到这台手机上测一遍。"
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "手机开发环境"
+  short_description: "有哪些工具、怎么装、MCP 和技能怎么加"
+  default_prompt: "用 $pocket-toolkit 看看这台手机上能用哪些开发工具。"
+policy:
+  allow_implicit_invocation: true

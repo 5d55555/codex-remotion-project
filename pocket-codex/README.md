@@ -4,6 +4,16 @@
 
 独立开发的客户端，使用官方发布的 Codex CLI，与 OpenAI 无官方隶属关系。
 
+## v0.3 更新（2026-11-03）
+
+- **修好“开发工具 → 安装没有完成：软件源签名验证失败：缺少内置公钥 termux-autobuilds”**：发布版经过 R8，验签类被改名换包，按相对路径找不到内置公钥。改成绝对路径；自检与诊断里加了“软件源签名公钥（内置）”一项。用当天的官方源和中科大镜像 InRelease 验过签。
+- **打开就是新对话**（和 ChatGPT 一样）；会话列表改成**从左边拉出的抽屉**：品牌名 + 搜索、文件 / 终端 / 工作区 / 开发工具 / 用量、置顶和聊天两组（长按：置顶、重命名、归档）、底部蓝色“新对话”胶囊和圆形设置键。
+- **输入框收起时是一行**：＋、提示文字、麦克风、蓝色“语音”胶囊（运行中变成“停止”）；点进去才展开成两行（模型标签、发送键）。
+- **设置页按 ChatGPT 设置页重做**：头像和账号、分组圆角卡片（图标 + 值 + ›/⌄）、下拉卡片、黑色开关、底部“搜索设置”；外观、**强调色**（蓝/绿/紫/橙/粉/黑）、权限、工作区、重启 Codex。**文件页**同样风格（路径胶囊、分组列表、搜索这个文件夹）。用量改成底部面板 + 进度条。
+- **工具集**（设置 → 开发工具，一组一组装，包名都对过 Termux 官方索引）：常用全家桶（约 469 MB）、代码与 Git 增强、APK 构建与测试（OpenJDK 21、aapt/aapt2、d8、ecj、apksigner、adb）、逆向分析（apktool、jadx、dex2jar、radare2、binutils、gdb、strace、binwalk、yara、capstone）、剪辑与程序化动画（ffmpeg、ImageMagick、sox、gifski、rsvg、Pillow、NumPy）、中文字体、C/C++ 编译、Gradle 与 Kotlin、更多编程语言。
+- **内置技能**（复制到 `~/.agents/skills/`，在 @ 里能选）：手机开发环境、构建 APK、测试 APK（无线调试让手机自己 adb 连自己）、逆向分析（含 leanrea / REA / r2mcp / jadx-headless-mcp 的接入说明）、剪辑与动画。
+- **config.toml 不再整份覆盖**：只重写开头那几行，Agent 或 REA 安装向导加的 `[mcp_servers.*]` 会保留（用真实 codex 0.166 的配置检查验证过）；设置里加了“重启 Codex”。
+
 ## v0.2 更新（2026-11-03）
 
 - **界面按 ChatGPT 手机端重做**：白底、近黑主色、圆形顶栏按钮；新对话顶部“聊天 / 工作”分段；底部大圆角输入卡片——“＋”、模型标签（如“6.1 Sol 中”）、麦克风、蓝色圆形发送键（空输入时是“语音输入并发送”，运行中变成黑色停止键）。
@@ -16,7 +26,7 @@
 
 ## 怎么用
 
-1. 安装 APK（`口袋工坊-v0.2.apk`）。安卓可能提示“此应用专为旧版 Android 打造”或 Play Protect 警告：这是 targetSdk 28 的缘故（见下面“为什么是 targetSdk 28”），选“仍然安装”。
+1. 安装 APK（`口袋工坊-v0.3.apk`）。安卓可能提示“此应用专为旧版 Android 打造”或 Play Protect 警告：这是 targetSdk 28 的缘故（见下面“为什么是 targetSdk 28”），选“仍然安装”。
 2. **安装 Codex CLI**：点“下载并安装”。从 npm 官方仓库（或国内镜像 npmmirror，安装包会和官方摘要比对）下载 `@openai/codex` 的 Linux 平台包（arm64 约 164 MB），断点续传、sha512 校验，只解出 `codex` 和 `codex-code-mode-host` 两个程序（约 350 MB），先在手机上自检 `codex --version`，通过才启用。
 3. **登录**：App 在后台运行 `codex login --device-auth`，输出重定向到文件（`<应用目录>/runtime/logs/device-auth.log`），从里面解析出网址和一次性代码显示出来。点“复制代码并打开浏览器”，在 `auth.openai.com/codex/device` 输入代码、登录 ChatGPT。代码有效期 15 分钟，**过期前 20 秒自动换新代码**，页面倒计时环会提示；网络错误自动退避重试。也可以改用 API 密钥登录。
    - 如果网页提示设备码授权没开启：ChatGPT 网页版 → 设置 → 安全，开启 Codex 的设备码授权（团队账号可能要管理员允许）。
@@ -90,6 +100,7 @@ codex app-server（musl 静态程序，子进程）
 CODEX_BIN=<x64 codex> CODEX_AUTH=~/.codex/auth.json ./gradlew :core:test --tests '*CodexIntegrationTest*'
                                           # 真实 codex 0.166 经 LocalProxy：设备码拿到代码、app-server 开会话、每步确认下批准命令、文件真的写了
 ./gradlew :smoke:testDebugUnitTest        # Robolectric 真实 Activity 跑一遍各个状态并截图（smoke/shots/，浅色和深色）
+                                          # v0.3：10 抽屉、11 文件、12/12b/12c 设置（下拉、搜索）、13/13b 开发工具和工具集、19 用量、23 收起的输入框、23b 展开
                                           # v0.2 新增：23–33 号截图（新对话、聊天模式、＋菜单、@、附件、模型/推理/速度面板、对话、⋯菜单）、13 开发工具、17 终端、18 常用命令
 ./gradlew :app:assembleRelease            # 发布包（R8），测试签名 signing/test.jks
 ```
