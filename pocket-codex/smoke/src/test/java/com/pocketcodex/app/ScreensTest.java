@@ -3,6 +3,7 @@ package com.pocketcodex.app;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -55,6 +56,7 @@ public class ScreensTest {
     public void setUp() {
         Paths.abiOverride = "arm64-v8a";
         Overlay.animate = false;
+        Thumbs.synchronous = true; // 截图里要看到缩略图
         CodexRuntimeManager.resetForTest();
         rt = CodexRuntimeManager.get(RuntimeEnvironment.getApplication());
     }
@@ -583,6 +585,24 @@ public class ScreensTest {
         assertTrue(hasText(root, "有什么可以帮忙的？"));
         layout(a);
         shot("24_chat_new_chat", a);
+        // 聊天模式点发送：不走 Codex，二选一（网页版 / 官方 App）；网页版打开官方 chatgpt.com 并带上这句话
+        android.widget.EditText inChat = (android.widget.EditText) field(a, "input");
+        inChat.setText("你好");
+        idle();
+        java.lang.reflect.Method send = ChatActivity.class.getDeclaredMethod("onSend");
+        send.setAccessible(true);
+        send.invoke(a);
+        idle();
+        layout(a);
+        assertTrue(hasText(root, "ChatGPT 网页版"));
+        assertTrue(hasText(root, "ChatGPT App"));
+        shot("24b_chat_send_choice", a);
+        tap(root, "ChatGPT 网页版");
+        Intent web = org.robolectric.Shadows.shadowOf(a).getNextStartedActivity();
+        assertEquals(ChatGptWebActivity.class.getName(), web.getComponent().getClassName());
+        assertEquals("https://chatgpt.com/?q=%E4%BD%A0%E5%A5%BD", web.getStringExtra(ChatGptWebActivity.EXTRA_URL));
+        assertEquals("", inChat.getText().toString());
+        assertNull("聊天模式不应该创建 Codex 会话", field(a, "conv"));
         tap(root, "工作");
         assertTrue(rt.prefs.workMode());
         layout(a);

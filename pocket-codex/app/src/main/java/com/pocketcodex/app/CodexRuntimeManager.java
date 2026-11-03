@@ -1394,6 +1394,22 @@ public final class CodexRuntimeManager {
         return def != null ? def : models.isEmpty() ? null : models.get(0);
     }
 
+    /**
+     * 聊天模式用的模型：账号套餐的默认模型（model/list 里 isDefault 的那个，Plus 实测是 GPT-6.1-Sol，默认推理 low），
+     * 不跟随工作模式里选的模型（例如 GPT-6-Astra），也不用“快速”档（服务端标注会增加用量）。
+     */
+    public ModelInfo planModel() {
+        for (ModelInfo m : models) if (m.isDefault) return m;
+        return models.isEmpty() ? null : models.get(0);
+    }
+
+    /** 聊天模式的推理强度：套餐默认模型自己的默认值；没有就用最低一档。 */
+    static String chatEffort(ModelInfo m) {
+        if (m == null) return null;
+        if (m.defaultEffort != null && (m.efforts.isEmpty() || m.efforts.contains(m.defaultEffort))) return m.defaultEffort;
+        return m.efforts.isEmpty() ? null : m.efforts.get(0);
+    }
+
     public interface FileSearchCallback {
         void onFiles(String query, List<String[]> files);
     }
@@ -1583,8 +1599,13 @@ public final class CodexRuntimeManager {
             m.put("cwd", cwd);
             m.put("developerInstructions", chat ? CHAT_INSTRUCTIONS : developerInstructions(cwd));
         }
-        ModelInfo mi = currentModel();
-        if (prefs.model() != null && mi != null) m.put("model", mi.id);
+        if (chat) {
+            ModelInfo pm = planModel(); // 聊天：固定用套餐默认模型
+            if (pm != null) m.put("model", pm.id);
+        } else {
+            ModelInfo mi = currentModel();
+            if (prefs.model() != null && mi != null) m.put("model", mi.id);
+        }
         return m;
     }
 
@@ -1787,10 +1808,18 @@ public final class CodexRuntimeManager {
         boolean chat = isChatCwd(currentCwd(c));
         Map<String, Object> p = Json.map("threadId", c.threadId, "input", input, "clientUserMessageId", clientId,
                 "approvalPolicy", chat ? Prefs.MODE_CONFIRM : prefs.mode());
-        ModelInfo mi = currentModel();
-        if (prefs.model() != null && mi != null) p.put("model", mi.id);
-        if (prefs.effort() != null) p.put("effort", prefs.effort());
-        if (prefs.speed() != null && mi != null && mi.serviceTiers.contains(prefs.speed())) p.put("serviceTier", prefs.speed());
+        if (chat) {
+            // 聊天：套餐默认模型 + 它自己的默认推理强度，不用“快速”档；工作模式里选的模型和推理不影响聊天
+            ModelInfo pm = planModel();
+            if (pm != null) p.put("model", pm.id);
+            String ce = chatEffort(pm);
+            if (ce != null) p.put("effort", ce);
+        } else {
+            ModelInfo mi = currentModel();
+            if (prefs.model() != null && mi != null) p.put("model", mi.id);
+            if (prefs.effort() != null) p.put("effort", prefs.effort());
+            if (prefs.speed() != null && mi != null && mi.serviceTiers.contains(prefs.speed())) p.put("serviceTier", prefs.speed());
+        }
         runningThreadId = c.threadId;
         c.turnStatus = "inProgress";
         changed();

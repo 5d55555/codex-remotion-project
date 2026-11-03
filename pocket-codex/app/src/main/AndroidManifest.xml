@@ -39,6 +39,10 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".FileViewerActivity" android:exported="false" />
+        <!-- 聊天模式的网页版：官方 chatgpt.com。旋转不重建，免得网页重新加载 -->
+        <activity android:name=".ChatGptWebActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".FolderPickerActivity" android:exported="false" />
         <activity android:name=".DiagnosticsActivity" android:exported="false" />
         <activity

@@ -147,6 +147,8 @@ final class Attach {
         if (o.outWidth <= 0) return null;
         int s = 1;
         while (Math.min(o.outWidth, o.outHeight) / (s * 2) >= sizePx) s *= 2;
+        // 超长图（长截图）：短边够了长边还很长，再缩到长边不超过 4 倍目标尺寸，免得一张缩略图占几 MB
+        while (Math.max(o.outWidth, o.outHeight) / s > sizePx * 4) s *= 2;
         BitmapFactory.Options o2 = new BitmapFactory.Options();
         o2.inSampleSize = s;
         return BitmapFactory.decodeFile(path, o2);

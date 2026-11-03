@@ -43,9 +43,45 @@ public final class FileViewerActivity extends AppCompatActivity {
 
     private File file;
     private String text;
+    /** 拆好的行（后台算好）。 */
+    private List<String> lines;
+    /** Markdown 预览（后台解析好的结果）。 */
+    private android.text.Spanned rendered;
     private boolean diff, preview;
     private FrameLayout body;
     private TextView info;
+    /** 读文件、解码、拆行、解析 Markdown、分享前复制都在这里做，主线程只放结果。 */
+    private final java.util.concurrent.ExecutorService io = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "file-viewer");
+        t.setDaemon(true);
+        return t;
+    });
+
+    @Override
+    protected void onDestroy() {
+        io.shutdownNow();
+        super.onDestroy();
+    }
+
+    /** 回到主线程；页面已经关了就丢掉。 */
+    private void post(Runnable r) {
+        runOnUiThread(() -> {
+            if (!isFinishing() && !isDestroyed()) r.run();
+        });
+    }
+
+    private static List<String> splitLines(String text) {
+        List<String> out = new ArrayList<>();
+        int start = 0;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '\n') {
+                out.add(text.substring(start, i));
+                start = i + 1;
+            }
+        }
+        if (start < text.length() || out.isEmpty()) out.add(text.substring(start));
+        return out;
+    }
 
     @Override
     protected void onCreate(Bundle b) {
@@ -105,49 +141,71 @@ public final class FileViewerActivity extends AppCompatActivity {
     }
 
     private void load() {
-        if (file == null) {
-            text = getIntent().getStringExtra(EXTRA_TEXT);
-            if (text == null) text = "";
-            info.setText(diff ? "改动记录（不是文件的当前内容）" : "");
-            show();
-            return;
-        }
-        if (!file.isFile()) {
-            info.setText("");
-            message("文件已不存在");
-            return;
-        }
-        if (sensitive(this, file)) {
-            message("这个文件属于应用的运行目录（凭据、日志），不在这里显示。");
-            return;
-        }
-        byte[] data;
-        try (InputStream in = new FileInputStream(file)) {
-            int n = (int) Math.min(file.length(), LIMIT);
-            data = new byte[n];
-            int off = 0, r;
-            while (off < n && (r = in.read(data, off, n - off)) > 0) off += r;
-        } catch (IOException e) {
-            message("无法读取：" + e.getMessage());
-            return;
-        }
-        boolean truncated = file.length() > LIMIT;
-        for (int i = 0; i < Math.min(data.length, 8192); i++) {
-            if (data[i] == 0) {
-                info.setText(Format.mb(file.length()));
-                message("暂不支持预览此类文件（" + Format.mb(file.length()) + "）。可以用右上角“分享”用其他应用打开。");
+        message("正在读取…");
+        final File f = file;
+        final String extra = f == null ? getIntent().getStringExtra(EXTRA_TEXT) : null;
+        io.execute(() -> {
+            if (f == null) {
+                final String t = extra == null ? "" : extra;
+                final List<String> ls = splitLines(t);
+                post(() -> {
+                    text = t;
+                    lines = ls;
+                    info.setText(diff ? "改动记录（不是文件的当前内容）" : "");
+                    show();
+                });
                 return;
             }
-        }
-        try {
-            text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(truncated ? CodingErrorAction.REPLACE : CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(data)).toString();
-        } catch (CharacterCodingException e) {
-            message("无法按 UTF-8 解码这个文件。可以用“分享”交给其他应用打开。");
-            return;
-        }
-        info.setText("UTF-8 · " + (file.length() < 1024 ? file.length() + " B" : Format.mb(file.length())) + (truncated ? " · 只显示前 2 MB" : ""));
-        show();
+            if (!f.isFile()) {
+                post(() -> {
+                    info.setText("");
+                    message("文件已不存在");
+                });
+                return;
+            }
+            if (sensitive(this, f)) {
+                post(() -> message("这个文件属于应用的运行目录（凭据、日志），不在这里显示。"));
+                return;
+            }
+            final long len = f.length();
+            byte[] data;
+            try (InputStream in = new FileInputStream(f)) {
+                int n = (int) Math.min(len, LIMIT);
+                data = new byte[n];
+                int off = 0, r;
+                while (off < n && (r = in.read(data, off, n - off)) > 0) off += r;
+            } catch (IOException e) {
+                final String m = e.getMessage();
+                post(() -> message("无法读取：" + m));
+                return;
+            }
+            final boolean truncated = len > LIMIT;
+            for (int i = 0; i < Math.min(data.length, 8192); i++) {
+                if (data[i] == 0) {
+                    post(() -> {
+                        info.setText(Format.mb(len));
+                        message("暂不支持预览此类文件（" + Format.mb(len) + "）。可以用右上角“分享”用其他应用打开。");
+                    });
+                    return;
+                }
+            }
+            final String t;
+            try {
+                t = StandardCharsets.UTF_8.newDecoder().onMalformedInput(truncated ? CodingErrorAction.REPLACE : CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(data)).toString();
+            } catch (CharacterCodingException e) {
+                post(() -> message("无法按 UTF-8 解码这个文件。可以用“分享”交给其他应用打开。"));
+                return;
+            }
+            final List<String> ls = splitLines(t);
+            final String inf = "UTF-8 · " + (len < 1024 ? len + " B" : Format.mb(len)) + (truncated ? " · 只显示前 2 MB" : "");
+            post(() -> {
+                text = t;
+                lines = ls;
+                info.setText(inf);
+                show();
+            });
+        });
     }
 
     private void message(String m) {
@@ -158,26 +216,32 @@ public final class FileViewerActivity extends AppCompatActivity {
     }
 
     private void show() {
+        if (text == null) return; // 还在读
         body.removeAllViews();
         if (preview) {
             ScrollView sv = new ScrollView(this);
             TextView tv = Ui.body(this, "");
             tv.setTextIsSelectable(true);
             tv.setPadding(Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 16), Ui.dp(this, 32));
-            Markdown.get(this).setMarkdown(tv, text);
             sv.addView(tv);
             body.addView(sv);
+            final io.noties.markwon.Markwon mw = Markdown.get(this);
+            if (rendered != null) {
+                mw.setParsedMarkdown(tv, rendered);
+                return;
+            }
+            tv.setText("正在排版…");
+            final String src = text;
+            io.execute(() -> { // 解析放后台，主线程只把结果放上去
+                final android.text.Spanned sp = mw.toMarkdown(src);
+                post(() -> {
+                    rendered = sp;
+                    if (preview) show();
+                });
+            });
             return;
         }
-        final List<String> lines = new ArrayList<>();
-        int start = 0;
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) == '\n') {
-                lines.add(text.substring(start, i));
-                start = i + 1;
-            }
-        }
-        if (start < text.length() || lines.isEmpty()) lines.add(text.substring(start));
+        final List<String> lines = this.lines != null ? this.lines : splitLines(text);
         final int digits = String.valueOf(lines.size()).length();
         RecyclerView rv = new RecyclerView(this);
         rv.setLayoutManager(new LinearLayoutManager(this));
@@ -234,30 +298,40 @@ public final class FileViewerActivity extends AppCompatActivity {
     }
 
     private void share() {
-        if (sensitive(this, file)) {
-            Toast.makeText(this, "这个文件属于应用的运行目录，不能分享", Toast.LENGTH_LONG).show();
-            return;
-        }
-        try {
-            // 复制一份到分享专用的缓存目录再分享：FileProvider 只开放这个目录
-            File dir = new File(getCacheDir(), "share");
-            Installer_deleteTree(dir);
-            dir.mkdirs();
-            File copy = new File(dir, file.getName());
-            try (InputStream in = new FileInputStream(file); java.io.OutputStream out = new java.io.FileOutputStream(copy)) {
-                byte[] buf = new byte[64 * 1024];
-                int n;
-                while ((n = in.read(buf)) >= 0) out.write(buf, 0, n);
+        if (file == null) return;
+        final File src = file;
+        Toast.makeText(this, "正在准备分享…", Toast.LENGTH_SHORT).show();
+        io.execute(() -> { // 判断路径、复制整个文件都在后台
+            if (sensitive(this, src)) {
+                post(() -> Toast.makeText(this, "这个文件属于应用的运行目录，不能分享", Toast.LENGTH_LONG).show());
+                return;
             }
-            Uri u = FileProvider.getUriForFile(this, getPackageName() + ".files", copy);
-            String ext = MimeTypeMap.getFileExtensionFromUrl(file.getName());
-            String mime = ext == null ? null : MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.toLowerCase(Locale.ROOT));
-            Intent i = new Intent(Intent.ACTION_SEND).setType(mime == null ? "text/plain" : mime).putExtra(Intent.EXTRA_STREAM, u)
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(i, "分享 " + file.getName()));
-        } catch (Exception e) {
-            Toast.makeText(this, "无法分享：" + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
+            try {
+                // 复制一份到分享专用的缓存目录再分享：FileProvider 只开放这个目录。每次一个新子目录，旧的先清掉
+                File root = new File(getCacheDir(), "share");
+                Installer_deleteTree(root);
+                File dir = new File(root, String.valueOf(System.currentTimeMillis()));
+                dir.mkdirs();
+                File copy = new File(dir, src.getName());
+                try (InputStream in = new FileInputStream(src); java.io.OutputStream out = new java.io.FileOutputStream(copy)) {
+                    byte[] buf = new byte[64 * 1024];
+                    int n;
+                    while ((n = in.read(buf)) >= 0) {
+                        if (Thread.currentThread().isInterrupted()) throw new IOException("已取消");
+                        out.write(buf, 0, n);
+                    }
+                }
+                final Uri u = FileProvider.getUriForFile(this, getPackageName() + ".files", copy);
+                String ext = MimeTypeMap.getFileExtensionFromUrl(src.getName());
+                String mime = ext == null ? null : MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.toLowerCase(Locale.ROOT));
+                final Intent i = new Intent(Intent.ACTION_SEND).setType(mime == null ? "text/plain" : mime).putExtra(Intent.EXTRA_STREAM, u)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                post(() -> startActivity(Intent.createChooser(i, "分享 " + src.getName())));
+            } catch (Exception e) {
+                final String m = e.getMessage();
+                post(() -> Toast.makeText(this, "无法分享：" + m, Toast.LENGTH_LONG).show());
+            }
+        });
     }
 
     private static void Installer_deleteTree(File f) {

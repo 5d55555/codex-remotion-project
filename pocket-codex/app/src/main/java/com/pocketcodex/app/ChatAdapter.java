@@ -82,12 +82,17 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
 
     static final class VH extends RecyclerView.ViewHolder {
         final LinearLayout box;
+        /** 上次绑定时的签名（见 onBindViewHolder）；null = 运行中，每次都重绑。 */
+        String sig;
 
         VH(View v, LinearLayout box) {
             super(v);
             this.box = box;
         }
     }
+
+    /** 每张卡片被展开/收起的次数：签名的一部分，点了哪张就只重绑哪张。 */
+    private final Map<String, Integer> toggles = new HashMap<>();
 
     @Override
     public VH onCreateViewHolder(ViewGroup parent, int type) {
@@ -111,6 +116,12 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
     @Override
     public void onBindViewHolder(VH h, int pos) {
         Conversation.Item it = conv.items.get(pos);
+        // 已经结束的卡片：内容版本、展开状态、待审批、强调色、目录都没变，就保留现有视图，不再整张重建。
+        // 运行中的卡片（流式正文有限频缓存）每次都重绑，免得停在旧的一段。
+        String sig = it.running() ? null
+                : it.id + "|" + it.version + "|" + toggles.get(it.id) + "|" + hasPendingApproval(it.id) + "|" + Ui.accent(ctx) + "|" + cwd;
+        if (sig != null && sig.equals(h.sig)) return;
+        h.sig = sig;
         h.box.removeAllViews();
         h.box.setVisibility(View.VISIBLE);
         h.box.setBackground(null);
@@ -154,9 +165,7 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
             for (String p : it.images) {
                 ImageView iv = new ImageView(ctx);
                 iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                android.graphics.Bitmap bm = Attach.thumb(p, Ui.dp(ctx, 120));
-                if (bm != null) iv.setImageBitmap(bm);
-                else iv.setImageResource(R.drawable.ic_image);
+                Thumbs.load(iv, p, Ui.dp(ctx, 120), R.drawable.ic_image); // 后台解码，有缓存
                 iv.setBackground(Ui.round(ctx, R.color.surface2, 0, 18));
                 iv.setClipToOutline(true);
                 iv.setContentDescription("图片");
@@ -318,7 +327,18 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
         collapsed.remove(key);
         if (cur) collapsed.add(key);
         else expanded.add(key);
-        notifyDataSetChanged();
+        // 键都是“前缀:条目 id”：只重绑这一张
+        String id = key.substring(key.indexOf(':') + 1);
+        toggles.merge(id, 1, Integer::sum);
+        int pos = -1;
+        for (int i = 0; conv != null && i < conv.items.size(); i++) {
+            if (conv.items.get(i).id.equals(id)) {
+                pos = i;
+                break;
+            }
+        }
+        if (pos >= 0) notifyItemChanged(pos);
+        else notifyDataSetChanged();
     }
 
     private final Map<String, Boolean> defaults = new HashMap<>();

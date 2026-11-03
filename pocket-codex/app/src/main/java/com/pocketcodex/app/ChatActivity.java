@@ -69,6 +69,8 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
     private LinearLayoutManager lm;
     // 顶栏
     private LinearLayout segmented, titleBox;
+    /** 右上角胶囊里的“新对话”：新对话页面本身就是新的，不显示（也免得和“聊天 / 工作”挤在一起）。 */
+    private ImageView newChatBtn;
     private TextView segChat, segWork, title, subtitle;
     // 计划、待处理、空状态
     private TextView planText, pendingText, statusText, emptyTitle, emptyHint, wsPill;
@@ -405,6 +407,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         Ui.elevate(pill, 4);
         ImageView newChat = Ui.plainIcon(this, R.drawable.ic_compose, R.color.text, 46, "新对话", v -> newChat());
         newChat.setPadding(dp(12), dp(12), dp(12), dp(12));
+        newChatBtn = newChat;
         ImageView more = Ui.plainIcon(this, R.drawable.ic_dots, R.color.text, 46, "更多", this::moreMenu);
         more.setPadding(dp(12), dp(12), dp(12), dp(12));
         pill.addView(newChat, new LinearLayout.LayoutParams(dp(46), dp(46)));
@@ -613,7 +616,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         input.setPadding(dp(ex ? 20 : 6), dp(ex ? 14 : 6), dp(ex ? 20 : 4), dp(ex ? 2 : 6));
         // 收起时右边的胶囊：空闲 = 语音（说完直接发送）；运行中 = 停止
         boolean running = conv != null && conv.running();
-        boolean ready = rt.stage == CodexRuntimeManager.Stage.READY;
+        boolean ready = chatMode || rt.stage == CodexRuntimeManager.Stage.READY; // 聊天交给官方 ChatGPT，不用等 Codex
         if (running) {
             // 运行中：强调色的圆形停止键（和 ChatGPT 一样只有一个方块，不写字）
             GradientDrawable d = new GradientDrawable();
@@ -786,7 +789,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         boolean empty = adapter.getItemCount() == 0 && !loading;
         emptyBox.setVisibility(empty ? View.VISIBLE : View.GONE);
         emptyTitle.setText(chatMode ? "有什么可以帮忙的？" : "今天要做点什么？");
-        emptyHint.setText(chatMode ? "聊天模式只回答问题，不会运行命令或修改文件" : "Codex 会在这个工作区里读写文件、运行命令");
+        emptyHint.setText(chatMode ? "用官方 ChatGPT 聊，不占 Codex 额度" : "Codex 会在这个工作区里读写文件、运行命令");
         wsPill.setText(Workspaces.name(cwd));
         wsPill.setVisibility(!chatMode && fresh() ? View.VISIBLE : View.GONE);
         boolean sug = empty && fresh() && input.getText().length() == 0 && attachments.isEmpty();
@@ -841,6 +844,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         if (title == null) return;
         boolean fresh = fresh();
         segmented.setVisibility(fresh ? View.VISIBLE : View.GONE);
+        if (newChatBtn != null) newChatBtn.setVisibility(fresh ? View.GONE : View.VISIBLE);
         titleBox.setVisibility(fresh ? View.GONE : View.VISIBLE);
         bindSegmented();
         title.setText(threadTitle());
@@ -872,7 +876,9 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
             modelChip.setCompoundDrawablesRelative(null, null, null, null);
         }
         modelChip.setContentDescription("模型和推理：" + modelChip.getText() + "，点按更改");
-        input.setHint(running ? "追加指令…" : chatMode ? "问问 Codex" : "用 Codex 工作");
+        // 聊天模式固定用套餐默认模型（见 CodexRuntimeManager.planModel），没有可选的：标签藏起来，和 ChatGPT 的输入框一样
+        modelChip.setVisibility(chatMode ? View.GONE : View.VISIBLE);
+        input.setHint(running ? "追加指令…" : chatMode ? "问问 ChatGPT" : "用 Codex 工作");
         // 计划
         if (conv != null && !conv.plan.isEmpty()) {
             int done = 0;
@@ -899,9 +905,10 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         pendingText.setText(submitting ? "正在提交决定…" : asking ? "Codex 在问你问题" : "有 " + approvals + " 项操作等待确认");
         if (olderBar != null) olderBar.setVisibility(conv != null && conv.olderCursor != null ? View.VISIBLE : View.GONE);
         // 发送键：空 → 语音（运行中是停止）；有内容 → 发送/追加
-        boolean otherRunning = rt.runningThreadId != null && (conv == null || !rt.runningThreadId.equals(conv.threadId));
+        // 聊天模式交给官方 ChatGPT：不受 Codex 是否启动、别的会话是否在跑影响
+        boolean otherRunning = !chatMode && rt.runningThreadId != null && (conv == null || !rt.runningThreadId.equals(conv.threadId));
         boolean hasContent = input.getText().toString().trim().length() > 0 || !attachments.isEmpty();
-        boolean ready = rt.stage == CodexRuntimeManager.Stage.READY;
+        boolean ready = chatMode || rt.stage == CodexRuntimeManager.Stage.READY;
         if (running && !hasContent) {
             setSend(R.drawable.ic_stop_square, R.color.primary, R.color.on_primary, !stopping, "停止", v -> stopTurn());
         } else if (hasContent) {
@@ -1157,7 +1164,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         String bmp = c.localBitmapIcon();
         if (bmp != null) {
             ImageView iv = new ImageView(this);
-            Bitmap bm = Attach.thumb(bmp, dp(sizeDp));
+            Bitmap bm = Thumbs.getSync(bmp, dp(sizeDp)); // 插件图标很小：同步取，但只解码一次
             if (bm != null) {
                 iv.setImageBitmap(bm);
                 iv.setLayoutParams(new LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp)));
@@ -1329,8 +1336,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
             FrameLayout f = new FrameLayout(this);
             ImageView iv = new ImageView(this);
             iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            Bitmap bm = Attach.thumb(a.path, dp(64));
-            if (bm != null) iv.setImageBitmap(bm);
+            Thumbs.load(iv, a.path, dp(64), 0); // 后台解码，有缓存
             iv.setBackground(Ui.round(this, R.color.surface2, 0, 16));
             iv.setClipToOutline(true);
             iv.setContentDescription("图片 " + a.name);
@@ -1511,6 +1517,11 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
     private void onSend() {
         final String text = input.getText().toString().trim();
         if ((text.isEmpty() && attachments.isEmpty()) || sending) return;
+        if (chatMode) { // 聊天交给官方 ChatGPT（网页版或官方 App），不经过 Codex，不占 Codex/Work 额度
+            hideMention();
+            chooseChatGpt(text);
+            return;
+        }
         if (!chatMode && !rt.prefs.sandboxNoticeSeen()) {
             new AlertDialog.Builder(this).setTitle("在本机运行")
                     .setMessage("文件和命令在本机运行，受 Android 应用沙箱限制。Agent 可能访问本应用内的其他文件；项目目录不是独立隔离区。模型请求需要联网。")
@@ -1554,6 +1565,34 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         } else {
             doSend(text);
         }
+    }
+
+    /** 聊天模式点发送：二选一——在这里用 ChatGPT 网页版，或者到官方 ChatGPT App 里继续。 */
+    private void chooseChatGpt(final String text) {
+        boolean search = false, files = false;
+        for (Attachment a : attachments) {
+            if (a.kind == Attachment.Kind.WEB_SEARCH) search = true;
+            else files = true;
+        }
+        final boolean fs = search, ff = files;
+        boolean app = ChatGpt.appInstalled(this);
+        List<Overlay.Opt> o = new ArrayList<>();
+        o.add(new Overlay.Opt("ChatGPT 网页版", "在口袋工坊里打开", false, () -> handOff(text, fs, ff, true)));
+        o.add(new Overlay.Opt("ChatGPT App", app ? "打开官方 App" : "未安装，去下载", false, () -> handOff(text, fs, ff, false)));
+        Overlay.dropdown(this, expanded() ? sendBtn : voicePill, o, false, null, null);
+    }
+
+    private void handOff(String text, boolean search, boolean files, boolean web) {
+        if (web) {
+            ChatGpt.openWeb(this, text, search);
+        } else if (!ChatGpt.openApp(this, text)) {
+            ChatGpt.openStore(this);
+            return; // 还没装：文字留在输入框里
+        }
+        if (files) Toast.makeText(this, "图片和文件请在 ChatGPT 里重新添加", Toast.LENGTH_LONG).show();
+        input.setText("");
+        attachments.clear();
+        renderAttachments();
     }
 
     private void doSend(String text) {

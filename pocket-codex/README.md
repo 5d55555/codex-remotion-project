@@ -4,6 +4,16 @@
 
 独立开发的客户端，使用官方发布的 Codex CLI，与 OpenAI 无官方隶属关系。
 
+## v0.3.4 更新（2026-11-03）
+
+- **聊天模式改走官方 ChatGPT，不经过 Codex，不占 Codex/Work 额度**：聊天里点发送时二选一——
+  - **ChatGPT 网页版**：在口袋工坊里用 WebView 打开官方 chatgpt.com（带上你写的话，`?q=`），你自己登录；登录状态会保存。
+  - **ChatGPT App**：把写好的话交给手机上的官方 ChatGPT App；没装就去应用商店。
+  依据官方帮助中心：“Work and Codex share the usage allowance”；第三方的 Sign in with ChatGPT “count toward the ChatGPT Work and Codex usage”（所以没用它）；12 月起 “Instant chat will not draw from your usage”。
+  口袋工坊不注入脚本、不读网页内容、不改 User-Agent。Google 不允许在内嵌网页里登录，碰到时会提示改用邮箱登录或转 App。
+- **性能和稳定性**（按 GPT-6-Astra 的优化审计）：图片缩略图改为后台解码、带内存缓存；对话卡片内容没变就不再整张重建，展开/收起只刷新那一张；文件预览的读取、拆行、Markdown 解析和分享前复制都放到后台；终端在进程启动前被停止或关闭时不再漏掉（会补杀，也不再往已关闭的页面回填）。
+- 新对话页面右上角只留“更多”（不再和“聊天 / 工作”挤在一起）；聊天模式不显示模型标签。
+
 ## v0.3.3 更新（2026-11-03）
 
 - **对话页右上角改成白色胶囊**：里面是“新对话”（编辑图标）和“更多”（三个点），和 ChatGPT 一样；左上角仍是会话列表的圆形按钮。

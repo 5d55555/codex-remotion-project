@@ -2,4 +2,5 @@
 <resources>
     <item name="tag_row_title" type="id" />
     <item name="tag_bundle" type="id" />
+    <item name="tag_thumb" type="id" />
 </resources>

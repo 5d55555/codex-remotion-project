@@ -67,6 +67,8 @@ public final class TerminalActivity extends AppCompatActivity implements CodexRu
     private volatile Process proc;
     private volatile int procPid = -1;
     private volatile boolean running, stopped;
+    /** 页面已销毁：后台任务不再启动进程，也不再往界面回填。 */
+    private volatile boolean destroyed;
     private final List<String> history = new ArrayList<>();
     private int histPos;
 
@@ -109,9 +111,18 @@ public final class TerminalActivity extends AppCompatActivity implements CodexRu
 
     @Override
     protected void onDestroy() {
+        destroyed = true; // 先立标记：进程还没启动时，后台任务看到它就不会再启动
         if (running) stop();
         io.shutdownNow();
+        h.removeCallbacksAndMessages(null);
         super.onDestroy();
+    }
+
+    /** 回到主线程；页面已经销毁就丢掉。 */
+    private void ui(Runnable r) {
+        h.post(() -> {
+            if (!destroyed) r.run();
+        });
     }
 
     @Override
@@ -355,9 +366,14 @@ public final class TerminalActivity extends AppCompatActivity implements CodexRu
                 pb.directory(new File(dir).isDirectory() ? new File(dir) : rt.paths.home);
                 pb.redirectErrorStream(true);
                 pb.redirectInput(new File("/dev/null"));
+                if (destroyed || stopped) throw new InterruptedException(); // 还没启动就被停止或页面关了
                 Process p = pb.start();
                 proc = p;
                 procPid = pidOf(p);
+                if (destroyed || stopped) { // 启动的同时被停止：stop() 那时还拿不到进程，这里补杀
+                    if (procPid > 0) killTree(procPid);
+                    p.destroy();
+                }
                 try (InputStream in = p.getInputStream(); Reader r = new InputStreamReader(in, StandardCharsets.UTF_8)) {
                     char[] cb = new char[4096];
                     StringBuilder pending = new StringBuilder();
@@ -376,13 +392,13 @@ public final class TerminalActivity extends AppCompatActivity implements CodexRu
                             last = now;
                             final String chunk = pending.toString();
                             pending.setLength(0);
-                            h.post(() -> append(chunk, 0, false));
+                            ui(() -> append(chunk, 0, false));
                         }
                     }
                     String rest = pending.toString();
                     if (rest.endsWith("\n") && marked) rest = rest.substring(0, rest.length() - 1); // 去掉标记前补的换行
                     final String fr = rest;
-                    if (!fr.isEmpty()) h.post(() -> append(fr, 0, false));
+                    if (!fr.isEmpty()) ui(() -> append(fr, 0, false));
                 }
                 rc = p.waitFor();
             } catch (IOException e) {
@@ -395,7 +411,7 @@ public final class TerminalActivity extends AppCompatActivity implements CodexRu
             final String ferr = err;
             final String newDir = pwd.toString().trim();
             final long ms = SystemClock.elapsedRealtime() - t0;
-            h.post(() -> {
+            ui(() -> {
                 proc = null;
                 procPid = -1;
                 running = false;
@@ -413,9 +429,9 @@ public final class TerminalActivity extends AppCompatActivity implements CodexRu
     }
 
     private void stop() {
+        stopped = true; // 先立标记：进程还在启动中时，后台任务会看到并补杀
         Process p = proc;
         if (p == null) return;
-        stopped = true;
         int pid = procPid;
         if (pid > 0) killTree(pid);
         p.destroy();
