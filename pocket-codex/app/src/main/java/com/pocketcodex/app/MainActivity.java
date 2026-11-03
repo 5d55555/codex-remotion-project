@@ -610,13 +610,11 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
                         + "第三方技能放在 ~/.agents/skills/<名字>/SKILL.md，例如让 Codex 执行：git clone https://github.com/aicodeking/leanrea 后复制 leanrea 目录过去。")
                 .setPositiveButton("复制示例", (d, w) -> copy("MCP", "[mcp_servers.r2]\ncommand = \"r2pm\"\nargs = [\"-r\", \"r2mcp\"]\n"))
                 .setNegativeButton("关闭", null).show());
-        row(mcp, R.drawable.ic_book, "安装 REA（逆向，实验性）", "在终端里运行安装命令（已填好，按发送即可）；装完回来点“重启 Codex”", null, 1, v ->
-                startActivity(new Intent(this, TerminalActivity.class).putExtra(TerminalActivity.EXTRA_PREFILL, REA_SETUP)));
+        ToolBundles.Bundle rb = ToolBundles.find(ToolBundles.REA);
+        row(mcp, R.drawable.ic_review, rb.title, "逆向分析 MCP，装好直接接入对话", bundleState(rb), 1, v -> installBundle(rb));
         row(mcp, R.drawable.ic_refresh_line, "重启 Codex", "加了 MCP 服务或技能后用", null, 1, v -> restartCodex());
     }
 
-    /** REA 注册到 Codex 的命令（版本固定，和内置技能里写的一致）。 */
-    static final String REA_SETUP = "npx --yes rea-agents@6.8.0 setup --client codex";
 
     private void restartCodex() {
         if (rt.restartCodex()) Toast.makeText(this, "正在重启 Codex…", Toast.LENGTH_SHORT).show();
@@ -737,6 +735,7 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
             case "apk":
                 return R.drawable.ic_android_line;
             case "reverse":
+            case "rea":
                 return R.drawable.ic_review;
             case "media":
                 return R.drawable.ic_film_line;
@@ -755,6 +754,10 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
 
     private String bundleState(ToolBundles.Bundle b) {
         if (b.id.equals(rt.bundleInstalling)) return "正在安装";
+        if (ToolBundles.REA.equals(b.id) && rt.bundleInstalled(b.id)) { // REA：要看它接没接进 Codex
+            String st = rt.reaStatus;
+            return st == null ? "已安装" : st.startsWith("已接入") ? "已接入" : st.startsWith("正在") ? "检查中" : "没接上";
+        }
         return rt.bundleInstalled(b.id) ? "已安装" : "安装";
     }
 
@@ -789,6 +792,10 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
             return;
         }
         boolean have = rt.bundleInstalled(b.id);
+        if (ToolBundles.REA.equals(b.id)) {
+            reaDialog(b, have);
+            return;
+        }
         new AlertDialog.Builder(this).setTitle((have ? "更新“" : "安装“") + b.title + "”？")
                 .setMessage(b.summary + "\n\n下载约 " + b.downloadMb + " MB，安装后占用约 " + b.installedMb + " MB（和已装的部分共用依赖，实际可能更少）。"
                         + "来自 Termux 官方仓库，签名和每个包的 SHA256 都会校验。" + (rt.toolkitUsable() ? "" : "\n基础工具包还没装好，会先装基础包（约 62 MB）。")
@@ -797,6 +804,29 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
                     rt.startBundleInstall(b.id);
                     bindToolkitCard();
                 }).setNegativeButton("取消", null).show();
+    }
+
+    /** REA：没装时说明并安装；装好后显示接没接进 Codex，可以重新检查或重装。 */
+    private void reaDialog(ToolBundles.Bundle b, boolean have) {
+        String msg = have
+                ? "状态：" + (rt.reaStatus == null ? "还没检查" : rt.reaStatus) + "\n\n在对话里直接让 Codex 用 REA 分析 APK、二进制等，工具名形如 mcp__rea__binary_session。"
+                : "装 REA " + ToolBundles.REA_VERSION + "（npm 包 rea-agents），装好自动接入 Codex，对话里能直接用它的逆向分析工具。\n\n下载约 " + b.downloadMb
+                        + " MB，占用约 " + b.installedMb + " MB。REA 在安卓上是实验性的：Ghidra、IDA 这类分析引擎手机上没有，需要 root 的动态分析也用不了。"
+                        + (rt.toolkitUsable() ? "" : "\n基础工具包还没装好，会先装基础包（约 62 MB）。");
+        AlertDialog.Builder d = new AlertDialog.Builder(this).setTitle(have ? b.title : "安装“" + b.title + "”？").setMessage(msg).setNegativeButton("关闭", null);
+        if (have) {
+            d.setPositiveButton("检查连接", (x, w) -> rt.checkRea());
+            d.setNeutralButton("重新安装", (x, w) -> {
+                rt.startBundleInstall(b.id);
+                bindToolkitCard();
+            });
+        } else {
+            d.setPositiveButton("安装", (x, w) -> {
+                rt.startBundleInstall(b.id);
+                bindToolkitCard();
+            });
+        }
+        d.show();
     }
 
     /** 开发工具卡片：未安装 / 安装中（进度）/ 已就绪（版本）/ 自检失败 / 安装失败。 */

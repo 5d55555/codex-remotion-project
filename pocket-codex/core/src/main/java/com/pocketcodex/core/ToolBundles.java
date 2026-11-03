@@ -30,6 +30,9 @@ public final class ToolBundles {
         }
     }
 
+    /** REA 那一项的 id，和它固定的版本（MCP 配置、技能都按这个版本装）。 */
+    public static final String REA = "rea", REA_VERSION = "6.8.0";
+
     public static final List<Bundle> ALL = Collections.unmodifiableList(Arrays.asList(
             new Bundle("recommended", "常用全家桶", "下面前五组一起装：代码与 Git、APK 构建与测试、逆向、剪辑与动画、中文字体", 602, 2253,
                     "gh", "git-lfs", "git-delta", "lazygit", "neovim", "vim", "tmux", "fd", "fzf", "bat", "eza", "shellcheck",
@@ -56,6 +59,10 @@ public final class ToolBundles {
                     "apktool", "jadx", "dex2jar", "radare2", "rizin", "binutils", "gdb", "lldb", "strace", "ltrace", "xxd",
                     "hexedit", "hexyl", "bvi", "binwalk", "yara", "capstone", "upx", "patchelf", "termux-elf-cleaner", "protobuf",
                     "flatbuffers", "dtc", "rhash", "hashdeep", "xmlstarlet", "libxml2-utils", "python-lxml", "python-cryptography"),
+            // REA：npm 包（不是 Termux 包），口袋工坊装好后自己写 MCP 配置、复制技能（见 CodexRuntimeManager.installRea）。
+            // 依赖的 Node.js 在基础包里，所以这里的 Termux 包只有 nodejs-lts；大小是 npm 实测的上限（含平台相关的预编译包）
+            new Bundle(REA, "REA 逆向助手", "REA 6.8.0：229 个逆向分析工具（MCP），装好直接接入 Codex 对话；来自 npm（rea-agents）", 151, 275,
+                    "nodejs-lts"),
             new Bundle("media", "剪辑与程序化动画", "ffmpeg、ImageMagick、GraphicsMagick、sox、gifski、rsvg、vips、exiftool、Pillow、pycairo、NumPy、WebP/AVIF/HEIF", 152, 699,
                     "ffmpeg", "imagemagick", "graphicsmagick", "sox", "mediainfo", "gifsicle", "gifski", "librsvg",
                     "python-pillow", "python-numpy", "pycairo", "pango", "exiftool", "jpegoptim", "optipng", "pngquant",

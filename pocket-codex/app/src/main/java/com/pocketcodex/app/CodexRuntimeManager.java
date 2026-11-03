@@ -398,8 +398,12 @@ public final class CodexRuntimeManager {
         cfg.model = prefs.model();
         cfg.reasoningEffort = prefs.effort();
         CodexRuntime.prepare(l, cfg);
+        Map<String, String> env = CodexRuntime.env(l, proxy.url(), System.getenv("PATH"), TimeZone.getDefault().getID());
+        // Codex 启动 MCP 服务时只传很少几个环境变量：把口袋工坊设的这些变量名都补给每个用命令启动的 MCP 服务（REA 等），
+        // 否则手机上的 node/npx 起不来，MCP 接不进对话（见 CodexRuntime.mcpOverrides）
+        cfg.mcpEnv = new ArrayList<>(env.keySet());
         runtimeConfig = cfg;
-        return CodexRuntime.env(l, proxy.url(), System.getenv("PATH"), TimeZone.getDefault().getID());
+        return env;
     }
 
     /**
@@ -761,6 +765,7 @@ public final class CodexRuntimeManager {
                         String miss = missingCommands(com.pocketcodex.core.ToolBundles.commands(id));
                         if (!miss.isEmpty()) err = "装好了，但这些命令运行不了：" + miss + "（可以到 自检与诊断 查看）";
                     }
+                    if (err == null && com.pocketcodex.core.ToolBundles.REA.equals(id)) err = installRea(pr); // npm 装 REA + 接入 Codex
                 }
             } catch (Installer.InstallException e) {
                 err = e.kind == Installer.Kind.CANCELLED ? "已取消" : e.getMessage();
@@ -820,8 +825,130 @@ public final class CodexRuntimeManager {
 
     /** 工具集是否装齐了。 */
     public boolean bundleInstalled(String id) {
+        if (com.pocketcodex.core.ToolBundles.REA.equals(id)) return prefs.bundles().contains(id) && reaScript().isFile();
         com.pocketcodex.core.ToolBundles.Bundle b = com.pocketcodex.core.ToolBundles.find(id);
         return b != null && !toolkitPackages.isEmpty() && toolkitPackages.containsAll(b.packages);
+    }
+
+    /* ---------------- REA（逆向分析 MCP，装在“开发工具”里） ---------------- */
+
+    /** REA 装在 npm 的全局目录（工具包的环境里 npm_config_prefix = ~/.npm-global）。 */
+    File reaDir() {
+        return new File(paths.home, ".npm-global/lib/node_modules/rea-agents");
+    }
+
+    File reaScript() {
+        return new File(reaDir(), "scripts/rea.mjs");
+    }
+
+    /** REA 接没接进 Codex：上次检查的结果（null = 还没查过）。主线程读写。 */
+    public String reaStatus;
+    /** 装完要在 Codex 重启好以后检查一次。 */
+    private boolean reaCheckPending;
+
+    /**
+     * toolkit 线程：装 REA 并接入 Codex，成功返回 null，否则返回给用户看的错误。
+     * 1. npm 装固定版本；2. 用 node 跑一次 --version 确认能启动；3. 把 [mcp_servers.rea] 写成直接用 node 运行（不经过 npx：安卓上
+     * npx 的 #!/usr/bin/env 要靠 LD_PRELOAD，Codex 起 MCP 时不传）；4. 复制 REA 自带的技能。不用 REA 自己的 setup：它装技能用硬链接，
+     * 安卓的应用目录里建不了。之后由调用方重启 Codex，重启好了检查 REA 接没接上（{@link #checkRea}）。
+     */
+    private String installRea(Toolkit.Progress pr) throws IOException {
+        String v = com.pocketcodex.core.ToolBundles.REA_VERSION;
+        Toolkit t = paths.toolkit();
+        CodexRuntime.Layout l = paths.layout(codexBin());
+        l.toolkitReady = true;
+        Map<String, String> env = CodexRuntime.env(l, proxy == null ? null : proxy.url(), System.getenv("PATH"), TimeZone.getDefault().getID());
+        pr.step("用 npm 下载安装 REA " + v + "（约 150 MB，要几分钟）…", -1, -1);
+        ProcessBuilder pb = new ProcessBuilder(t.bin("bash").getAbsolutePath(), "-c",
+                "set -o pipefail; npm install -g rea-agents@" + v + " --no-fund --no-audit 2>&1 | tail -n 25");
+        pb.environment().clear();
+        pb.environment().putAll(env);
+        pb.directory(paths.home);
+        Object[] r = runWithTimeout(pb, null, 40 * 60_000L);
+        if ((Integer) r[0] != 0 || !reaScript().isFile()) return "REA 没装上（npm 退出码 " + r[0] + "）：" + lastLine(String.valueOf(r[1]));
+        pr.step("检查 REA 能不能启动…", -1, -1);
+        File node = t.bin("node");
+        ProcessBuilder vb = new ProcessBuilder(node.getAbsolutePath(), reaScript().getAbsolutePath(), "--version");
+        vb.environment().clear();
+        vb.environment().putAll(env);
+        vb.directory(paths.home);
+        Object[] vr = runWithTimeout(vb, null, 120_000L);
+        if ((Integer) vr[0] != 0) return "REA 装好了，但启动不了：" + lastLine(String.valueOf(vr[1]));
+        pr.step("把 REA 接入 Codex…", -1, -1);
+        File cfg = new File(paths.codexHome, "config.toml");
+        String old = cfg.isFile() ? new String(java.nio.file.Files.readAllBytes(cfg.toPath()), StandardCharsets.UTF_8) : null;
+        String now = CodexRuntime.withRea(old, node.getAbsolutePath(), reaScript().getAbsolutePath());
+        if (!now.equals(old)) {
+            if (old != null) java.nio.file.Files.write(new File(paths.codexHome, "config.toml.bak").toPath(), old.getBytes(StandardCharsets.UTF_8));
+            File tmp = new File(paths.codexHome, "config.toml.tmp");
+            java.nio.file.Files.write(tmp.toPath(), now.getBytes(StandardCharsets.UTF_8));
+            if (!tmp.renameTo(cfg)) return "写 Codex 配置失败";
+        }
+        File skillSrc = new File(reaDir(), "skills/reverse-engineer-anything");
+        if (skillSrc.isDirectory()) {
+            File dst = new File(paths.home, ".agents/skills/reverse-engineer-anything");
+            Installer.deleteTree(dst);
+            copyTree(skillSrc, dst);
+        }
+        onMain(() -> {
+            reaStatus = null;
+            reaCheckPending = true; // Codex 重启好以后检查
+        });
+        return null;
+    }
+
+    private static String lastLine(String s) {
+        String t = s.trim();
+        int nl = t.lastIndexOf('\n');
+        String l = nl >= 0 ? t.substring(nl + 1) : t;
+        return l.length() > 300 ? l.substring(0, 300) + "…" : l;
+    }
+
+    /** 普通复制（不用硬链接：安卓的应用目录里建不了）。 */
+    private static void copyTree(File src, File dst) throws IOException {
+        if (src.isDirectory()) {
+            if (!dst.isDirectory() && !dst.mkdirs()) throw new IOException("建目录失败：" + dst);
+            File[] kids = src.listFiles();
+            if (kids != null) for (File k : kids) copyTree(k, new File(dst, k.getName()));
+        } else if (src.isFile()) {
+            java.nio.file.Files.copy(src.toPath(), dst.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    /** 问 Codex：REA 接上没有、有几个工具（不用开对话，Codex 自己起一个检查用的连接）。主线程调用。 */
+    public void checkRea() {
+        if (server == null) {
+            reaCheckPending = true; // Codex 起来以后再查
+            return;
+        }
+        reaCheckPending = false;
+        reaStatus = "正在检查…";
+        changed();
+        server.request("mcpServerStatus/list", Json.map("serverName", "rea"), new AppServer.Callback() {
+            @Override
+            public void onResult(Map<String, Object> r) {
+                String st = "配置里没有 REA";
+                for (Object o : Json.arr(r, "data")) {
+                    if (!"rea".equals(Json.str(o, "name"))) continue;
+                    int n = Json.obj(o, "tools").size();
+                    String e = Json.str(o, "toolsError");
+                    st = n > 0 ? "已接入（" + n + " 个工具）" : "没接上" + (e == null ? "" : "：" + e);
+                }
+                final String fst = st;
+                onMain(() -> {
+                    reaStatus = fst;
+                    changed();
+                });
+            }
+
+            @Override
+            public void onError(AppServer.RpcError e) {
+                onMain(() -> {
+                    reaStatus = "检查失败：" + e.getMessage();
+                    changed();
+                });
+            }
+        });
     }
 
     private Toolkit.Progress toolkitProgress() {
@@ -1152,6 +1279,7 @@ public final class CodexRuntimeManager {
                     accountType = type;
                     prefs.setAccount(email, plan, type);
                     setStage(Stage.READY);
+                    if (reaCheckPending) checkRea(); // 刚装完 REA：看它接没接进 Codex
                     maybeAutoInstallToolkit();
                     loadModels();
                     loadCatalog();
@@ -1579,8 +1707,11 @@ public final class CodexRuntimeManager {
         }
         b.append("Skills for this phone are in ~/.agents/skills: $pocket-toolkit (environment, pkg, MCP), $pocket-apk-build, $pocket-apk-test "
                 + "(test APKs on this same phone via wireless-debugging adb), $pocket-reverse (apktool/jadx/radare2, leanrea, REA, r2mcp), $pocket-media (ffmpeg, animation); "
-                + "read the relevant SKILL.md before such tasks. MCP servers you add under [mcp_servers.*] in $CODEX_HOME/config.toml are kept across restarts "
-                + "(only the first managed lines are rewritten); a restart of Codex is needed to load them. ");
+                + "read the relevant SKILL.md before such tasks. MCP servers you add under [mcp_servers.*] in $CODEX_HOME/config.toml are kept as written "
+                + "(Pocket Codex passes its own settings with -c and also forwards its environment variables and a 120 s startup timeout to stdio MCP servers); "
+                + "a restart of Codex is needed to load them. When many tools are available, MCP tools (for example REA's mcp__rea__binary_session, "
+                + "mcp__rea__xrefs) are not all listed up front: search your tool catalog for the server or tool name before concluding an MCP tool is unavailable. "
+                + "REA itself is installed from Pocket Codex → Settings → Developer tools → REA reverse-engineering assistant. ");
         b.append("Edit files with apply_patch. There is no project-level sandbox: stay inside the working directory unless the user asks otherwise. "
                 + "Reply in the language the user writes in.");
         return b.toString();

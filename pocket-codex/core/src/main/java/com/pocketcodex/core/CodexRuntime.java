@@ -112,8 +112,204 @@ public final class CodexRuntime {
         List<String> c = new ArrayList<>();
         c.add(l.codexBin.getAbsolutePath());
         c.addAll(overrides(cfg == null ? new Config() : cfg));
+        if (cfg != null && cfg.mcpEnv != null && l.codexHome != null) {
+            File f = new File(l.codexHome, "config.toml");
+            String toml = null;
+            try {
+                if (f.isFile()) toml = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+            } catch (IOException ignored) {
+                // 读不了就不补：Codex 自己也会报配置错误
+            }
+            c.addAll(mcpOverrides(toml, cfg.mcpEnv));
+        }
         for (String a : args) c.add(a);
         return c;
+    }
+
+    /* ---------------- MCP 服务（config.toml 里的 [mcp_servers.*]） ---------------- */
+
+    /** MCP 服务的启动超时（秒）：手机上 Node 起得慢，Codex 默认的不够。只在用户自己没设的时候补。 */
+    public static final int MCP_STARTUP_TIMEOUT_SEC = 120;
+
+    /** config.toml 里的一个 MCP 服务：是不是用命令启动的（stdio）、设没设启动超时、原有的 env_vars。 */
+    static final class McpServer {
+        final String name;
+        boolean stdio, hasTimeout;
+        final List<String> envVars = new ArrayList<>();
+
+        McpServer(String name) {
+            this.name = name;
+        }
+    }
+
+    /**
+     * 从 config.toml 里找出 MCP 服务。认 [mcp_servers.名字] 表（[mcp_servers.名字.env] 之类的子表不算服务本身的键）
+     * 和 [mcp_servers] 下面的内联表；多行字符串、跨行数组都按 TOML 规则跳过。
+     */
+    static Map<String, McpServer> mcpServers(String toml) {
+        Map<String, McpServer> out = new LinkedHashMap<>();
+        if (toml == null) return out;
+        TomlScan sc = new TomlScan();
+        McpServer cur = null;
+        boolean serverTable = false, parentTable = false;
+        StringBuilder envArr = null; // 跨行的 env_vars 数组
+        for (String line : toml.split("\n", -1)) {
+            String t = line.trim();
+            boolean free = sc.ml == null && sc.depth == 0;
+            sc.scan(line);
+            boolean complete = sc.ml == null && sc.depth == 0;
+            if (envArr != null) {
+                envArr.append(' ').append(line);
+                if (complete) {
+                    tomlStrings(envArr.toString(), cur.envVars);
+                    envArr = null;
+                }
+                continue;
+            }
+            if (!free) continue;
+            if (t.startsWith("[") && complete) {
+                List<String> parts = tableName(t);
+                cur = null;
+                serverTable = parentTable = false;
+                if (parts != null && !parts.isEmpty() && parts.get(0).equals("mcp_servers")) {
+                    if (parts.size() == 1) parentTable = true;
+                    else {
+                        cur = out.computeIfAbsent(parts.get(1), McpServer::new);
+                        serverTable = parts.size() == 2;
+                    }
+                }
+                continue;
+            }
+            int eq = t.startsWith("#") ? -1 : t.indexOf('=');
+            if (eq <= 0) continue;
+            String key = unquote(t.substring(0, eq).trim()), value = t.substring(eq + 1).trim();
+            if (parentTable && value.startsWith("{")) { // [mcp_servers] 下的 名字 = { command = …, … }
+                McpServer s = out.computeIfAbsent(key, McpServer::new);
+                if (value.matches("(?s).*[{,]\\s*command\\s*=.*")) s.stdio = true;
+                if (value.matches("(?s).*[{,]\\s*startup_timeout_(sec|ms)\\s*=.*")) s.hasTimeout = true;
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("env_vars\\s*=\\s*\\[([^\\]]*)\\]").matcher(value);
+                if (m.find()) tomlStrings(m.group(1), s.envVars);
+                continue;
+            }
+            if (cur == null || !serverTable) continue;
+            if (key.equals("command")) cur.stdio = true;
+            else if (key.equals("startup_timeout_sec") || key.equals("startup_timeout_ms")) cur.hasTimeout = true;
+            else if (key.equals("env_vars")) {
+                if (complete) tomlStrings(value, cur.envVars);
+                else envArr = new StringBuilder(value);
+            }
+        }
+        return out;
+    }
+
+    /** 表头 [a.b."c d"] → [a, b, c d]；数组表 [[…]] 和写法不认识的返回 null。 */
+    static List<String> tableName(String header) {
+        if (!header.startsWith("[") || header.startsWith("[[")) return null;
+        List<String> parts = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        char quote = 0;
+        for (int i = 1; i < header.length(); i++) {
+            char c = header.charAt(i);
+            if (quote != 0) {
+                if (c == quote) quote = 0;
+                else cur.append(c);
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '.') {
+                parts.add(cur.toString().trim());
+                cur.setLength(0);
+            } else if (c == ']') {
+                parts.add(cur.toString().trim());
+                return parts;
+            } else {
+                cur.append(c);
+            }
+        }
+        return null;
+    }
+
+    private static String unquote(String k) {
+        if (k.length() >= 2 && (k.startsWith("\"") && k.endsWith("\"") || k.startsWith("'") && k.endsWith("'"))) return k.substring(1, k.length() - 1);
+        return k;
+    }
+
+    /** 把一段 TOML 里的字符串字面量（"…" 或 '…'）收集起来。 */
+    private static void tomlStrings(String s, List<String> out) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"((?:[^\"\\\\]|\\\\.)*)\"|'([^']*)'").matcher(s);
+        while (m.find()) {
+            String v = m.group(1) != null ? m.group(1).replace("\\\"", "\"").replace("\\\\", "\\") : m.group(2);
+            if (!out.contains(v)) out.add(v);
+        }
+    }
+
+    /**
+     * Codex 启动用命令跑的 MCP 服务时，只传很少几个环境变量（PATH、HOME、SHELL、TERM、证书路径）加上配置里的 env_vars 和 env
+     * （在 codex 0.166 上实测）。口袋工坊给 Codex 设的 LD_PRELOAD、PREFIX、TMPDIR、代理、LANG 都会丢——手机上的 node、npx
+     * （脚本开头是 #!/usr/bin/env）因此起不来，MCP 服务接不进对话。这里给每个用命令启动的服务补上 env_vars（和原有的合并），
+     * 没设启动超时的补成 {@link #MCP_STARTUP_TIMEOUT_SEC} 秒。只用 -c 传，不改 config.toml。
+     */
+    static List<String> mcpOverrides(String toml, java.util.Collection<String> envNames) {
+        List<String> o = new ArrayList<>();
+        for (McpServer s : mcpServers(toml).values()) {
+            if (!s.stdio || !s.name.matches("[A-Za-z0-9_-]+")) continue; // 名字要能直接写进 -c 的键路径
+            java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>(s.envVars);
+            if (envNames != null) names.addAll(envNames);
+            if (!names.isEmpty()) {
+                StringBuilder arr = new StringBuilder("[");
+                for (String n : names) arr.append(arr.length() > 1 ? "," : "").append(tomlString(n));
+                o.add("-c");
+                o.add("mcp_servers." + s.name + ".env_vars=" + arr.append(']'));
+            }
+            if (!s.hasTimeout) {
+                o.add("-c");
+                o.add("mcp_servers." + s.name + ".startup_timeout_sec=" + MCP_STARTUP_TIMEOUT_SEC);
+            }
+        }
+        return o;
+    }
+
+    /** 口袋工坊写的 REA 配置：直接用 node 跑 REA，不经过 npx（安卓上 npx 的 #!/usr/bin/env 要靠 LD_PRELOAD，而且每次都要查 npm）。 */
+    static String reaBlock(String node, String script) {
+        return "[mcp_servers.rea]\n"
+                + "# 口袋工坊装的 REA（设置 → 开发工具 → REA 逆向助手）：直接用 node 运行，不经过 npx\n"
+                + "command = " + tomlString(node) + "\n"
+                + "args = [" + tomlString(script) + ", \"mcp\"]\n"
+                + "startup_timeout_sec = " + MCP_STARTUP_TIMEOUT_SEC + "\n";
+    }
+
+    /**
+     * 把 [mcp_servers.rea] 换成口袋工坊的写法（REA 自己的安装器写的是 npx 版本）；没有就加在末尾。
+     * 只替换这一张表本身的几行，[mcp_servers.rea.env] 之类的子表和别的内容原样保留。
+     */
+    public static String withRea(String toml, String node, String script) {
+        String block = reaBlock(node, script);
+        if (toml == null || toml.isEmpty()) return HEADER + "\n" + block;
+        List<String> lines = new ArrayList<>(java.util.Arrays.asList(toml.split("\n", -1)));
+        TomlScan sc = new TomlScan();
+        int start = -1, end = lines.size();
+        for (int i = 0; i < lines.size(); i++) {
+            String t = lines.get(i).trim();
+            boolean free = sc.ml == null && sc.depth == 0;
+            sc.scan(lines.get(i));
+            boolean complete = sc.ml == null && sc.depth == 0;
+            if (!free || !complete || !t.startsWith("[")) continue;
+            List<String> parts = tableName(t);
+            if (start < 0) {
+                if (parts != null && parts.size() == 2 && parts.get(0).equals("mcp_servers") && parts.get(1).equals("rea")) start = i;
+            } else {
+                end = i;
+                break;
+            }
+        }
+        if (start < 0) {
+            String base = toml.endsWith("\n") ? toml : toml + "\n";
+            return base + "\n" + block;
+        }
+        while (end > start + 1 && lines.get(end - 1).trim().isEmpty()) end--; // 表后面的空行留着
+        List<String> out = new ArrayList<>(lines.subList(0, start));
+        out.addAll(java.util.Arrays.asList(block.substring(0, block.length() - 1).split("\n", -1)));
+        out.addAll(lines.subList(end, lines.size()));
+        return String.join("\n", out);
     }
 
     /**
@@ -218,6 +414,8 @@ public final class CodexRuntime {
         public String model;            // null = codex 默认
         public String reasoningEffort;  // null = 默认
         public boolean webSearch = true;
+        /** 口袋工坊给 Codex 设的环境变量名：启动时补给每个用命令启动的 MCP 服务（见 {@link #mcpOverrides}）。null = 不补。 */
+        public List<String> mcpEnv;
 
         public Config() {
         }

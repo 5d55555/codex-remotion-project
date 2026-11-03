@@ -4,6 +4,12 @@
 
 独立开发的客户端，使用官方发布的 Codex CLI，与 OpenAI 无官方隶属关系。
 
+## v0.3.5 更新（2026-11-03）
+
+- **修好“REA 能启动、但接不进对话”**：Codex 0.166 启动用命令跑的 MCP 服务时，只传 PATH、HOME、SHELL、TERM 和几个证书变量（实测），口袋工坊设的 LD_PRELOAD、PREFIX、TMPDIR、代理、LANG 都会丢。手机上 node/npx（脚本开头 `#!/usr/bin/env node`）因此起不来，Codex 报 “connection closed: initialize response”。现在口袋工坊启动 Codex 时用 `-c` 给每个用命令启动的 MCP 服务补上 `env_vars`（和你原有的合并）和 120 秒启动超时（你自己设了的不动），不改 config.toml。用真 Codex 复现过失败、验证过修复（`McpConfigTest` 覆盖配置解析）。
+- **开发工具里新增“REA 逆向助手”**：一键装 REA 6.8.0（npm），把 `[mcp_servers.rea]` 写成直接用 node 运行（不经过 npx，启动约 1–2 秒），复制 REA 自带的技能；装完重启 Codex 并检查接没接上，那一行显示“已接入 / 没接上”，点开能看原因、重新检查、重新安装。不用 REA 自己的 setup（在安卓上装技能会因硬链接失败）。
+- 工具多时 MCP 工具不会直接列给模型，要先搜工具目录（实测模型能搜到 `mcp__rea__xrefs`）：给 Agent 的说明和内置逆向技能都写明了。
+
 ## v0.3.4 更新（2026-11-03）
 
 - **聊天模式改走官方 ChatGPT，不经过 Codex，不占 Codex/Work 额度**：聊天里点发送时二选一——

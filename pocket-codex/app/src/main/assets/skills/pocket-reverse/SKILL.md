@@ -49,7 +49,10 @@ rabin2 -I -i -E -z lib.so | head -100
 ## 更强的工具（可选，先问用户）
 
 - **leanrea**（技能，用本地命令行工具做多类型逆向）：`git clone --depth 1 https://github.com/aicodeking/leanrea /tmp/leanrea && cp -r /tmp/leanrea/leanrea ~/.agents/skills/`。它是按 macOS 写的：`brew`、`otool`、`xcrun`、`codesign` 在这里没有，换成 `pkg install`、`readelf`/`r2`。
-- **REA（rea-agents）**：`npx rea-agents@latest setup --client codex`，要求 Node 22.23.4+ / 24.22.1+（Termux 的 nodejs-lts 满足）。在安卓上属实验性：部分功能可用，doctor 检查不认 android 平台；原生模块（PTY、Frida）可能装不上。
+- **REA（rea-agents 6.8.0，229 个 MCP 工具）**：请用户在 口袋工坊 → 设置 → 开发工具 → **REA 逆向助手** 一键安装（装在 `~/.npm-global`，`[mcp_servers.rea]` 直接用 node 运行 `scripts/rea.mjs mcp`，技能复制到 `~/.agents/skills/reverse-engineer-anything`）。**不要**用 `npx rea-agents setup`：它在安卓上装技能会因硬链接失败，而且 npx 版本的配置在手机上启动慢。
+  - 工具名形如 `mcp__rea__binary_session`、`mcp__rea__xrefs`。工具很多时它们不会直接列出来：**先在工具目录里搜 “rea” 或具体工具名**，搜不到再说没有。
+  - 真的没接上（新开对话也搜不到）：让用户到 开发工具 → REA 逆向助手 → 检查连接，会显示 Codex 报的原因；或者重新安装。
+  - 在安卓上属实验性：Ghidra、IDA、Hopper、Kuna 这类反编译引擎手机上没有；APK 后端要完整 JDK 和 JADX headless；PTY、Frida 这些原生功能可能用不了。
 - **r2mcp**（radare2 的 MCP）：`pkg install radare2 clang make pkg-config git && r2pm -Uci r2mcp`，在 `$CODEX_HOME/config.toml` 加 `[mcp_servers.r2]` `command="r2pm"` `args=["-r","r2mcp"]`，重启 Codex。
 - **jadx-headless-mcp**：下载 release 的 `jadx-headless-mcp-0.8.0-all.jar`，配置 `command="java"`、`args=["-Xmx2g","-jar","/绝对路径/jadx-headless-mcp-0.8.0-all.jar","--threads","2"]`。
 - Ghidra、Frida 在手机本机很难跑，建议用户在电脑上运行后端。
