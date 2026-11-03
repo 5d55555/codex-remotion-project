@@ -120,6 +120,12 @@ public final class CodexRuntime {
      * </ul>
      */
     public static void prepare(Layout l, Config cfg) throws IOException {
+        prepareShims(l);
+        writeConfig(l.codexHome, cfg);
+    }
+
+    /** 只建目录和 PATH 最前面的命令（不动 config.toml）：App 里的终端也用这套环境。 */
+    public static void prepareShims(Layout l) throws IOException {
         for (File d : new File[]{l.codexHome, l.homeDir, l.binDir, l.tmpDir, l.logDir}) {
             if (!d.isDirectory() && !d.mkdirs()) throw new IOException("建目录失败：" + d);
         }
@@ -130,7 +136,6 @@ public final class CodexRuntime {
             File gc = new File(l.homeDir, ".gitconfig");
             if (!gc.exists()) writeIfChanged(gc, DEFAULT_GITCONFIG, false);
         }
-        writeConfig(l.codexHome, cfg);
     }
 
     /** 第一次有工具包时写到 HOME 的 git 配置（用户或 Agent 之后可以改）。 */

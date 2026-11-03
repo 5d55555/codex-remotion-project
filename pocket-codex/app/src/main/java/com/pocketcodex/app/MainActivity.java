@@ -33,6 +33,7 @@ import java.util.Locale;
 /** 主界面：底部导航“会话 / 文件 / 设置”。对话在 {@link ChatActivity} 里。 */
 public final class MainActivity extends AppCompatActivity implements CodexRuntimeManager.Listener {
     static final int TAB_SESSIONS = 1, TAB_FILES = 2, TAB_SETTINGS = 3;
+    static final String EXTRA_TAB = "tab";
 
     private CodexRuntimeManager rt;
     private FrameLayout pageHost;
@@ -72,8 +73,16 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         root.addView(nav, Ui.matchWrap());
         setContentView(root);
         if (b != null) tab = b.getInt("tab", TAB_SESSIONS);
+        else tab = getIntent().getIntExtra(EXTRA_TAB, TAB_SESSIONS);
         nav.setSelectedItemId(tab);
         showTab(tab);
+    }
+
+    @Override
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        int t = i.getIntExtra(EXTRA_TAB, 0);
+        if (t != 0 && t != tab) nav.setSelectedItemId(t); // 会触发 showTab
     }
 
     @Override
@@ -110,7 +119,11 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
             return;
         }
         if (tab == TAB_SESSIONS) bindSessions();
-        else if (tab == TAB_SETTINGS) buildSettings(); // 设置页显示的状态（账号、版本）可能变了
+        else if (tab == TAB_SETTINGS) {
+            // 设置页显示的状态（账号、版本）变了才整页重建；工具包安装进度只刷新那张卡片
+            if (settingsSignature().equals(settingsSig)) bindToolkitCard();
+            else buildSettings();
+        }
     }
 
     private void showTab(int t) {
@@ -267,7 +280,7 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
             if (t.id.equals(rt.runningThreadId)) status = rt.pendingApprovalCount() > 0 ? "等待确认" : "正在执行";
             boolean named = t.name != null && !t.name.trim().isEmpty();
             String sub = named && t.preview != null ? t.preview.trim().replace('\n', ' ') : ""; // 没起名时标题就是预览，不重复
-            String ws = t.cwd == null ? "" : Workspaces.name(t.cwd);
+            String ws = t.cwd == null ? "" : rt.isChatCwd(t.cwd) ? "聊天" : Workspaces.name(t.cwd);
             String line = ws.isEmpty() ? sub : sub.isEmpty() ? ws : ws + " · " + sub;
             rows.add(new RowAdapter.Row(t, R.drawable.ic_chat, t.id.equals(rt.runningThreadId) ? R.color.primary : R.color.text2,
                     t.title(), line, Format.ago(t.updatedAt), status, 2));
@@ -450,12 +463,25 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
 
     /* ---------------- 设置 ---------------- */
 
+    private String settingsSig = "";
+    private ScrollView settingsScroll;
+    private LinearLayout toolkitHost;
+
+    private String settingsSignature() {
+        return rt.stage + "|" + rt.accountEmail + "|" + rt.accountPlan + "|" + rt.installedVersion + "|" + rt.models.size() + "|" + ModelPicker.summary(rt)
+                + "|" + rt.prefs.mode() + "|" + rt.prefs.workspace() + "|" + (rt.lastRateLimits == null ? 0 : rt.lastRateLimits.hashCode());
+    }
+
     private void buildSettings() {
         if (tab != TAB_SETTINGS) return;
+        final int oldY = settingsScroll == null ? 0 : settingsScroll.getScrollY();
+        settingsSig = settingsSignature();
         pageHost.removeAllViews();
         LinearLayout page = Ui.vbox(this);
         page.addView(topBar("设置"));
         ScrollView sv = new ScrollView(this);
+        settingsScroll = sv;
+        if (oldY > 0) sv.post(() -> sv.scrollTo(0, oldY));
         LinearLayout list = Ui.vbox(this);
         list.setPadding(0, 0, 0, Ui.dp(this, 24));
 
@@ -482,9 +508,15 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
                         buildSettings();
                     }).setNegativeButton("保持每步确认", null).show();
         }));
-        CodexRuntimeManager.ModelInfo mi = rt.currentModel();
-        list.addView(item("模型", mi == null ? "由 Codex 决定" : mi.displayName + (rt.prefs.model() == null ? "（默认）" : ""), v -> ModelPicker.show(this, rt, this::buildSettings)));
-        list.addView(item("推理强度", rt.prefs.effort() == null ? "由模型决定" : ModelPicker.effortName(rt.prefs.effort()), v -> ModelPicker.showEffort(this, rt, this::buildSettings)));
+        list.addView(item("模型、推理与速度", rt.models.isEmpty() ? "Codex 启动后可选" : ModelPicker.summary(rt), v -> ModelPicker.show(this, rt, false, this::buildSettings)));
+
+        list.addView(Ui.section(this, "开发工具（Node.js · Git · Python）"));
+        toolkitHost = Ui.vbox(this);
+        list.addView(toolkitHost, Ui.matchWrap());
+        bindToolkitCard();
+        list.addView(item("终端", "直接运行 node、npm、git、pkg 等命令；不经过模型，不消耗额度", v -> startActivity(new Intent(this, TerminalActivity.class))));
+        list.addView(item("常用命令", "Node.js、npm、Git、Python、pkg 的常用写法，点一下就能用", v -> startActivity(new Intent(this, TerminalActivity.class).putExtra(TerminalActivity.EXTRA_COMMANDS, true))));
+        list.addView(item("软件源", toolkitRepoLabel(), v -> chooseToolkitRepo()));
 
         list.addView(Ui.section(this, "工作区"));
         String ws = rt.prefs.workspace();
@@ -551,6 +583,125 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         sv.addView(list);
         page.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         pageHost.addView(page);
+    }
+
+    /** 开发工具卡片：未安装 / 安装中（进度）/ 已就绪（版本）/ 自检失败 / 安装失败。 */
+    private void bindToolkitCard() {
+        if (toolkitHost == null) return;
+        toolkitHost.removeAllViews();
+        LinearLayout card = Ui.vbox(this);
+        card.setBackground(Ui.round(this, R.color.surface2, 0, 22));
+        card.setPadding(Ui.dp(this, 18), Ui.dp(this, 16), Ui.dp(this, 18), Ui.dp(this, 16));
+        LinearLayout.LayoutParams cl = Ui.matchWrap();
+        cl.leftMargin = cl.rightMargin = Ui.dp(this, 16);
+        cl.topMargin = Ui.dp(this, 4);
+        cl.bottomMargin = Ui.dp(this, 6);
+        CodexRuntimeManager.ToolkitState st = rt.toolkitState;
+        if (rt.paths.toolkit() == null) st = CodexRuntimeManager.ToolkitState.FAILED;
+        String head, body = null;
+        int icon, tint;
+        switch (st) {
+            case INSTALLING:
+                head = "正在安装开发工具";
+                body = rt.toolkitStep == null ? "准备中…" : rt.toolkitStep;
+                icon = R.drawable.ic_download;
+                tint = R.color.text;
+                break;
+            case READY:
+                head = "开发工具已就绪";
+                StringBuilder v = new StringBuilder();
+                String[][] names = {{"node", "Node.js"}, {"npm", "npm"}, {"git", "Git"}, {"python3", "Python"}, {"pip", "pip"}, {"bash", "bash"}, {"rg", "ripgrep"}, {"curl", "curl"}};
+                for (String[] n : names) {
+                    String ver = rt.toolkitVersions.get(n[0]);
+                    if (ver == null) continue;
+                    if (v.length() > 0) v.append("　");
+                    v.append(n[1]).append(' ').append(ver);
+                }
+                body = (v.length() == 0 ? "" : v + "\n") + "Codex 和终端都能用。缺的软件让 Codex 用 pkg install 安装，或在终端里自己装。";
+                icon = R.drawable.ic_check;
+                tint = R.color.success;
+                break;
+            case BROKEN:
+                head = "装好了，但在这台手机上自检没通过";
+                body = (rt.toolkitError == null ? "" : rt.toolkitError + "\n") + "可以重新安装，或到 自检与诊断 里查看详情。";
+                icon = R.drawable.ic_warning;
+                tint = R.color.warning;
+                break;
+            case FAILED:
+                head = rt.paths.toolkit() == null ? "这台设备不支持开发工具包" : "安装没有完成";
+                body = rt.toolkitError == null ? "可以换一个软件源再试。" : rt.toolkitError;
+                icon = R.drawable.ic_warning;
+                tint = R.color.error;
+                break;
+            default:
+                head = "还没安装";
+                body = "装好后 Codex 就能用 Node.js、npm/npx、Git、Python/pip、bash、rg、curl、jq 等命令，缺的用 pkg install 补。下载约 57 MB，占用约 230 MB，来自 Termux 官方仓库（签名校验）。";
+                icon = R.drawable.ic_download;
+                tint = R.color.text;
+        }
+        LinearLayout row = Ui.hbox(this);
+        row.addView(Ui.icon(this, icon, tint, 22));
+        TextView t = Overlay.strong(this, head, 16);
+        LinearLayout.LayoutParams tl = Ui.weight1();
+        tl.leftMargin = Ui.dp(this, 12);
+        row.addView(t, tl);
+        card.addView(row);
+        if (body != null) {
+            TextView b = Ui.caption(this, body);
+            card.addView(b, Ui.matchWrap(this, 8));
+        }
+        if (st == CodexRuntimeManager.ToolkitState.INSTALLING) {
+            com.google.android.material.progressindicator.LinearProgressIndicator pi = new com.google.android.material.progressindicator.LinearProgressIndicator(this);
+            pi.setTrackStopIndicatorSize(0);
+            pi.setIndicatorColor(Ui.color(this, R.color.text));
+            pi.setTrackColor(Ui.color(this, R.color.border));
+            pi.setTrackCornerRadius(Ui.dp(this, 2));
+            if (rt.toolkitTotal > 0) {
+                pi.setMax(1000);
+                pi.setProgressCompat((int) (rt.toolkitDone * 1000 / rt.toolkitTotal), false);
+            } else {
+                pi.setIndeterminate(true);
+            }
+            card.addView(pi, Ui.matchWrap(this, 12));
+            com.google.android.material.button.MaterialButton c = Ui.outlined(this, "取消", v -> rt.cancelToolkitInstall());
+            c.setTextColor(Ui.color(this, R.color.text));
+            LinearLayout.LayoutParams bl = Ui.wrap();
+            bl.topMargin = Ui.dp(this, 12);
+            card.addView(c, bl);
+        } else if (rt.paths.toolkit() != null) {
+            String label = st == CodexRuntimeManager.ToolkitState.NONE ? "安装开发工具" : st == CodexRuntimeManager.ToolkitState.READY ? "重新安装" : "重试";
+            com.google.android.material.button.MaterialButton go = st == CodexRuntimeManager.ToolkitState.NONE || st == CodexRuntimeManager.ToolkitState.FAILED
+                    ? Ui.primary(this, label, null) : Ui.outlined(this, label, null);
+            go.setOnClickListener(v -> {
+                if (rt.toolkitState == CodexRuntimeManager.ToolkitState.READY) {
+                    new AlertDialog.Builder(this).setTitle("重新安装开发工具？").setMessage("会重新下载并校验全部软件包（约 57 MB），用 pkg 装的额外软件包需要重新安装。")
+                            .setPositiveButton("重新安装", (d, w) -> rt.startToolkitInstall()).setNegativeButton("取消", null).show();
+                } else {
+                    rt.startToolkitInstall();
+                }
+            });
+            LinearLayout.LayoutParams bl = Ui.wrap();
+            bl.topMargin = Ui.dp(this, 12);
+            card.addView(go, bl);
+        }
+        toolkitHost.addView(card, cl);
+    }
+
+    private String toolkitRepoLabel() {
+        String id = rt.prefs.toolkitRepo();
+        if (id != null) for (com.pocketcodex.core.Toolkit.Repo r : com.pocketcodex.core.Toolkit.REPOS) if (r.id.equals(id)) return r.label + "（上次成功）";
+        return "自动（官方仓库和国内镜像，哪个能连上用哪个）";
+    }
+
+    private void chooseToolkitRepo() {
+        final List<com.pocketcodex.core.Toolkit.Repo> repos = com.pocketcodex.core.Toolkit.REPOS;
+        List<String> labels = new ArrayList<>();
+        labels.add("自动");
+        for (com.pocketcodex.core.Toolkit.Repo r : repos) labels.add(r.label);
+        new AlertDialog.Builder(this).setTitle("开发工具的软件源").setItems(labels.toArray(new String[0]), (d, w) -> {
+            rt.prefs.setToolkitRepo(w == 0 ? null : repos.get(w - 1).id);
+            buildSettings();
+        }).setNegativeButton("取消", null).show();
     }
 
     private View item(String title, String summary, View.OnClickListener l) {

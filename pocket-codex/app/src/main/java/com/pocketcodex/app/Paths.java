@@ -23,7 +23,7 @@ import java.io.File;
  * </pre>
  */
 public final class Paths {
-    public final File root, codexHome, home, shimBin, certs, caFile, tmp, logs, workspaces, usr, pkgWork;
+    public final File root, codexHome, home, shimBin, certs, caFile, tmp, logs, workspaces, usr, pkgWork, attachments;
     public final String appDataDir;
     private Toolkit toolkit;
 
@@ -39,6 +39,7 @@ public final class Paths {
         workspaces = new File(root, "workspaces");
         usr = new File(root, "usr");
         pkgWork = new File(root, "pkg");
+        attachments = new File(root, "attachments"); // 输入框里加的照片、文件（发给 Codex 前复制到这里）
         appDataDir = c.getApplicationInfo().dataDir;
     }
 

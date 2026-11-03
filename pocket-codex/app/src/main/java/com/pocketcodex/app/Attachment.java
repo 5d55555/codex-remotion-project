@@ -8,6 +8,8 @@ final class Attachment {
     final String name;   // 显示名（技能/插件的显示名，文件名）
     final String id;     // 技能/插件的名字（发送用）
     final String path;   // 本地路径；技能是 SKILL.md 路径；插件是 plugin://…
+    /** 聊天模式（不能跑命令）里的小文本文件：直接把内容附在消息里。 */
+    String inline;
 
     Attachment(Kind kind, String name, String id, String path) {
         this.kind = kind;

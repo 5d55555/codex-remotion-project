@@ -90,7 +90,10 @@ public final class CodexRuntimeManager {
         public final boolean isDefault;
         /** 可选的速度档（serviceTier id → 说明），一般只有 priority（快速）。 */
         public final List<String> serviceTiers = new ArrayList<>();
+        public final List<String> serviceTierNames = new ArrayList<>();
         public final List<String> serviceTierDescriptions = new ArrayList<>();
+        /** 和 efforts 一一对应的服务端说明。 */
+        public final List<String> effortDescriptions = new ArrayList<>();
 
         ModelInfo(String id, String displayName, String description, String defaultEffort, List<String> efforts, boolean isDefault) {
             this.id = id;
@@ -1001,18 +1004,29 @@ public final class CodexRuntimeManager {
                     models.clear();
                     for (Object o : Json.arr(r, "data")) {
                         if (Json.bool(o, "hidden", false)) continue;
-                        List<String> efforts = new ArrayList<>();
+                        List<String> efforts = new ArrayList<>(), effortDesc = new ArrayList<>();
                         for (Object e : Json.arr(o, "supportedReasoningEfforts")) {
                             String eff = Json.str(e, "reasoningEffort");
-                            if (eff != null) efforts.add(eff);
+                            if (eff == null) continue;
+                            efforts.add(eff);
+                            effortDesc.add(Json.str(e, "description", ""));
                         }
                         ModelInfo mi = new ModelInfo(Json.str(o, "id", Json.str(o, "model", "?")), Json.str(o, "displayName", Json.str(o, "id", "?")),
                                 Json.str(o, "description", ""), Json.str(o, "defaultReasoningEffort"), efforts, Json.bool(o, "isDefault", false));
+                        mi.effortDescriptions.addAll(effortDesc);
                         for (Object t : Json.arr(o, "serviceTiers")) {
                             String tid = Json.str(t, "id");
                             if (tid == null) continue;
                             mi.serviceTiers.add(tid);
+                            mi.serviceTierNames.add(Json.str(t, "name", tid));
                             mi.serviceTierDescriptions.add(Json.str(t, "description", ""));
+                        }
+                        // 旧字段（只有 id 的字符串数组）
+                        for (Object t : Json.arr(o, "additionalSpeedTiers")) {
+                            if (!(t instanceof String) || mi.serviceTiers.contains(t)) continue;
+                            mi.serviceTiers.add((String) t);
+                            mi.serviceTierNames.add((String) t);
+                            mi.serviceTierDescriptions.add("");
                         }
                         models.add(mi);
                     }
@@ -1051,7 +1065,7 @@ public final class CodexRuntimeManager {
                         Map<String, Object> itf = Json.obj(sk, "interface");
                         skills.add(new Catalog(true, name, Json.str(itf, "displayName", name),
                                 Json.str(itf, "shortDescription", Json.str(sk, "shortDescription", Json.str(sk, "description", ""))),
-                                Json.str(itf, "iconSmallUrl"), Json.str(itf, "brandColor"), Json.str(sk, "path", "")));
+                                Json.str(itf, "iconSmall", Json.str(itf, "iconSmallUrl")), Json.str(itf, "brandColor"), Json.str(sk, "path", "")));
                     }
                 }
                 onMain(() -> publishCatalog(skills, null));
@@ -1071,7 +1085,8 @@ public final class CodexRuntimeManager {
                         String name = Json.str(pl, "name", Json.str(pl, "id", "?"));
                         String display = Json.str(itf, "displayName", name);
                         plugins.add(new Catalog(false, Json.str(pl, "id", name), display, Json.str(itf, "shortDescription", ""),
-                                Json.str(itf, "composerIconUrl", Json.str(itf, "logoUrl")), Json.str(itf, "brandColor"), "plugin://" + Json.str(pl, "id", name)));
+                                Json.str(itf, "composerIcon", Json.str(itf, "logo", Json.str(itf, "composerIconUrl"))), Json.str(itf, "brandColor"),
+                                "plugin://" + Json.str(pl, "id", name)));
                     }
                 }
                 onMain(() -> publishCatalog(null, plugins));
@@ -1110,6 +1125,67 @@ public final class CodexRuntimeManager {
             if (m.isDefault) def = m;
         }
         return def != null ? def : models.isEmpty() ? null : models.get(0);
+    }
+
+    public interface FileSearchCallback {
+        void onFiles(String query, List<String[]> files);
+    }
+
+    /** “@”里的文件：codex 的 fuzzyFileSearch（结果是 {相对路径, 文件名, file/directory}）。 */
+    public void fileSearch(final String query, String root, final FileSearchCallback cb) {
+        if (server == null || root == null || query.isEmpty()) return;
+        List<Object> roots = new ArrayList<>();
+        roots.add(root);
+        server.request("fuzzyFileSearch", Json.map("query", query, "roots", roots, "cancellationToken", "composer"), new AppServer.Callback() {
+            @Override
+            public void onResult(Map<String, Object> r) {
+                final List<String[]> out = new ArrayList<>();
+                for (Object f : Json.arr(r, "files")) {
+                    String path = Json.str(f, "path");
+                    if (path == null) continue;
+                    out.add(new String[]{path, Json.str(f, "file_name", path), Json.str(f, "match_type", "file")});
+                    if (out.size() >= 8) break;
+                }
+                onMain(() -> cb.onFiles(query, out));
+            }
+
+            @Override
+            public void onError(AppServer.RpcError error) {
+            }
+        });
+    }
+
+    /** 工具包能不能用（自检通过）。 */
+    public boolean toolkitUsable() {
+        return toolkitUsable;
+    }
+
+    /**
+     * 终端用：和 Agent 一样的环境（PATH 里有工具包、pkg、codex；代理、证书都设好）。在后台线程调用。
+     * 返回 {环境, shell 路径}。
+     */
+    Object[] terminalEnv() throws IOException {
+        synchronized (this) {
+            if (proxy == null) {
+                proxy = new LocalProxy(LocalProxy.SYSTEM);
+                proxy.setLocalHandler(this::handleLocalCommand);
+                proxy.start();
+            }
+        }
+        if (!paths.caFile.isFile()) Certs.export(paths.caFile, prefs.userCa());
+        File bin = codexBin();
+        CodexRuntime.Layout l = paths.layout(bin);
+        l.toolkitReady = toolkitUsable;
+        if (bin != null) CodexRuntime.prepareShims(l);
+        Map<String, String> env = CodexRuntime.env(l, proxy.url(), System.getenv("PATH"), TimeZone.getDefault().getID());
+        env.put("GIT_TERMINAL_PROMPT", "0");
+        env.put("PAGER", "cat");
+        env.put("GIT_PAGER", "cat");
+        paths.home.mkdirs();
+        paths.tmp.mkdirs();
+        Toolkit t = paths.toolkit();
+        String shell = l.useToolkit() && t != null ? t.bin("bash").getAbsolutePath() : Paths.systemShell();
+        return new Object[]{env, shell};
     }
 
     public void refreshRateLimits() {
@@ -1396,8 +1472,13 @@ public final class CodexRuntimeManager {
                         images.add(a.path);
                         extra.add(Json.map("type", "localImage", "path", a.path));
                         break;
-                    case FILE: // 文件：Codex 自己读，用路径引用
-                        full.append(full.length() > 0 ? "\n" : "").append("附件文件：").append(a.path);
+                    case FILE: // 文件：工作模式用路径引用（Codex 自己读）；聊天模式不能跑命令，小文本直接附上内容
+                        if (a.inline != null) {
+                            full.append(full.length() > 0 ? "\n\n" : "").append("附件《").append(a.name).append("》的内容：\n```\n")
+                                    .append(a.inline).append(a.inline.endsWith("\n") ? "" : "\n").append("```");
+                        } else {
+                            full.append(full.length() > 0 ? "\n" : "").append("附件文件：").append(a.path);
+                        }
                         mentions.add(a.name);
                         break;
                     case SKILL:

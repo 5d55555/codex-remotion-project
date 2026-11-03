@@ -54,6 +54,7 @@ public class ScreensTest {
     @Before
     public void setUp() {
         Paths.abiOverride = "arm64-v8a";
+        Overlay.animate = false;
         CodexRuntimeManager.resetForTest();
         rt = CodexRuntimeManager.get(RuntimeEnvironment.getApplication());
     }
@@ -269,7 +270,24 @@ public class ScreensTest {
         nav.setSelectedItemId(MainActivity.TAB_SETTINGS);
         idle();
         assertTrue(hasText(root, "每步确认"));
+        assertTrue(hasText(root, "安装开发工具"));
         shot("12_settings", a);
+        // 开发工具：装好以后显示各工具版本；进度变化只刷新那张卡片
+        rt.toolkitState = CodexRuntimeManager.ToolkitState.READY;
+        rt.toolkitVersions.put("node", "24.11.1");
+        rt.toolkitVersions.put("npm", "11.6.2");
+        rt.toolkitVersions.put("git", "2.51.2");
+        rt.toolkitVersions.put("python3", "3.12.12");
+        rt.toolkitVersions.put("pip", "25.3");
+        rt.toolkitVersions.put("bash", "5.3.3");
+        rt.toolkitVersions.put("rg", "15.1.0");
+        rt.toolkitVersions.put("curl", "8.17.0");
+        rt.setStageForTest(CodexRuntimeManager.Stage.READY);
+        idle();
+        assertTrue(hasText(root, "开发工具已就绪"));
+        assertTrue(hasText(root, "Node.js 24.11.1"));
+        scrollTo(root, "开发工具已就绪");
+        shot("13_settings_devtools", a);
         // 打开文本查看
         Intent i = new Intent(a, FileViewerActivity.class).putExtra(FileViewerActivity.EXTRA_PATH, new File(ws, "trip.md").getAbsolutePath());
         FileViewerActivity fv = Robolectric.buildActivity(FileViewerActivity.class, i).setup().get();
@@ -282,6 +300,32 @@ public class ScreensTest {
         // 文件夹选择
         FolderPickerActivity fp = Robolectric.buildActivity(FolderPickerActivity.class).setup().get();
         shot("16_folder_picker", fp);
+    }
+
+    /** 把包含这段文字的 ScrollView 滚到它那里。 */
+    private static void scrollTo(View root, String text) {
+        View t = findTextContains(root, text);
+        assertNotNull(t);
+        int y = 0;
+        View v = t;
+        while (v.getParent() instanceof View && !(v.getParent() instanceof android.widget.ScrollView)) {
+            y += v.getTop();
+            v = (View) v.getParent();
+        }
+        y += v.getTop();
+        if (v.getParent() instanceof android.widget.ScrollView) ((android.widget.ScrollView) v.getParent()).scrollTo(0, Math.max(0, y - 400));
+    }
+
+    private static View findTextContains(View v, String s) {
+        if (v instanceof TextView && ((TextView) v).getText().toString().contains(s)) return v;
+        if (v instanceof android.view.ViewGroup) {
+            android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                View f = findTextContains(g.getChildAt(i), s);
+                if (f != null) return f;
+            }
+        }
+        return null;
     }
 
     private static com.google.android.material.bottomnavigation.BottomNavigationView findNav(View v) {
@@ -379,8 +423,224 @@ public class ScreensTest {
         rt.runningThreadId = null;
         ChatActivity empty = Robolectric.buildActivity(ChatActivity.class, i2).setup().get();
         settle();
-        assertTrue(hasText(empty.getWindow().getDecorView(), "想先改点什么？"));
+        assertTrue(hasText(empty.getWindow().getDecorView(), "今天要做点什么？"));
         shot("22_chat_empty", empty);
+    }
+
+    /* ---------------- v0.2：ChatGPT 风格的输入卡片、＋菜单、@、模型面板、终端 ---------------- */
+
+    @Test
+    public void chatgptStyleLight() throws Exception {
+        chatgptStyle();
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h860dp-night-xxhdpi")
+    public void chatgptStyleDark() throws Exception {
+        theme = "dark";
+        chatgptStyle();
+    }
+
+    /** 和用户截图里账号的模型列表一致（model/list 的形状）。 */
+    private void fakeModels() {
+        String[][] ms = {{"gpt-6.1-sol", "GPT-6.1-Sol"}, {"gpt-6.1-terra", "GPT-6.1 Terra"}, {"gpt-6-astra", "GPT-6-Astra"}, {"gpt-6-sol", "GPT-6-Sol"},
+                {"gpt-6-luna", "GPT-6-Luna"}, {"gpt-5.6-sol", "GPT-5.6-Sol"}, {"gpt-5.6-terra", "GPT-5.6-Terra"}, {"gpt-5.6-luna", "GPT-5.6-Luna"}};
+        for (int i = 0; i < ms.length; i++) {
+            List<String> eff = new ArrayList<>(java.util.Arrays.asList("low", "medium", "high", "xhigh", "max", "ultra"));
+            CodexRuntimeManager.ModelInfo m = new CodexRuntimeManager.ModelInfo(ms[i][0], ms[i][1], "", "medium", eff, i == 0);
+            for (String e : eff) m.effortDescriptions.add("");
+            if (i < 2) {
+                m.serviceTiers.add("priority");
+                m.serviceTierNames.add("Fast");
+                m.serviceTierDescriptions.add("Faster responses, higher usage");
+            }
+            rt.models.add(m);
+        }
+        rt.catalog.add(new Catalog(true, "imagegen", "Image Gen", "Generate or edit images", null, null, "/x/imagegen/SKILL.md"));
+        rt.catalog.add(new Catalog(false, "github@openai-curated", "GitHub", "Repos, issues, PRs", null, null, "plugin://github@openai-curated"));
+        rt.catalog.add(new Catalog(true, "review-agent", "Review Agent", "Find bugs", null, null, "/x/review-agent/SKILL.md"));
+        rt.catalog.add(new Catalog(true, "openai-docs", "OpenAI Docs", "Docs", null, null, "/x/openai-docs/SKILL.md"));
+        rt.catalog.add(new Catalog(true, "skill-creator", "Skill Creator", "Create a skill", null, null, "/x/skill-creator/SKILL.md"));
+    }
+
+    private static void layout(Activity a) {
+        View root = a.getWindow().getDecorView();
+        DisplayMetrics dm = root.getResources().getDisplayMetrics();
+        root.measure(View.MeasureSpec.makeMeasureSpec(dm.widthPixels, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(dm.heightPixels, View.MeasureSpec.EXACTLY));
+        root.layout(0, 0, dm.widthPixels, dm.heightPixels);
+    }
+
+    /** 点文字所在的可点击行（文字本身或往上找第一个能点的父视图）。 */
+    private static void tap(View root, String text) {
+        View v = findText(root, text);
+        assertNotNull("找不到：" + text, v);
+        while (v != null && !v.hasOnClickListeners()) v = v.getParent() instanceof View ? (View) v.getParent() : null;
+        assertNotNull("不能点：" + text, v);
+        v.performClick();
+        idle();
+    }
+
+    private static Object field(Object o, String name) throws Exception {
+        java.lang.reflect.Field f = o.getClass().getDeclaredField(name);
+        f.setAccessible(true);
+        return f.get(o);
+    }
+
+    private void chatgptStyle() throws Exception {
+        readyWithWorkspace();
+        fakeModels();
+        rt.prefs.setWorkMode(true);
+        Intent i = new Intent(RuntimeEnvironment.getApplication(), ChatActivity.class).putExtra(ChatActivity.EXTRA_CWD, rt.prefs.workspace());
+        ChatActivity a = Robolectric.buildActivity(ChatActivity.class, i).setup().get();
+        settle();
+        layout(a);
+        View root = a.getWindow().getDecorView();
+        // 新对话：顶部“聊天 / 工作”，输入卡片里“6.1 Sol 中”
+        assertTrue(hasText(root, "聊天"));
+        assertTrue(hasText(root, "工作"));
+        assertTrue(hasText(root, "6.1 Sol 中"));
+        assertTrue(hasText(root, "今天要做点什么？"));
+        shot("23_chat_new_work", a);
+        // 切到聊天
+        tap(root, "聊天");
+        assertFalse(rt.prefs.workMode());
+        assertTrue(hasText(root, "有什么可以帮忙的？"));
+        layout(a);
+        shot("24_chat_new_chat", a);
+        tap(root, "工作");
+        assertTrue(rt.prefs.workMode());
+        layout(a);
+        // “＋”菜单
+        android.widget.ImageView plusBtn = (android.widget.ImageView) field(a, "plusBtn");
+        plusBtn.performClick();
+        idle();
+        assertTrue(hasText(root, "拍照"));
+        assertTrue(hasText(root, "照片"));
+        assertTrue(hasText(root, "文件"));
+        assertTrue(hasText(root, "插件"));
+        shot("25_plus_menu", a);
+        a.getOnBackPressedDispatcher().onBackPressed(); // 返回键关掉菜单
+        idle();
+        assertFalse(hasText(root, "拍照"));
+        // 输入“@”：上方列出技能和插件
+        android.widget.EditText input = (android.widget.EditText) field(a, "input");
+        input.requestFocus();
+        input.setSelection(0);
+        input.getText().insert(0, "@");
+        idle();
+        assertTrue(hasText(root, "插件与技能"));
+        assertTrue(hasText(root, "创建图像"));
+        assertTrue(hasText(root, "GitHub"));
+        shot("26_mention", a);
+        // 选“创建图像” → 变成输入框上方的标签，“@”被去掉
+        tap(root, "创建图像");
+        assertEquals("", input.getText().toString());
+        assertFalse(hasText(root, "插件与技能"));
+        // 再加一张图片附件、写点字
+        File img = new File(rt.paths.attachments, "cat.png");
+        img.getParentFile().mkdirs();
+        android.graphics.Bitmap bm = android.graphics.Bitmap.createBitmap(120, 90, android.graphics.Bitmap.Config.ARGB_8888);
+        new Canvas(bm).drawColor(0xFF8EC5FC);
+        try (FileOutputStream o = new FileOutputStream(img)) {
+            bm.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, o);
+        }
+        a.addAttachment(new Attachment(Attachment.Kind.IMAGE, "cat.png", null, img.getAbsolutePath()));
+        input.setText("画一只橘猫，放在这张图的风格里");
+        idle();
+        layout(a);
+        assertTrue(hasText(root, "创建图像"));
+        assertEquals("发送", ((View) field(a, "sendBtn")).getContentDescription());
+        shot("27_composer_attachments", a);
+        // 模型面板
+        tap(root, "6.1 Sol 中");
+        assertTrue(hasText(root, "模型"));
+        assertTrue(hasText(root, "推理"));
+        assertTrue(hasText(root, "速度"));
+        assertTrue(hasText(root, "权限"));
+        assertTrue(hasText(root, "完成"));
+        layout(a);
+        shot("28_model_sheet", a);
+        tap(root, "模型");
+        assertTrue(hasText(root, "推荐的前沿模型组合"));
+        assertTrue(hasText(root, "5.6 Luna"));
+        shot("29_model_dropdown", a);
+        tap(root, "6.1 Terra");
+        assertEquals("gpt-6.1-terra", rt.prefs.model());
+        layout(a);
+        tap(root, "推理");
+        assertTrue(hasText(root, "全力思考，用量很大"));
+        shot("30_effort_dropdown", a);
+        tap(root, "高");
+        assertEquals("high", rt.prefs.effort());
+        layout(a);
+        tap(root, "速度");
+        assertTrue(hasText(root, "用量更高"));
+        shot("31_speed_dropdown", a);
+        tap(root, "快速");
+        assertEquals("priority", rt.prefs.speed());
+        tap(root, "完成");
+        assertFalse(hasText(root, "推荐的前沿模型组合"));
+        assertTrue(hasText(root, "6.1 Terra 高"));
+        // 换成不支持快速档的模型：速度自动回到标准
+        layout(a);
+        tap(root, "6.1 Terra 高");
+        tap(root, "模型");
+        tap(root, "6 Luna");
+        assertEquals(null, rt.prefs.speed());
+        tap(root, "完成");
+
+        // 对话里：用户消息带图片和提及；Agent 的回答；顶部是标题
+        String tid = "th-style";
+        Conversation conv = new Conversation(tid);
+        conv.addLocalUserMessage("u1", "画一只橘猫，放在这张图的风格里", java.util.Collections.singletonList(img.getAbsolutePath()), java.util.Collections.singletonList("创建图像"));
+        conv.apply("turn/started", Json.parseObject("{\"threadId\":\"" + tid + "\",\"turn\":{\"id\":\"t1\",\"status\":\"inProgress\",\"items\":[]}}"));
+        conv.apply("item/completed", Json.parseObject("{\"threadId\":\"" + tid + "\",\"turnId\":\"t1\",\"item\":{\"type\":\"agentMessage\",\"id\":\"a1\",\"phase\":\"final_answer\","
+                + "\"text\":\"好的，已经按参考图的**柔和蓝色调**生成了一只橘猫，保存为 `orange-cat.png`。\\n\\n- 尺寸：1024×1024\\n- 风格：扁平插画\"}}"));
+        conv.apply("turn/completed", Json.parseObject("{\"threadId\":\"" + tid + "\",\"turn\":{\"id\":\"t1\",\"status\":\"completed\",\"items\":[]}}"));
+        conv.threadName = "画一只橘猫";
+        rt.putConversationForTest(conv);
+        Intent i3 = new Intent(RuntimeEnvironment.getApplication(), ChatActivity.class).putExtra(ChatActivity.EXTRA_THREAD, tid).putExtra(ChatActivity.EXTRA_CWD, rt.prefs.workspace());
+        ChatActivity c3 = Robolectric.buildActivity(ChatActivity.class, i3).setup().get();
+        settle();
+        layout(c3);
+        idle();
+        layout(c3);
+        View r3 = c3.getWindow().getDecorView();
+        assertTrue(hasText(r3, "画一只橘猫"));
+        assertTrue(hasText(r3, "@创建图像"));
+        assertFalse("对话里不显示“聊天 / 工作”切换", findText(r3, "工作").isShown());
+        layout(c3);
+        shot("32_chat_conversation", c3);
+        // “⋯”菜单
+        java.util.ArrayList<View> found = new java.util.ArrayList<>();
+        r3.findViewsWithText(found, "更多", View.FIND_VIEWS_WITH_CONTENT_DESCRIPTION);
+        assertFalse(found.isEmpty());
+        found.get(0).performClick();
+        idle();
+        assertTrue(hasText(r3, "终端"));
+        assertTrue(hasText(r3, "重命名"));
+        shot("33_more_menu", c3);
+        // 终端（从菜单进）
+        tap(r3, "终端");
+        Intent ti = shadowOf(c3).getNextStartedActivity();
+        assertNotNull(ti);
+        assertEquals(TerminalActivity.class.getName(), ti.getComponent().getClassName());
+        rt.toolkitState = CodexRuntimeManager.ToolkitState.NONE;
+        TerminalActivity term = Robolectric.buildActivity(TerminalActivity.class, ti).setup().get();
+        settle();
+        View tr = term.getWindow().getDecorView();
+        assertTrue(hasText(tr, "不消耗模型额度"));
+        assertTrue(hasText(tr, "git status"));
+        layout(term);
+        shot("17_terminal", term);
+        tap(tr, "常用命令");
+        assertTrue(hasText(tr, "npm install <包名>"));
+        assertTrue(hasText(tr, "git clone <仓库网址>"));
+        shot("18_commands", term);
+        tap(tr, "git clone <仓库网址>");
+        android.widget.EditText tin = (android.widget.EditText) field(term, "input");
+        assertEquals("git clone <仓库网址>", tin.getText().toString());
+        assertEquals("<仓库网址>", tin.getText().subSequence(tin.getSelectionStart(), tin.getSelectionEnd()).toString());
     }
 
     /** 文案集中一处，测试也用。 */

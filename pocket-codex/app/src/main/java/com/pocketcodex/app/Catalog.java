@@ -22,7 +22,7 @@ final class Catalog {
                 case "imagegen":
                     return "创建图像";
                 case "openai-docs":
-                    return "查 OpenAI 文档";
+                    return "OpenAI 文档";
                 case "review-agent":
                     return "代码审查";
                 case "skill-creator":
@@ -34,6 +34,45 @@ final class Catalog {
             }
         }
         return displayName == null || displayName.isEmpty() ? id : displayName;
+    }
+
+    /** 内置图标：常见技能用对应的线条图标，GitHub 插件用它的标志，其他插件用 @ 图标。 */
+    int iconRes() {
+        String k = (id + " " + displayName).toLowerCase(java.util.Locale.ROOT);
+        if (skill) {
+            switch (id) {
+                case "imagegen":
+                    return R.drawable.ic_image_color;
+                case "openai-docs":
+                    return R.drawable.ic_book;
+                case "review-agent":
+                    return R.drawable.ic_review;
+                case "skill-creator":
+                    return R.drawable.ic_sparkle;
+                case "skill-installer":
+                    return R.drawable.ic_download;
+                default:
+                    break;
+            }
+            if (k.contains("task") || k.contains("todo")) return R.drawable.ic_tasks;
+            if (k.contains("draw") || k.contains("sketch")) return R.drawable.ic_scribble;
+            return R.drawable.ic_sparkle;
+        }
+        if (k.contains("github")) return R.drawable.ic_github;
+        return R.drawable.ic_plugin;
+    }
+
+    /** 彩色图标不着色。 */
+    boolean colored() {
+        return skill && "imagegen".equals(id);
+    }
+
+    /** 插件包里自带的位图图标（本地路径，PNG/JPG/WebP；SVG 用内置图标）。 */
+    String localBitmapIcon() {
+        if (iconUrl == null || iconUrl.startsWith("http")) return null;
+        String l = iconUrl.toLowerCase(java.util.Locale.ROOT);
+        if (!(l.endsWith(".png") || l.endsWith(".jpg") || l.endsWith(".jpeg") || l.endsWith(".webp"))) return null;
+        return new java.io.File(iconUrl).isFile() ? iconUrl : null;
     }
 
     Attachment toAttachment() {

@@ -98,7 +98,7 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
         int side = Ui.dp(ctx, 16);
         if (type == T_USER) {
             lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.END);
-            lp.leftMargin = Ui.dp(ctx, 48);
+            lp.leftMargin = Ui.dp(ctx, 56);
         }
         lp.leftMargin += side;
         lp.rightMargin = side;
@@ -116,6 +116,7 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
         h.box.setPadding(0, 0, 0, 0);
         h.box.setOnClickListener(null);
         h.box.setOnLongClickListener(null);
+        h.box.setGravity(Gravity.NO_GRAVITY);
         switch (it.kind) {
             case USER:
                 bindUser(h.box, it);
@@ -143,17 +144,83 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
 
     /* ---------------- 各种卡片 ---------------- */
 
+    /** 用户消息：右侧浅灰圆角气泡（ChatGPT 样式）；带的图片显示在气泡上方，提及的技能/插件/文件是气泡里的小标签。 */
     private void bindUser(LinearLayout box, Conversation.Item it) {
-        box.setBackground(Ui.round(ctx, R.color.primary_soft, 0, 16));
-        int p = Ui.dp(ctx, 12);
-        box.setPadding(Ui.dp(ctx, 14), p, Ui.dp(ctx, 14), p);
-        TextView t = Ui.body(ctx, it.text);
-        t.setTextIsSelectable(true);
-        box.addView(t);
-        box.setOnLongClickListener(v -> {
-            copy(it.text.toString());
+        box.setGravity(Gravity.END);
+        if (!it.images.isEmpty()) {
+            LinearLayout imgs = Ui.hbox(ctx);
+            imgs.setGravity(Gravity.END);
+            for (String p : it.images) {
+                ImageView iv = new ImageView(ctx);
+                iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                android.graphics.Bitmap bm = Attach.thumb(p, Ui.dp(ctx, 120));
+                if (bm != null) iv.setImageBitmap(bm);
+                else iv.setImageResource(R.drawable.ic_image);
+                iv.setBackground(Ui.round(ctx, R.color.surface2, 0, 18));
+                iv.setClipToOutline(true);
+                iv.setContentDescription("图片");
+                final String path = p;
+                iv.setOnClickListener(v -> openImage(path));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Ui.dp(ctx, 120), Ui.dp(ctx, 120));
+                lp.leftMargin = Ui.dp(ctx, 6);
+                imgs.addView(iv, lp);
+            }
+            HorizontalScrollView hs = new HorizontalScrollView(ctx);
+            hs.setHorizontalScrollBarEnabled(false);
+            hs.addView(imgs);
+            LinearLayout.LayoutParams hl = Ui.wrap();
+            hl.bottomMargin = Ui.dp(ctx, 6);
+            box.addView(hs, hl);
+        }
+        String text = it.text.toString();
+        if (text.trim().isEmpty() && it.mentions.isEmpty()) return;
+        LinearLayout bubble = Ui.vbox(ctx);
+        bubble.setBackground(Ui.round(ctx, R.color.bubble, 0, 22));
+        bubble.setPadding(Ui.dp(ctx, 16), Ui.dp(ctx, 10), Ui.dp(ctx, 16), Ui.dp(ctx, 11));
+        if (!it.mentions.isEmpty()) {
+            LinearLayout tags = Ui.hbox(ctx);
+            for (String m : it.mentions) {
+                TextView t = Ui.text(ctx, "@" + m, 13, R.color.text2);
+                t.setBackground(Ui.round(ctx, R.color.card, 0, 10));
+                t.setPadding(Ui.dp(ctx, 8), Ui.dp(ctx, 2), Ui.dp(ctx, 8), Ui.dp(ctx, 2));
+                t.setSingleLine();
+                t.setMaxWidth(Ui.dp(ctx, 200));
+                t.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+                LinearLayout.LayoutParams lp = Ui.wrap();
+                lp.rightMargin = Ui.dp(ctx, 6);
+                tags.addView(t, lp);
+            }
+            HorizontalScrollView hs = new HorizontalScrollView(ctx);
+            hs.setHorizontalScrollBarEnabled(false);
+            hs.addView(tags);
+            LinearLayout.LayoutParams tl = Ui.wrap();
+            tl.bottomMargin = Ui.dp(ctx, text.trim().isEmpty() ? 0 : 6);
+            bubble.addView(hs, tl);
+        }
+        if (!text.trim().isEmpty()) {
+            TextView t = Ui.body(ctx, text);
+            t.setTextIsSelectable(true);
+            bubble.addView(t, Ui.wrap()); // 不能用默认的 MATCH_PARENT：气泡是 WRAP_CONTENT，会被压成标签那么窄
+        }
+        bubble.setOnLongClickListener(v -> {
+            copy(text);
             return true;
         });
+        box.addView(bubble, Ui.wrap());
+    }
+
+    private void openImage(String path) {
+        try {
+            File src = new File(path);
+            File dir = new File(ctx.getCacheDir(), "share");
+            dir.mkdirs();
+            File dst = new File(dir, src.getName());
+            java.nio.file.Files.copy(src.toPath(), dst.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            android.net.Uri u = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".files", dst);
+            ctx.startActivity(new Intent(Intent.ACTION_VIEW).setDataAndType(u, "image/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));
+        } catch (Exception e) {
+            Toast.makeText(ctx, "无法打开图片", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void bindAgent(LinearLayout box, Conversation.Item it) {
@@ -206,9 +273,9 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
     }
 
     private LinearLayout cardShell(LinearLayout box, int icon, int iconTint, String title, String status, int statusColor, final String key, boolean expandable) {
-        box.setBackground(Ui.round(ctx, R.color.card, R.color.border, 12));
-        int p = Ui.dp(ctx, 12);
-        box.setPadding(p, Ui.dp(ctx, 8), p, Ui.dp(ctx, 10));
+        box.setBackground(Ui.round(ctx, R.color.card, R.color.border, 18));
+        int p = Ui.dp(ctx, 14);
+        box.setPadding(p, Ui.dp(ctx, 8), p, Ui.dp(ctx, 12));
         LinearLayout head = Ui.hbox(ctx);
         head.setMinimumHeight(Ui.dp(ctx, 36));
         head.addView(Ui.icon(ctx, icon, iconTint, 20));
@@ -286,7 +353,7 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
             tint = R.color.text2;
         } else {
             title = "命令已完成";
-            tint = R.color.primary;
+            tint = R.color.success;
             icon = R.drawable.ic_check;
         }
         String status = null;
@@ -316,7 +383,7 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
                 HorizontalScrollView hs = new HorizontalScrollView(ctx);
                 o.setHorizontallyScrolling(true);
                 hs.addView(o);
-                hs.setBackground(Ui.round(ctx, R.color.code_bg, 0, 8));
+                hs.setBackground(Ui.round(ctx, R.color.code_bg, 0, 12));
                 hs.setPadding(Ui.dp(ctx, 8), Ui.dp(ctx, 6), Ui.dp(ctx, 8), Ui.dp(ctx, 6));
                 box.addView(hs, Ui.matchWrap(ctx, 8));
                 if (it.outputTruncated) box.addView(Ui.small(ctx, "较早的输出未保留"), Ui.matchWrap(ctx, 4));
@@ -384,7 +451,10 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
         } else if ("failed".equals(st)) {
             title = "文件改动未完成";
             tint = R.color.error;
-        } else if ("completed".equals(st)) title = "文件改动已应用";
+        } else if ("completed".equals(st)) {
+            title = "文件改动已应用";
+            tint = R.color.success;
+        }
         else {
             title = "文件改动（状态待确认）"; // 被中断或未知状态：不能报成功
             tint = R.color.text2;
@@ -474,7 +544,7 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
         t.setHorizontallyScrolling(true);
         HorizontalScrollView hs = new HorizontalScrollView(ctx);
         hs.addView(t);
-        hs.setBackground(Ui.round(ctx, R.color.code_bg, 0, 8));
+        hs.setBackground(Ui.round(ctx, R.color.code_bg, 0, 12));
         hs.setPadding(Ui.dp(ctx, 8), Ui.dp(ctx, 6), Ui.dp(ctx, 8), Ui.dp(ctx, 6));
         return hs;
     }
@@ -517,7 +587,7 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
         boolean retry = "retry".equals(it.level);
         boolean info = "info".equals(it.level);
         int fill = error ? R.color.error_soft : info ? R.color.surface2 : R.color.warning_soft;
-        box.setBackground(Ui.round(ctx, fill, 0, 12));
+        box.setBackground(Ui.round(ctx, fill, 0, 18));
         int p = Ui.dp(ctx, 12);
         box.setPadding(p, Ui.dp(ctx, 10), p, Ui.dp(ctx, 10));
         LinearLayout row = Ui.hbox(ctx);

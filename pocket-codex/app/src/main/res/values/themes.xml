@@ -6,7 +6,6 @@
         <item name="colorPrimaryContainer">@color/primary_soft</item>
         <item name="colorOnPrimaryContainer">@color/text</item>
         <item name="colorSecondary">@color/primary</item>
-        <item name="colorSecondaryContainer">@color/primary_soft</item>
         <item name="colorOnSecondaryContainer">@color/text</item>
         <item name="colorTertiary">@color/warning</item>
         <item name="colorError">@color/error</item>
@@ -32,6 +31,8 @@
         <item name="shapeAppearanceCornerLarge">@style/Shape.Large</item>
         <item name="materialButtonStyle">@style/Button.Primary</item>
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.PocketCodex.BottomSheet</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.PocketCodex.Dialog</item>
+        <item name="colorSecondaryContainer">@color/primary_soft</item>
     </style>
 
     <style name="Shape.Small" parent="">
@@ -46,21 +47,28 @@
 
     <style name="Shape.Large" parent="">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">16dp</item>
+        <item name="cornerSize">24dp</item>
     </style>
 
+    <style name="Shape.Pill" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <!-- 按钮做成 ChatGPT 那样的胶囊：近黑底白字 -->
     <style name="Button.Primary" parent="Widget.Material3.Button">
-        <item name="android:minHeight">48dp</item>
-        <item name="android:textSize">15sp</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
         <item name="android:letterSpacing">0</item>
-        <item name="shapeAppearance">@style/Shape.Medium</item>
+        <item name="shapeAppearance">@style/Shape.Pill</item>
     </style>
 
     <style name="Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:minHeight">48dp</item>
         <item name="android:textSize">15sp</item>
         <item name="android:letterSpacing">0</item>
-        <item name="shapeAppearance">@style/Shape.Medium</item>
+        <item name="shapeAppearance">@style/Shape.Pill</item>
         <item name="strokeColor">@color/border</item>
     </style>
 
@@ -76,6 +84,37 @@
 
     <style name="BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
         <item name="backgroundTint">@color/card</item>
+        <item name="shapeAppearance">@style/Shape.Sheet</item>
+    </style>
+
+    <style name="Shape.Sheet" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">32dp</item>
+        <item name="cornerSizeTopRight">32dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <!-- 对话框：大圆角白卡片，按钮文字用正文色 -->
+    <style name="ThemeOverlay.PocketCodex.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="shapeAppearanceOverlay">@style/Shape.Dialog</item>
+        <item name="colorSurface">@color/card</item>
+        <item name="colorSurfaceContainerHigh">@color/card</item>
+        <item name="colorPrimary">@color/text</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Button.DialogText</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Button.DialogText</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Button.DialogText</item>
+    </style>
+
+    <style name="Shape.Dialog" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">28dp</item>
+    </style>
+
+    <style name="Button.DialogText" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:letterSpacing">0</item>
     </style>
 
     <style name="Text.Title" parent="">
@@ -98,7 +137,7 @@
 
     <style name="Text.Section" parent="">
         <item name="android:textSize">13sp</item>
-        <item name="android:textColor">@color/primary</item>
+        <item name="android:textColor">@color/text2</item>
         <item name="android:textStyle">bold</item>
     </style>
 

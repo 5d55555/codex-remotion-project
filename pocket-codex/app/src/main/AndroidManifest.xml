@@ -41,6 +41,10 @@
         <activity android:name=".FileViewerActivity" android:exported="false" />
         <activity android:name=".FolderPickerActivity" android:exported="false" />
         <activity android:name=".DiagnosticsActivity" android:exported="false" />
+        <activity
+            android:name=".TerminalActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <service
             android:name=".RuntimeService"

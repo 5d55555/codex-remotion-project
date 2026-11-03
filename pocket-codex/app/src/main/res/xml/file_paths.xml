@@ -2,4 +2,6 @@
 <!-- 只开放分享专用的缓存目录：要分享的文件先复制到这里（运行时目录、凭据永远不会被分享） -->
 <paths>
     <cache-path name="share" path="share/" />
+    <!-- 拍照：相机应用把照片写到这里，App 再复制进附件目录 -->
+    <cache-path name="camera" path="camera/" />
 </paths>

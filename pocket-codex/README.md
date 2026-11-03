@@ -4,9 +4,19 @@
 
 独立开发的客户端，使用官方发布的 Codex CLI，与 OpenAI 无官方隶属关系。
 
+## v0.2 更新（2026-11-03）
+
+- **界面按 ChatGPT 手机端重做**：白底、近黑主色、圆形顶栏按钮；新对话顶部“聊天 / 工作”分段；底部大圆角输入卡片——“＋”、模型标签（如“6.1 Sol 中”）、麦克风、蓝色圆形发送键（空输入时是“语音输入并发送”，运行中变成黑色停止键）。
+- **“＋”菜单**：拍照、照片（可多选）、文件、插件。照片缩到长边 2048、按 EXIF 转正后作为 `localImage` 发给 Codex；文件复制到应用私有的附件目录，工作模式让 Codex 按路径读，聊天模式附带 64 KB 以内的文本内容。
+- **输入“@”**：在输入框上方列出技能和插件（`skills/list`、`plugin/list`：创建图像、代码审查、OpenAI 文档、GitHub……）和工作区里的文件（`fuzzyFileSearch`），选中后变成输入框里的标签。
+- **模型面板**（点模型标签，替换掉原来的单选对话框）：模型 / 推理 / 速度 / 权限四行，点一行在上方弹出下拉卡片，底部黑色“完成”。列表来自账号的 `model/list`；速度档用模型的 `serviceTiers`（快速 = 用量更高），模型不支持时自动回到标准。
+- **聊天模式**：会话放在空目录，命令和改文件请求自动拒绝；**工作模式**：在工作区里读写文件、跑命令。
+- **开发工具（Node.js · Git · Python）**：设置 → 开发工具 显示安装进度、各工具版本，可安装 / 重装 / 取消 / 换软件源。来自 Termux 官方仓库（含国内镜像），InRelease 签名校验；Codex 的 PATH 里有 node、npm、npx、git、python、pip、bash、rg、curl、jq 和 `pkg install`。
+- **终端**：直接在手机上运行命令，环境和 Codex 一样，**不经过模型、不消耗额度**；记住 cd 后的目录，停止时连子进程一起结束。**常用命令**面板列出 Node.js、npm、Git、Python、pkg 的常用写法，点一条放进输入框并选中要改的部分。
+
 ## 怎么用
 
-1. 安装 APK（`口袋工坊-v0.1.apk`）。安卓可能提示“此应用专为旧版 Android 打造”或 Play Protect 警告：这是 targetSdk 28 的缘故（见下面“为什么是 targetSdk 28”），选“仍然安装”。
+1. 安装 APK（`口袋工坊-v0.2.apk`）。安卓可能提示“此应用专为旧版 Android 打造”或 Play Protect 警告：这是 targetSdk 28 的缘故（见下面“为什么是 targetSdk 28”），选“仍然安装”。
 2. **安装 Codex CLI**：点“下载并安装”。从 npm 官方仓库（或国内镜像 npmmirror，安装包会和官方摘要比对）下载 `@openai/codex` 的 Linux 平台包（arm64 约 164 MB），断点续传、sha512 校验，只解出 `codex` 和 `codex-code-mode-host` 两个程序（约 350 MB），先在手机上自检 `codex --version`，通过才启用。
 3. **登录**：App 在后台运行 `codex login --device-auth`，输出重定向到文件（`<应用目录>/runtime/logs/device-auth.log`），从里面解析出网址和一次性代码显示出来。点“复制代码并打开浏览器”，在 `auth.openai.com/codex/device` 输入代码、登录 ChatGPT。代码有效期 15 分钟，**过期前 20 秒自动换新代码**，页面倒计时环会提示；网络错误自动退避重试。也可以改用 API 密钥登录。
    - 如果网页提示设备码授权没开启：ChatGPT 网页版 → 设置 → 安全，开启 Codex 的设备码授权（团队账号可能要管理员允许）。
@@ -68,7 +78,9 @@ codex app-server（musl 静态程序，子进程）
 - 安卓应用进程有 seccomp 白名单：Android 12 以下调用 `pidfd_open` 等较新的系统调用可能被直接杀掉（SIGSYS）。这里没有真机，**首版以真机自检为准**：设置 → 自检与诊断，结果可以复制发给开发者（不含凭据、登录代码、邮箱、项目内容）。
 - Android 12+ 的“幽灵进程”限制可能在后台杀掉子进程；前台服务能降低但不能杜绝。被打断时可以在设置 → 电池限制放宽。
 - 只支持 64 位（arm64-v8a、x86_64）：官方 Codex CLI 只有这两种 Linux 构建。
-- 首版不带 git、python、node、rg；Agent 用安卓自带的 toybox 命令和 apply_patch 改文件。
+- 开发工具包没装好之前，Agent 只有安卓自带的 toybox 命令和 apply_patch；装好后才有 node、git、python 等（设置 → 开发工具）。
+- 终端没有伪终端：不支持 vim、python 交互模式这类需要键盘交互的程序；git 需要密码时不会提示（用令牌写进网址或 credential store）。
+- 语音输入用系统的语音识别服务（`RecognizerIntent`）；没装的手机会提示改用输入法的语音键。
 - 还没做（下一版）：发送记录持久化对账（进程中途死掉时“提交状态待确认”）、会话和文件搜索、手动 HTTP 代理设置、平板双栏、存储用量统计。
 
 ## 构建与测试
@@ -78,6 +90,7 @@ codex app-server（musl 静态程序，子进程）
 CODEX_BIN=<x64 codex> CODEX_AUTH=~/.codex/auth.json ./gradlew :core:test --tests '*CodexIntegrationTest*'
                                           # 真实 codex 0.166 经 LocalProxy：设备码拿到代码、app-server 开会话、每步确认下批准命令、文件真的写了
 ./gradlew :smoke:testDebugUnitTest        # Robolectric 真实 Activity 跑一遍各个状态并截图（smoke/shots/，浅色和深色）
+                                          # v0.2 新增：23–33 号截图（新对话、聊天模式、＋菜单、@、附件、模型/推理/速度面板、对话、⋯菜单）、13 开发工具、17 终端、18 常用命令
 ./gradlew :app:assembleRelease            # 发布包（R8），测试签名 signing/test.jks
 ```
 

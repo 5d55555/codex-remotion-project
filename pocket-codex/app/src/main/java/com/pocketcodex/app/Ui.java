@@ -61,9 +61,8 @@ final class Ui {
     }
 
     static TextView section(Context c, CharSequence s) {
-        TextView t = text(c, s, 14, R.color.primary);
-        t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setPadding(dp(c, 16), dp(c, 20), dp(c, 16), dp(c, 8));
+        TextView t = text(c, s, 13, R.color.text2);
+        t.setPadding(dp(c, 20), dp(c, 24), dp(c, 20), dp(c, 6));
         return t;
     }
 
@@ -74,6 +73,65 @@ final class Ui {
         d.setCornerRadius(dp(c, radiusDp));
         if (strokeRes != 0) d.setStroke(dp(c, 1), color(c, strokeRes));
         return d;
+    }
+
+    /** 圆形底。 */
+    static GradientDrawable circle(Context c, int fillRes) {
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(color(c, fillRes));
+        return d;
+    }
+
+    /** 按下时的水波纹（加在前景上，不改背景）。 */
+    static void ripple(View v, boolean borderless) {
+        TypedValue tv = new TypedValue();
+        v.getContext().getTheme().resolveAttribute(borderless ? android.R.attr.selectableItemBackgroundBorderless : android.R.attr.selectableItemBackground, tv, true);
+        v.setForeground(androidx.core.content.ContextCompat.getDrawable(v.getContext(), tv.resourceId));
+        v.setClickable(true);
+    }
+
+    /** 阴影（圆角按背景的轮廓走）。 */
+    static void elevate(View v, float dp) {
+        v.setElevation(dp(v.getContext(), dp));
+        v.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            int sh = color(v.getContext(), R.color.shadow);
+            v.setOutlineAmbientShadowColor(sh);
+            v.setOutlineSpotShadowColor(sh);
+        }
+    }
+
+    /** ChatGPT 风格的圆形按钮：白底细边 + 轻阴影，中间一个线条图标。 */
+    static ImageView roundButton(Context c, int icon, String desc, View.OnClickListener l) {
+        ImageView b = new ImageView(c);
+        b.setImageResource(icon);
+        b.setImageTintList(ColorStateList.valueOf(color(c, R.color.text)));
+        b.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        int p = dp(c, 12);
+        b.setPadding(p, p, p, p);
+        GradientDrawable bg = circle(c, R.color.card);
+        bg.setStroke(Math.max(1, dp(c, 1) / 2), color(c, R.color.border));
+        b.setBackground(bg);
+        elevate(b, 1.5f);
+        ripple(b, true);
+        b.setContentDescription(desc);
+        b.setOnClickListener(l);
+        b.setLayoutParams(new LinearLayout.LayoutParams(dp(c, 46), dp(c, 46)));
+        return b;
+    }
+
+    /** 无底色的图标按钮（输入框里的 +、麦克风）。 */
+    static ImageView plainIcon(Context c, int icon, int tintRes, int sizeDp, String desc, View.OnClickListener l) {
+        ImageView b = new ImageView(c);
+        b.setImageResource(icon);
+        b.setImageTintList(ColorStateList.valueOf(color(c, tintRes)));
+        b.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        b.setContentDescription(desc);
+        b.setOnClickListener(l);
+        ripple(b, true);
+        b.setLayoutParams(new LinearLayout.LayoutParams(dp(c, sizeDp), dp(c, sizeDp)));
+        return b;
     }
 
     static LinearLayout vbox(Context c) {
