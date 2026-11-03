@@ -74,6 +74,15 @@ public final class Prefs {
         p.edit().putBoolean("work_mode", b).apply();
     }
 
+    /** 设置页头像下面显示的名字（空 = 用邮箱前缀）。 */
+    public String nickname() {
+        return p.getString("nickname", null);
+    }
+
+    public void setNickname(String n) {
+        p.edit().putString("nickname", n == null || n.trim().isEmpty() ? null : n.trim()).apply();
+    }
+
     /** 强调色（Ui.ACCENT_NAMES 的下标）。 */
     public int accent() {
         return p.getInt("accent", 0);

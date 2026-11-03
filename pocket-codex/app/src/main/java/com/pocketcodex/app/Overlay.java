@@ -88,10 +88,18 @@ final class Overlay {
         }
     }
 
-    /** 底部面板：从下往上滑出。 */
+    /** 底部面板：从下往上滑出。内容比屏幕高（横屏、大字体）时可以滚动，顶上留一点空让人知道下面还有页面。 */
     void addSheet(View sheet) {
         sheet.setClickable(true);
-        layer.addView(sheet, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM));
+        android.widget.ScrollView sv = new android.widget.ScrollView(a);
+        sv.setFillViewport(false);
+        sv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        sv.setVerticalScrollBarEnabled(false);
+        sv.addView(sheet);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
+        lp.topMargin = Ui.dp(a, 40);
+        layer.addView(sv, lp);
+        sheet = sv;
         if (animate) {
             sheet.setTranslationY(Ui.dp(a, 400));
             sheet.animate().translationY(0).setDuration(220).setInterpolator(new DecelerateInterpolator(1.6f)).start();

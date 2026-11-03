@@ -105,10 +105,15 @@ final class SessionDrawer {
 
         ScrollView sv = new ScrollView(a);
         sv.setClipToPadding(false);
-        sv.setPadding(0, 0, 0, dp(96));
+        sv.setVerticalScrollBarEnabled(false);
+        sv.setPadding(0, dp(6), 0, dp(110));
         LinearLayout content = Ui.vbox(a);
         sv.addView(content);
-        col.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        // 列表滚到顶部标题下面时淡出，不是一刀切
+        FrameLayout svHost = new FrameLayout(a);
+        svHost.addView(sv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        svHost.addView(Ui.fade(a, R.color.bg, true), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(22), Gravity.TOP));
+        col.addView(svHost, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         content.addView(navRow(R.drawable.ic_folder_line, "文件", v -> open(new Intent(a, MainActivity.class).putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_FILES))));
         content.addView(navRow(R.drawable.ic_terminal_line, "终端", v -> open(new Intent(a, TerminalActivity.class))));
@@ -131,7 +136,8 @@ final class SessionDrawer {
         list = Ui.vbox(a);
         content.addView(list, Ui.matchWrap(a, 12));
 
-        // 底部：新对话（强调色胶囊）+ 设置（圆形）
+        // 底部：新对话（强调色胶囊）+ 设置（圆形），后面的列表淡出
+        root.addView(Ui.fade(a, R.color.bg_low, false), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(130), Gravity.BOTTOM));
         FrameLayout bottom = new FrameLayout(a);
         LinearLayout pill = Ui.hbox(a);
         pill.setBackground(roundColor(Ui.accent(a), dp(30)));

@@ -779,6 +779,14 @@ public final class Toolkit {
             List<String> files = new ArrayList<>();
             try {
                 extractDeb(deb, dest, prefix.getAbsolutePath(), files, p);
+                // 我们不执行包的安装脚本：postinst 里 update-alternatives 建的链接（java、javac、keytool、editor、vi……）自己建
+                String postinst = null;
+                try (InputStream raw = new BufferedInputStream(new FileInputStream(deb), 64 * 1024)) {
+                    postinst = Deb.controlFile(raw, "postinst");
+                } catch (IOException ignored) {
+                    // 没有 control.tar 或读不了：没有 alternatives
+                }
+                for (String l : applyAlternatives(postinst, dest)) if (!files.contains(l)) files.add(l);
             } catch (InstallException e) {
                 throw e;
             } catch (IOException e) {
@@ -799,6 +807,37 @@ public final class Toolkit {
 
     private void clearDebs() {
         Installer.deleteTree(new File(work, "debs"));
+    }
+
+    /**
+     * 按 postinst 里的 update-alternatives（Termux 自动生成的格式：--install "链接" "名字" "目标" 优先级，--slave "链接" "名字" "目标"）
+     * 建相对路径的符号链接。目标不存在（例如被我们省略的手册页）或链接已经指向有效文件的不动。返回新建的链接（相对前缀）。
+     */
+    static List<String> applyAlternatives(String postinst, File dest) {
+        List<String> made = new ArrayList<>();
+        if (postinst == null || !postinst.contains("update-alternatives")) return made;
+        String joined = postinst.replace("\\\n", " ");
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("--(?:install|slave)\\s+\"?([^\"\\s]+)\"?\\s+\"?([^\"\\s]+)\"?\\s+\"?([^\"\\s]+)\"?").matcher(joined);
+        String pre = TERMUX_PREFIX + "/";
+        while (m.find()) {
+            String link = m.group(1), target = m.group(3);
+            if (!link.startsWith(pre) || !target.startsWith(pre)) continue;
+            String lr = link.substring(pre.length()), tr = target.substring(pre.length());
+            if (!safeRel(lr) || !safeRel(tr) || dropped(lr)) continue;
+            File lf = new File(dest, lr), tf = new File(dest, tr);
+            if (!tf.exists()) continue;
+            try {
+                if (lf.exists()) continue;                // 已经有了（别的包提供的，或者是真文件）
+                if (isSymlink(lf)) Files.delete(lf.toPath()); // 断掉的旧链接
+                File dir = lf.getParentFile();
+                if (!dir.isDirectory() && !dir.mkdirs()) continue;
+                Files.createSymbolicLink(lf.toPath(), dir.toPath().relativize(tf.toPath()));
+                made.add(lr);
+            } catch (IOException | UnsupportedOperationException ignored) {
+                // 建不了就算了：程序本身还在原位置
+            }
+        }
+        return made;
     }
 
     /** 装完后的整理：bin/sh、tmp、给 python -m venv 用的 pip wheel。 */
@@ -1158,7 +1197,21 @@ public final class Toolkit {
         e.put("npm_config_fund", "false");
         e.put("PIP_DISABLE_PIP_VERSION_CHECK", "1");
         e.put("PYTHONUNBUFFERED", "1");
+        File jdk = javaHome(prefix);
+        if (jdk != null) e.put("JAVA_HOME", jdk.getAbsolutePath()); // Gradle、apktool、jadx 这些要 JAVA_HOME
         return e;
+    }
+
+    /** 装了 OpenJDK 时的 JAVA_HOME（优先 21，再 17，再随便一个）。 */
+    static File javaHome(File prefix) {
+        File jvm = new File(prefix, "lib/jvm");
+        for (String n : new String[]{"java-21-openjdk", "java-17-openjdk"}) {
+            File d = new File(jvm, n);
+            if (new File(d, "bin/java").exists()) return d;
+        }
+        File[] all = jvm.listFiles();
+        if (all != null) for (File d : all) if (new File(d, "bin/java").exists()) return d;
+        return null;
     }
 
     /** PATH 里要放在系统目录前面的目录（按顺序）。 */
@@ -1406,6 +1459,46 @@ public final class Toolkit {
                     if (name.endsWith(".gz")) return new GZIPInputStream(body, 64 * 1024);
                     if (name.equals("data.tar")) return body;
                     throw new IOException("不支持的压缩格式：" + name);
+                }
+                skipFully(in, size + (size & 1));
+            }
+        }
+
+        /** control.tar.* 里的一个文件（例如 postinst）；没有就返回 null。 */
+        static String controlFile(InputStream in, String wanted) throws IOException {
+            byte[] magic = new byte[8];
+            readFully(in, magic);
+            if (!new String(magic, StandardCharsets.US_ASCII).equals("!<arch>\n")) throw new IOException("不是 .deb 文件");
+            byte[] h = new byte[60];
+            while (true) {
+                int first = in.read();
+                if (first == '\n') first = in.read();
+                if (first < 0) return null;
+                h[0] = (byte) first;
+                readFully(in, h, 1, 59);
+                String name = new String(h, 0, 16, StandardCharsets.US_ASCII).trim();
+                if (name.endsWith("/")) name = name.substring(0, name.length() - 1);
+                long size = parseLong(new String(h, 48, 10, StandardCharsets.US_ASCII));
+                if (size < 0 || size > (4L << 30)) throw new IOException(".deb 成员大小不对");
+                if (name.startsWith("control.tar")) {
+                    InputStream body = new Bounded(in, size);
+                    InputStream tarIn = name.endsWith(".xz") ? new org.tukaani.xz.XZInputStream(body, 64 << 20)
+                            : name.endsWith(".gz") ? new GZIPInputStream(body, 16 * 1024) : body;
+                    TarReader t = new TarReader(tarIn);
+                    TarReader.Entry e;
+                    while ((e = t.next()) != null) {
+                        String n = e.name.startsWith("./") ? e.name.substring(2) : e.name;
+                        if (!n.equals(wanted) || e.size > (1 << 20)) continue;
+                        byte[] buf = new byte[(int) e.size];
+                        int off = 0;
+                        while (off < buf.length) {
+                            int r = t.read(buf, off, buf.length - off);
+                            if (r < 0) break;
+                            off += r;
+                        }
+                        return new String(buf, 0, off, StandardCharsets.UTF_8);
+                    }
+                    return null;
                 }
                 skipFully(in, size + (size & 1));
             }

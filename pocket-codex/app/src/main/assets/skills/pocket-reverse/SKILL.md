@@ -42,6 +42,9 @@ rabin2 -I -i -E -z lib.so | head -100
 ## 固件 / 未知数据
 
 `binwalk -e firmware.bin`（提取），`yara rules.yar target`，`xxd`/`hexedit` 看字节。
+`rizin`（radare2 的分支，命令相近）、`lldb`/`gdb` 调试自己启动的程序、`upx -d` 解 UPX 壳、`patchelf --print-needed`、`protoc --decode_raw < blob` 看未知 protobuf、`dtc -I dtb -O dts` 转设备树。
+
+写脚本分析时可以用纯 Python 的库（`pip install` 一般能直接装）：`pyelftools`（ELF/DWARF）、`pefile`（PE）、`construct` / `kaitaistruct`（声明式二进制解析）、`hachoir`。`androguard`、`lief` 有原生依赖，先确认 Termux 的 `python-lxml`、`python-cryptography` 已装，再按版本装，装不上就换上面的纯 Python 方案。
 
 ## 更强的工具（可选，先问用户）
 

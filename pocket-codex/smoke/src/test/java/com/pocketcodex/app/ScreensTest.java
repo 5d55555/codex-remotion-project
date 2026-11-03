@@ -277,15 +277,19 @@ public class ScreensTest {
         assertTrue(hasText(root, "notes"));
         layout(fa);
         shot("11_files", fa);
-        // 设置页
+        // 设置页（首页只有几个入口）
+        rt.catalog.add(new Catalog(true, "pocket-apk-build", "构建 APK", "aapt2 + d8 + apksigner，或 Gradle 覆盖 aapt2", null, null, "/x/SKILL.md"));
+        rt.catalog.add(new Catalog(true, "pocket-reverse", "逆向分析", "apktool、jadx、radare2，及 leanrea / REA / r2mcp", null, null, "/x/SKILL.md"));
+        rt.catalog.add(new Catalog(true, "imagegen", "Image Gen", "Generate or edit images", null, null, "/x/SKILL.md"));
         MainActivity a = Robolectric.buildActivity(MainActivity.class, new Intent(RuntimeEnvironment.getApplication(), MainActivity.class)
                 .putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_SETTINGS)).setup().get();
         settle();
         root = a.getWindow().getDecorView();
         assertTrue(hasText(root, "账户"));
+        assertTrue(hasText(root, "我的口袋工坊"));
+        assertTrue(hasText(root, "技能与插件"));
         assertTrue(hasText(root, "用量与限额"));
-        assertTrue(hasText(root, "强调色"));
-        assertTrue(hasText(root, "安装开发工具"));
+        assertFalse("具体选项在子页面里", hasText(root, "信任用户安装的证书"));
         layout(a);
         shot("12_settings", a);
         // 外观下拉
@@ -294,40 +298,54 @@ public class ScreensTest {
         shot("12b_settings_dropdown", a);
         a.getOnBackPressedDispatcher().onBackPressed();
         idle();
-        // 搜索设置
+        // 搜索设置：能搜到子页面里的项
         android.widget.EditText search = (android.widget.EditText) field(a, "searchBox");
-        search.setText("终端");
+        search.setText("证书");
         idle();
-        assertTrue(hasText(root, "直接运行 node"));
-        assertFalse(findText(root, "强调色").isShown());
+        assertTrue(hasText(root, "信任用户安装的证书"));
+        assertFalse(findText(root, "强调色") != null && findText(root, "强调色").isShown());
         layout(a);
         shot("12c_settings_search", a);
         search.setText("");
         idle();
+        // 开发工具子页
+        tap(root, "开发工具");
+        assertTrue(hasText(root, "安装开发工具"));
+        assertTrue(hasText(root, "网络调试与压测"));
+        assertTrue(hasText(root, "终端"));
+        layout(a);
+        shot("13_settings_devtools", a);
         // 开发工具：装好以后显示各工具版本；进度变化只刷新那张卡片
         rt.toolkitState = CodexRuntimeManager.ToolkitState.READY;
-        rt.toolkitVersions.put("node", "24.11.1");
+        rt.toolkitVersions.put("node", "24.22.2");
         rt.toolkitVersions.put("npm", "11.6.2");
         rt.toolkitVersions.put("git", "2.51.2");
-        rt.toolkitVersions.put("python3", "3.12.12");
-        rt.toolkitVersions.put("pip", "25.3");
+        rt.toolkitVersions.put("python3", "3.14.8");
+        rt.toolkitVersions.put("pip", "26.3");
         rt.toolkitVersions.put("bash", "5.3.3");
-        rt.toolkitVersions.put("rg", "15.1.0");
-        rt.toolkitVersions.put("curl", "8.17.0");
+        rt.toolkitVersions.put("rg", "15.2.0");
+        rt.toolkitVersions.put("curl", "8.23.0");
         rt.toolkitVersions.put("ffmpeg", "9.0.2");
-        rt.toolkitPackages.addAll(java.util.Arrays.asList("bash", "nodejs-lts", "git", "ffmpeg", "imagemagick", "graphicsmagick", "sox", "mediainfo", "gifsicle", "gifski",
-                "librsvg", "python-pillow", "python-numpy", "fontconfig-utils", "ttf-dejavu"));
+        rt.toolkitPackages.addAll(com.pocketcodex.core.ToolBundles.find("media").packages);
+        rt.toolkitPackages.add("bash");
         rt.setStageForTest(CodexRuntimeManager.Stage.READY);
         idle();
         assertTrue(hasText(root, "开发工具已就绪"));
-        assertTrue(hasText(root, "Node.js 24.11.1"));
-        assertTrue(hasText(root, "逆向分析"));
+        assertTrue(hasText(root, "Node.js 24.22.2"));
         assertTrue(hasText(root, "已安装")); // 剪辑与程序化动画
         layout(a);
-        scrollTo(root, "开发工具已就绪");
-        shot("13_settings_devtools", a);
-        scrollTo(root, "更多编程语言");
-        shot("13b_settings_bundles", a);
+        shot("13b_settings_devtools_ready", a);
+        // 返回首页，再进技能与插件
+        a.getOnBackPressedDispatcher().onBackPressed();
+        idle();
+        assertTrue(hasText(root, "我的口袋工坊"));
+        tap(root, "技能与插件");
+        assertTrue(hasText(root, "构建 APK"));
+        assertTrue(hasText(root, "怎么加 MCP 服务"));
+        layout(a);
+        shot("13c_settings_skills", a);
+        a.getOnBackPressedDispatcher().onBackPressed();
+        idle();
         // 用量与限额（底部面板）
         rt.lastRateLimits = Json.parseObject("{\"rateLimits\":{\"primary\":{\"usedPercent\":37,\"windowDurationMins\":300,\"resetsAt\":1793733725},"
                 + "\"secondary\":{\"usedPercent\":76,\"windowDurationMins\":10080,\"resetsAt\":1793785825}}}");

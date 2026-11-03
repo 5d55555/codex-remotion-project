@@ -42,6 +42,7 @@ adb logcat -b crash -d -v threadtime > "$OUT/crash.txt"; kill $LP
 - 用资源 ID / 文字 / content-desc 定位元素，等状态满足再操作；不要靠固定 sleep。
 - `am start` 成功不等于测试通过：检查 UI 树里的文字、截图（可以把截图给用户看）、crash 日志。
 - 压力测试：`adb shell monkey -p $APP -s 20261103 --throttle 100 --pct-syskeys 0 -v 2000 > "$OUT/monkey.txt"`。
+- 批量操作也可以用纯 Python 的 `pure-python-adb`（连现有的 adb server）；网络接口调试用 `socat`、`nmap`（`ncat`）、`wrk`/`vegeta` 压测、`testssl.sh` 查 TLS（“网络调试与压测”工具集）。
 - 正式回归：Gradle `assembleDebugAndroidTest`，两个 APK 都装上后 `adb shell am instrument -w -r <测试包>/androidx.test.runner.AndroidJUnitRunner`。
 - 测试时屏幕要亮着、已解锁；口袋工坊自己也在前台跑着，点击可能落到口袋工坊上——先 `am start` 目标 App。
 

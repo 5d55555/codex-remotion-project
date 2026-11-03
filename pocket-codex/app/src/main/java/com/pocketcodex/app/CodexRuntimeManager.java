@@ -378,11 +378,13 @@ public final class CodexRuntimeManager {
         }
         CodexRuntime.Layout l = paths.layout(codexBin);
         l.toolkitReady = toolkitUsable;
+        codexHasToolkit = toolkitUsable;
         CodexRuntime.Config cfg = new CodexRuntime.Config();
         cfg.approvalPolicy = prefs.mode();
         cfg.model = prefs.model();
         cfg.reasoningEffort = prefs.effort();
         CodexRuntime.prepare(l, cfg);
+        runtimeConfig = cfg;
         return CodexRuntime.env(l, proxy.url(), System.getenv("PATH"), TimeZone.getDefault().getID());
     }
 
@@ -422,6 +424,12 @@ public final class CodexRuntimeManager {
         }
         if (!tmp.renameTo(to)) throw new IOException("写入失败：" + to);
     }
+
+    /** 这次启动的 codex 环境里有没有工具包（没有的话工具包装好后要重启它）。 */
+    private volatile boolean codexHasToolkit;
+
+    /** 这次启动 codex 用的设置（用 -c 传）。 */
+    private volatile CodexRuntime.Config runtimeConfig;
 
     /** 证书设置变了：下次启动重新导出。 */
     public void invalidateCerts() {
@@ -688,13 +696,17 @@ public final class CodexRuntimeManager {
                 });
                 versions = toolkitSelfTest();
                 if (versions == null) err = "装好了，但自检没通过（bash 无法运行）";
+                else {
+                    String miss = missingCommands(com.pocketcodex.core.ToolBundles.commands(id));
+                    if (!miss.isEmpty()) err = "装好了，但这些命令运行不了：" + miss + "（可以到 自检与诊断 查看）";
+                }
             } catch (Installer.InstallException e) {
                 err = e.kind == Installer.Kind.CANCELLED ? "已取消" : e.getMessage();
             } catch (IOException e) {
                 err = "自检失败：" + e.getMessage();
             }
             toolkitInstalling = false;
-            if (versions != null) toolkitUsable = true;
+            if (t.installed()) toolkitUsable = versions != null || (toolkitUsable && err != null && !err.startsWith("装好了，但自检"));
             final java.util.Set<String> pk = new java.util.HashSet<>(t.status().keySet());
             final String ferr = err, frepo = repo;
             final Map<String, String> fv = versions;
@@ -716,10 +728,31 @@ public final class CodexRuntimeManager {
                 }
                 toolkitState = t.installed() ? (toolkitUsable ? ToolkitState.READY : ToolkitState.BROKEN) : ToolkitState.FAILED;
                 if (ferr != null && t.installed() && toolkitUsable) toolkitState = ToolkitState.READY; // 工具集没装成，基础包还能用
-                if (fbase && ferr == null) restartForToolkit();
+                // 新装的命令、JAVA_HOME 要重启 Codex 才能进它的环境（正在跑的回合结束后再重启）
+                if (toolkitUsable && (fbase || ferr == null || !codexHasToolkit)) restartForToolkit();
                 changed();
             });
         });
+    }
+
+    /** 在 Agent 的同一套环境里看这些命令能不能找到；返回找不到的（空格分隔），都在返回空串。 */
+    private String missingCommands(List<String> cmds) throws IOException {
+        if (cmds.isEmpty()) return "";
+        Toolkit t = paths.toolkit();
+        CodexRuntime.Layout l = paths.layout(codexBin());
+        l.toolkitReady = true;
+        Map<String, String> env = CodexRuntime.env(l, proxy == null ? null : proxy.url(), System.getenv("PATH"), TimeZone.getDefault().getID());
+        StringBuilder sc = new StringBuilder("for c in");
+        for (String c : cmds) sc.append(' ').append(c);
+        sc.append("; do command -v \"$c\" >/dev/null 2>&1 || printf '%s ' \"$c\"; done; echo __done__");
+        ProcessBuilder pb = new ProcessBuilder(t.bin("bash").getAbsolutePath(), "-c", sc.toString());
+        pb.environment().clear();
+        pb.environment().putAll(env);
+        pb.directory(paths.home);
+        Object[] r = runWithTimeout(pb, null, 30_000);
+        String out = String.valueOf(r[1]);
+        if (!out.contains("__done__")) return String.join(" ", cmds);
+        return out.substring(0, out.indexOf("__done__")).trim();
     }
 
     /** 工具集是否装齐了。 */
@@ -996,7 +1029,7 @@ public final class CodexRuntimeManager {
                 Map<String, String> env = prepareEnv(bin);
                 long t0 = SystemClock.elapsedRealtime();
                 File cwd = paths.home;
-                s = AppServer.start(CodexRuntime.command(paths.layout(bin), "app-server"), env, cwd, new AppServer.Listener() {
+                s = AppServer.start(CodexRuntime.command(paths.layout(bin), runtimeConfig, "app-server"), env, cwd, new AppServer.Listener() {
                     @Override
                     public void onNotification(String method, Map<String, Object> params) {
                         onMain(() -> {

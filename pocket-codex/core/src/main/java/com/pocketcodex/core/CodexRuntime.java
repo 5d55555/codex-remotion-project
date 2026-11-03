@@ -103,12 +103,50 @@ public final class CodexRuntime {
         return e;
     }
 
-    /** codex 命令行。 */
+    /** codex 命令行（口袋工坊的设置用 -c 传，见 {@link #overrides}）。 */
     public static List<String> command(Layout l, String... args) {
+        return command(l, null, args);
+    }
+
+    public static List<String> command(Layout l, Config cfg, String... args) {
         List<String> c = new ArrayList<>();
         c.add(l.codexBin.getAbsolutePath());
+        c.addAll(overrides(cfg == null ? new Config() : cfg));
         for (String a : args) c.add(a);
         return c;
+    }
+
+    /**
+     * 口袋工坊管的设置，用命令行 -c 传给 codex（优先级高于 config.toml）。这样 config.toml 完全留给用户和 Agent
+     * （例如 [mcp_servers.*]），我们不再改写它，也就不会写坏或丢掉别人的配置。
+     */
+    public static List<String> overrides(Config cfg) {
+        List<String> o = new ArrayList<>();
+        // 安卓上没有系统钥匙串：凭据存文件
+        o.add("-c");
+        o.add("cli_auth_credentials_store=\"file\"");
+        // 没有 bubblewrap / 用户命名空间：codex 自己的沙箱用不了，由安卓的应用沙箱兜底（见 App 的说明）
+        o.add("-c");
+        o.add("sandbox_mode=\"danger-full-access\"");
+        o.add("-c");
+        o.add("check_for_update_on_startup=false");
+        if (cfg.model != null && !cfg.model.isEmpty()) {
+            o.add("-c");
+            o.add("model=" + tomlString(cfg.model));
+        }
+        if (cfg.reasoningEffort != null && !cfg.reasoningEffort.isEmpty()) {
+            o.add("-c");
+            o.add("model_reasoning_effort=" + tomlString(cfg.reasoningEffort));
+        }
+        o.add("-c");
+        o.add("web_search=" + tomlString(cfg.webSearch ? "live" : "disabled"));
+        // shell 快照会用 bash 专有的命令探测环境；安卓的 mksh 冒充 bash 时没有意义，关掉省一次子进程
+        o.add("-c");
+        o.add("features.shell_snapshot=false");
+        o.add("-c");
+        o.add("shell_environment_policy.inherit=\"all\"");
+        // 不传 approval_policy：0.166 起 "untrusted" 写进配置会拒绝启动（实测），审批模式在每次 thread/start、turn/start 里显式传
+        return o;
     }
 
     /**
@@ -121,7 +159,7 @@ public final class CodexRuntime {
      */
     public static void prepare(Layout l, Config cfg) throws IOException {
         prepareShims(l);
-        writeConfig(l.codexHome, cfg);
+        ensureConfig(l.codexHome);
     }
 
     /** 只建目录和 PATH 最前面的命令（不动 config.toml）：App 里的终端也用这套环境。 */
@@ -185,90 +223,57 @@ public final class CodexRuntime {
         }
     }
 
-    static void writeConfig(File codexHome, Config cfg) throws IOException {
+    static final String HEADER = "# 口袋工坊的设置（模型、沙箱、凭据存储……）在启动时用命令行 -c 传给 Codex，不写在这里。\n"
+            + "# 这个文件留给你和 Agent：例如在下面加 [mcp_servers.名字]。改完在 设置 → 技能与插件 → 重启 Codex。\n";
+    /** v0.2 及以前：整份都是我们生成的（每次启动覆盖）。 */
+    static final String LEGACY_V02 = "# 由 Pocket Codex 生成，每次启动会覆盖。";
+    /** v0.3：开头几行是我们写的，后面保留用户的。 */
+    static final String LEGACY_V03 = "# 由口袋工坊生成：下面几行每次启动会重写；";
+    static final java.util.Set<String> V03_KEYS = new java.util.HashSet<>(java.util.Arrays.asList(
+            "cli_auth_credentials_store", "sandbox_mode", "check_for_update_on_startup", "model", "model_reasoning_effort", "web_search",
+            "features.shell_snapshot", "shell_environment_policy.inherit"));
+
+    /** 没有 config.toml 就建一个只有说明的；旧版口袋工坊写的内容迁移掉（只动我们自己写过的行）。 */
+    static void ensureConfig(File codexHome) throws IOException {
         File f = new File(codexHome, "config.toml");
-        String old = f.isFile() ? new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8) : "";
+        String old = f.isFile() ? new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8) : null;
+        String now = migrateConfig(old);
+        if (old != null && now.equals(old)) return;
+        File bak = new File(codexHome, "config.toml.bak");
+        if (old != null && !old.trim().isEmpty()) Files.write(bak.toPath(), old.getBytes(StandardCharsets.UTF_8)); // 迁移前留一份
         File tmp = new File(codexHome, "config.toml.tmp");
         try (FileOutputStream o = new FileOutputStream(tmp)) {
-            o.write(mergeConfig(old, cfg).getBytes(StandardCharsets.UTF_8));
+            o.write(now.getBytes(StandardCharsets.UTF_8));
         }
         if (!tmp.renameTo(f)) throw new IOException("写 config.toml 失败");
     }
 
-    /** 口袋工坊管的几个顶层键（每次启动重写）。其余内容（例如 Agent 或 REA 安装向导加的 [mcp_servers.*]）原样保留。 */
-    static final java.util.Set<String> MANAGED_KEYS = new java.util.HashSet<>(java.util.Arrays.asList(
-            "cli_auth_credentials_store", "sandbox_mode", "check_for_update_on_startup", "model", "model_reasoning_effort", "web_search",
-            "features.shell_snapshot", "shell_environment_policy.inherit"));
-    static final String HEADER = "# 由口袋工坊生成：下面几行每次启动会重写；";
-    static final String HEADER2 = "# 之后的内容（你或 Agent 加的配置，例如 [mcp_servers.*]）会原样保留。";
-
-    /**
-     * 合并：顶层只写我们管的键（去掉旧文件里同名的），[features] / [shell_environment_policy] 表里我们管的那一项也替换；
-     * 其他行原样保留。旧版（v0.2 及以前）整份都是我们生成的，合并后也不会出现重复键。
-     */
-    static String mergeConfig(String old, Config cfg) {
-        List<String> pre = new ArrayList<>(), tables = new ArrayList<>();
-        boolean inTables = false;
+    /** 返回应该写入的内容：用户自己的文件原样返回。 */
+    static String migrateConfig(String old) {
+        if (old == null) return HEADER;
+        if (old.startsWith(LEGACY_V02)) {
+            // v0.2 的文件每次启动都被整份覆盖，里面不会有用户能留下的东西
+            return HEADER;
+        }
+        if (!old.startsWith(LEGACY_V03)) return old;
+        // v0.3：去掉开头的说明和我们写的顶层键（只在第一个表之前），其余原样保留
+        StringBuilder b = new StringBuilder(HEADER);
+        boolean inTables = false, skippingHeader = true;
         for (String line : old.split("\n", -1)) {
             String t = line.trim();
             if (!inTables && t.startsWith("[")) inTables = true;
-            (inTables ? tables : pre).add(line);
-        }
-        StringBuilder b = new StringBuilder();
-        b.append(HEADER).append('\n').append(HEADER2).append('\n');
-        b.append("cli_auth_credentials_store = \"file\"\n");
-        // 安卓上没有 bubblewrap / 用户命名空间：codex 自己的沙箱用不了，由安卓的应用沙箱兜底（见 App 的说明）
-        b.append("sandbox_mode = \"danger-full-access\"\n");
-        // 不写 approval_policy：0.166 起 config.toml 里写 "untrusted" 会直接拒绝启动（实测）。
-        // 审批模式每次 thread/start、thread/resume、turn/start 都显式传（每步确认 = untrusted，完全自动 = never）。
-        b.append("check_for_update_on_startup = false\n");
-        if (cfg.model != null && !cfg.model.isEmpty()) b.append("model = ").append(tomlString(cfg.model)).append('\n');
-        if (cfg.reasoningEffort != null && !cfg.reasoningEffort.isEmpty()) b.append("model_reasoning_effort = ").append(tomlString(cfg.reasoningEffort)).append('\n');
-        b.append("web_search = ").append(tomlString(cfg.webSearch ? "live" : "disabled")).append('\n');
-        boolean hasFeatures = false, hasShellEnv = false;
-        for (String line : tables) {
-            String h = line.trim().replace(" ", "");
-            if (h.equals("[features]")) hasFeatures = true;
-            if (h.equals("[shell_environment_policy]")) hasShellEnv = true;
-        }
-        // shell 快照会用 bash 专有的命令探测环境；安卓的 mksh 冒充 bash 时没有意义，关掉省一次子进程
-        if (!hasFeatures) b.append("features.shell_snapshot = false\n");
-        if (!hasShellEnv) b.append("shell_environment_policy.inherit = \"all\"\n");
-        // 旧文件顶层里用户自己的键
-        for (String line : pre) {
-            String t = line.trim();
-            if (t.isEmpty() || t.startsWith("#")) continue; // 我们的注释和空行（用户的注释放在表里的会保留）
-            if (MANAGED_KEYS.contains(keyOf(t))) continue;
+            if (!inTables) {
+                if (skippingHeader && t.startsWith("#")) continue;
+                skippingHeader = false;
+                int eq = t.indexOf('=');
+                if (eq > 0 && V03_KEYS.contains(t.substring(0, eq).trim())) continue;
+                if (t.isEmpty()) continue;
+            }
             b.append(line).append('\n');
         }
-        // 表：原样，只替换我们管的两项
-        String table = null;
-        StringBuilder rest = new StringBuilder();
-        for (String line : tables) {
-            String t = line.trim();
-            if (t.startsWith("[")) {
-                table = t.replace(" ", "");
-                rest.append(line).append('\n');
-                if (table.equals("[features]")) rest.append("shell_snapshot = false\n");
-                if (table.equals("[shell_environment_policy]")) rest.append("inherit = \"all\"\n");
-                continue;
-            }
-            String k = keyOf(t);
-            if ("[features]".equals(table) && "shell_snapshot".equals(k)) continue;
-            if ("[shell_environment_policy]".equals(table) && "inherit".equals(k)) continue;
-            rest.append(line).append('\n');
-        }
-        String r = rest.toString();
+        String r = b.toString();
         while (r.endsWith("\n\n")) r = r.substring(0, r.length() - 1);
-        if (!r.trim().isEmpty()) b.append('\n').append(r);
-        return b.toString();
-    }
-
-    /** “key = value” 的键（去掉引号和空格）；不是赋值行返回 null。 */
-    static String keyOf(String t) {
-        int eq = t.indexOf('=');
-        if (eq <= 0 || t.startsWith("#") || t.startsWith("[")) return null;
-        return t.substring(0, eq).trim().replace("\"", "").replace(" ", "");
+        return r;
     }
 
     static String tomlString(String s) {

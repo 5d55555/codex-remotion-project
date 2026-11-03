@@ -86,7 +86,8 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
     private FrameLayout sendBtn, voicePill;
     private ImageView voiceIcon;
     private TextView voiceText;
-    private LinearLayout bottomRow;
+    private LinearLayout bottomRow, header;
+    private View topFade;
     private FrameLayout frame;
     // 左边拉出的会话抽屉
     private androidx.drawerlayout.widget.DrawerLayout drawerLayout;
@@ -125,7 +126,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         sheet = new ApprovalSheet(this, rt);
         setContentView(build());
         if (b != null) restoreAttachments(b.getString("attachments"));
-        String draft = getIntent().getStringExtra(EXTRA_DRAFT);
+        String draft = b != null && b.getString("draftText") != null ? b.getString("draftText") : getIntent().getStringExtra(EXTRA_DRAFT);
         if (draft != null) input.setText(draft);
         if (threadId != null) {
             String saved = getSharedPreferences("drafts", MODE_PRIVATE).getString(threadId, null);
@@ -142,6 +143,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         out.putString(EXTRA_THREAD, threadId);
         out.putString(EXTRA_CWD, cwd);
         out.putBoolean("chat", chatMode);
+        out.putString("draftText", input.getText().toString());
         if (pendingCamera != null) out.putString("camera", pendingCamera.getAbsolutePath());
         List<Object> l = new ArrayList<>();
         for (Attachment a : attachments) l.add(Json.map("kind", a.kind.name(), "name", a.name, "id", a.id, "path", a.path, "inline", a.inline));
@@ -190,7 +192,9 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         mentionLayer = new FrameLayout(this);
         frame.addView(mentionLayer, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        root.addView(buildTopBar(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(68)));
+        // 顶部：顶栏、计划条、“更早的记录”浮在消息列表上，列表滚上去是渐隐的（不是一刀切）
+        header = Ui.vbox(this);
+        header.addView(buildTopBar(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(68)));
 
         // 计划
         planBar = Ui.vbox(this);
@@ -219,12 +223,12 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         LinearLayout.LayoutParams pbl = Ui.matchWrap();
         pbl.leftMargin = pbl.rightMargin = dp(14);
         pbl.bottomMargin = dp(4);
-        root.addView(planBar, pbl);
+        header.addView(planBar, pbl);
 
         olderBar = Ui.textButton(this, "加载更早的记录", v -> loadOlder());
         olderBar.setTextColor(color(R.color.text2));
         olderBar.setVisibility(View.GONE);
-        root.addView(olderBar, Ui.matchWrap());
+        header.addView(olderBar, Ui.matchWrap());
 
         // 消息列表 + 空状态
         FrameLayout listHost = new FrameLayout(this);
@@ -233,7 +237,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         lm.setStackFromEnd(true);
         list.setLayoutManager(lm);
         list.setItemAnimator(null); // 流式更新不要闪
-        list.setPadding(0, dp(4), 0, dp(16));
+        list.setPadding(0, dp(72), 0, dp(16));
         list.setClipToPadding(false);
         adapter = new ChatAdapter(this);
         list.setAdapter(adapter);
@@ -252,6 +256,20 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         FrameLayout.LayoutParams fl = new FrameLayout.LayoutParams(dp(40), dp(40), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
         fl.bottomMargin = dp(12);
         listHost.addView(toLatest, fl);
+        // 底部：消息滑到输入框上方时淡出
+        listHost.addView(Ui.fade(this, R.color.bg_low, false), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(28), Gravity.BOTTOM));
+        topFade = Ui.fade(this, R.color.bg, true);
+        listHost.addView(topFade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(96), Gravity.TOP));
+        listHost.addView(header, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP));
+        header.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            int h = b - t;
+            if (h == ob - ot && list.getPaddingTop() == h + dp(4)) return;
+            list.setPadding(0, h + dp(4), 0, dp(16));
+            ViewGroup.LayoutParams fp = topFade.getLayoutParams();
+            fp.height = h + dp(28);
+            topFade.setLayoutParams(fp);
+            emptyBox.setPadding(dp(28), h, dp(28), dp(24));
+        });
         root.addView(listHost, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         // 待处理（审批、提问）
@@ -979,6 +997,13 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
             }
             rt.prefs.setWorkspace(p);
             Workspaces.remember(this, p);
+            if (!fresh()) {
+                // 已有的会话属于原来的工作区（Codex 那边的目录不会跟着变）：换工作区就开一个新对话
+                startActivity(new Intent(this, ChatActivity.class).putExtra(EXTRA_CWD, p));
+                overridePendingTransition(0, 0);
+                finish();
+                return;
+            }
             cwd = p;
             bindAll();
         }).setNegativeButton("取消", null).show();

@@ -52,6 +52,8 @@ for i in range(N):
 
 也可以写 SVG 模板逐帧替换参数，用 `rsvg-convert -w 1080 frame.svg -o frame.png` 渲染；ImageMagick `magick` 做合成、文字和特效。复杂补间用 NumPy 计算。
 
+更多：`pycairo`（矢量绘图、抗锯齿文字）、`vips`（大图处理，省内存）、`exiftool`（元数据）、`cwebp`/`img2webp`（WebP 动图）、`avifenc`、`heif-convert`、`pngquant`/`optipng`（压图）、`potrace`（位图转矢量）。纯 Python：`pysubs2` / `srt`（字幕时间轴）、`drawsvg` / `svgwrite`（生成 SVG 帧）。
+
 ## 验证输出
 
 每次产出后 `ffprobe` 检查时长、分辨率、帧率、是否有音轨；抽几帧 `ffmpeg -ss 1 -i out.mp4 -frames:v 1 check.png` 给用户看。手机性能有限：先用低分辨率预览，确认后再出成片。

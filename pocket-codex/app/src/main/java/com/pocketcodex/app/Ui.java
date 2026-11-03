@@ -134,6 +134,23 @@ final class Ui {
         return b;
     }
 
+    /**
+     * 渐隐过渡（ChatGPT 的顶栏和底部输入/搜索框下面，内容是淡出去的，不是一刀切）：
+     * fromTop = true 时上面是不透明底色、往下变透明；false 反过来。colorRes 用页面的底色。
+     */
+    static View fade(Context c, int colorRes, boolean fromTop) {
+        View v = new View(c);
+        int col = color(c, colorRes);
+        int clear = col & 0x00FFFFFF;
+        int mid = (col & 0x00FFFFFF) | 0xB0000000;
+        GradientDrawable g = new GradientDrawable(fromTop ? GradientDrawable.Orientation.TOP_BOTTOM : GradientDrawable.Orientation.BOTTOM_TOP,
+                new int[]{col, col, mid, clear});
+        v.setBackground(g);
+        v.setClickable(false);
+        v.setFocusable(false);
+        return v;
+    }
+
     /* ---------------- ChatGPT 风格的设置卡片 ---------------- */
 
     /** 强调色（设置 → 外观 → 强调色）：发送键、开关、链接。 */

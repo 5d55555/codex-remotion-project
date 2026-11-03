@@ -21,6 +21,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.button.MaterialButton;
@@ -36,25 +37,34 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 设置页、文件页（v0.3 按 ChatGPT 手机端的设置页重做）：左上圆形返回键、居中标题；
- * 头像和账号；一组一组的大圆角卡片（图标 + 名称 + 右边的值 + “›”或“⌄”），下拉卡片、黑色开关；底部浮着“搜索设置”。
- * 会话列表不在这里了：在对话页左边拉出的抽屉里。
+ * 设置页、文件页（按 ChatGPT 手机端的设置页）：
+ * <ul>
+ * <li>顶栏浮在内容上面，内容滚上去是渐隐的（底部搜索框下面也是），不是一刀切；</li>
+ * <li>设置首页只有几个入口（头像、账户、外观、我的口袋工坊、通用……），具体选项在点进去的子页面里；</li>
+ * <li>首页的“搜索设置”能搜到所有子页面里的项。</li>
+ * </ul>
+ * 会话列表不在这里：在对话页左边拉出的抽屉里。
  */
 public final class MainActivity extends AppCompatActivity implements CodexRuntimeManager.Listener {
     static final int TAB_SESSIONS = 1, TAB_FILES = 2, TAB_SETTINGS = 3;
     static final String EXTRA_TAB = "tab", EXTRA_SECTION = "section";
+    static final String P_ROOT = "root", P_DEV = "devtools", P_SKILLS = "skills", P_GENERAL = "general", P_CLI = "cli", P_ABOUT = "about";
 
     private CodexRuntimeManager rt;
     private int tab = TAB_SETTINGS;
+    private String page = P_ROOT;
     private LinearLayout content;
     private ScrollView scroll;
     private TextView titleView, subtitleView;
     private ImageView actionButton;
+    private View searchBar, bottomFade;
     private EditText searchBox;
     private String query = "";
+    private int rootScrollY;
+    private OnBackPressedCallback pageBack;
     // 设置
     private String settingsSig = "";
-    private LinearLayout toolkitHost, profileBox;
+    private LinearLayout toolkitHost;
     private final List<Group> groups = new ArrayList<>();
     // 文件
     private File filesDir;
@@ -82,8 +92,31 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
             finish();
             return;
         }
+        if (b == null && "devtools".equals(getIntent().getStringExtra(EXTRA_SECTION))) page = P_DEV;
+        String savedQuery = "";
+        int savedY = 0;
+        if (b != null) { // 旋转、切换深色模式后回到原来的位置
+            page = b.getString("page", P_ROOT);
+            savedQuery = b.getString("query", "");
+            savedY = b.getInt("scrollY", 0);
+            rootScrollY = b.getInt("rootScrollY", 0);
+            showHidden = b.getBoolean("hidden", false);
+            String fd = b.getString("filesDir");
+            if (fd != null) filesDir = new File(fd);
+        }
+        pageBack = new OnBackPressedCallback(false) {
+            @Override
+            public void handleOnBackPressed() {
+                openPage(P_ROOT);
+            }
+        };
+        getOnBackPressedDispatcher().addCallback(this, pageBack);
         setContentView(buildShell());
+        query = savedQuery;
+        if (!query.isEmpty()) searchBox.setText(query); // 触发重建
         showTab();
+        final int y = savedY;
+        if (y > 0) scroll.post(() -> scroll.scrollTo(0, y));
     }
 
     @Override
@@ -93,6 +126,9 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         int t = i.getIntExtra(EXTRA_TAB, 0);
         if (t == TAB_FILES || t == TAB_SETTINGS) {
             tab = t;
+            page = "devtools".equals(i.getStringExtra(EXTRA_SECTION)) ? P_DEV : P_ROOT;
+            query = "";
+            searchBox.setText("");
             showTab();
         }
     }
@@ -101,6 +137,12 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
     protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
         out.putInt("tab", tab);
+        out.putString("page", page);
+        out.putString("query", query);
+        if (scroll != null) out.putInt("scrollY", scroll.getScrollY());
+        out.putInt("rootScrollY", rootScrollY);
+        out.putBoolean("hidden", showHidden);
+        if (filesDir != null) out.putString("filesDir", filesDir.getAbsolutePath());
     }
 
     @Override
@@ -108,7 +150,10 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         super.onStart();
         rt.addListener(this);
         if (rt.stage == CodexRuntimeManager.Stage.CHECKING || rt.stage == CodexRuntimeManager.Stage.ERROR && !rt.serverAlive()) rt.check();
-        else if (rt.stage == CodexRuntimeManager.Stage.READY) rt.refreshRateLimits();
+        else if (rt.stage == CodexRuntimeManager.Stage.READY) {
+            rt.refreshRateLimits();
+            rt.loadCatalog();
+        }
         onRuntimeChanged();
     }
 
@@ -129,7 +174,7 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
             return;
         }
         if (tab == TAB_SETTINGS) {
-            // 账号、版本等变了才整页重建；工具包安装进度只刷新那张卡片
+            // 账号、版本等变了才整页重建；工具包安装进度只刷新那张卡片和工具集那几行
             if (settingsSignature().equals(settingsSig)) bindToolkitCard();
             else buildSettings();
         }
@@ -142,15 +187,24 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
     /* ---------------- 页面外壳 ---------------- */
 
     private View buildShell() {
-        FrameLayout pageRoot = new FrameLayout(this);
-        pageRoot.setFitsSystemWindows(true);
-        pageRoot.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Ui.color(this, R.color.bg_low), Ui.color(this, R.color.bg_low), Ui.color(this, R.color.bg)}));
-        LinearLayout col = Ui.vbox(this);
-        pageRoot.addView(col, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        FrameLayout root = new FrameLayout(this);
+        root.setFitsSystemWindows(true);
+        root.setBackgroundColor(Ui.color(this, R.color.bg_low));
+        scroll = new ScrollView(this);
+        scroll.setClipToPadding(false);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.setPadding(0, dp(84), 0, dp(120));
+        content = Ui.vbox(this);
+        scroll.addView(content);
+        root.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // 顶部：内容滚到顶栏下面时淡出（ChatGPT 的头像就是这样滑走的）
+        root.addView(Ui.fade(this, R.color.bg_low, true), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(104), Gravity.TOP));
         FrameLayout bar = new FrameLayout(this);
-        ImageView back = Ui.roundButton(this, R.drawable.ic_back_line, "返回", v -> finish());
-        FrameLayout.LayoutParams bl = new FrameLayout.LayoutParams(dp(50), dp(50), Gravity.START | Gravity.CENTER_VERTICAL);
+        ImageView back = Ui.roundButton(this, R.drawable.ic_back_line, "返回", v -> {
+            if (!P_ROOT.equals(page) && tab == TAB_SETTINGS) openPage(P_ROOT);
+            else finish();
+        });
+        FrameLayout.LayoutParams bl = new FrameLayout.LayoutParams(dp(52), dp(52), Gravity.START | Gravity.CENTER_VERTICAL);
         bl.leftMargin = dp(16);
         bar.addView(back, bl);
         LinearLayout tb = Ui.vbox(this);
@@ -164,25 +218,21 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         subtitleView.setEllipsize(TextUtils.TruncateAt.MIDDLE);
         tb.addView(subtitleView, Ui.matchWrap());
         FrameLayout.LayoutParams tl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
-        tl.leftMargin = tl.rightMargin = dp(80);
+        tl.leftMargin = tl.rightMargin = dp(84);
         bar.addView(tb, tl);
         actionButton = Ui.roundButton(this, R.drawable.ic_dots, "更多", null);
-        FrameLayout.LayoutParams al = new FrameLayout.LayoutParams(dp(50), dp(50), Gravity.END | Gravity.CENTER_VERTICAL);
+        FrameLayout.LayoutParams al = new FrameLayout.LayoutParams(dp(52), dp(52), Gravity.END | Gravity.CENTER_VERTICAL);
         al.rightMargin = dp(16);
         bar.addView(actionButton, al);
-        col.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(76)));
-        scroll = new ScrollView(this);
-        scroll.setClipToPadding(false);
-        scroll.setPadding(0, dp(4), 0, dp(110));
-        content = Ui.vbox(this);
-        scroll.addView(content);
-        col.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        // 底部浮着的搜索框（ChatGPT 设置页那样）
+        root.addView(bar, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(80), Gravity.TOP));
+        // 底部：搜索框下面也淡出
+        bottomFade = Ui.fade(this, R.color.bg_low, false);
+        root.addView(bottomFade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(120), Gravity.BOTTOM));
         LinearLayout sb = Ui.hbox(this);
         GradientDrawable sbg = Ui.round(this, R.color.card, 0, 30);
         sbg.setStroke(Math.max(1, dp(1) / 2 + 1), Ui.color(this, R.color.border));
         sb.setBackground(sbg);
-        Ui.elevate(sb, 10);
+        Ui.elevate(sb, 8);
         sb.setPadding(dp(20), 0, dp(16), 0);
         sb.addView(Ui.icon(this, R.drawable.ic_search_line, R.color.text2, 24));
         searchBox = new EditText(this);
@@ -203,40 +253,45 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
 
             @Override
             public void afterTextChanged(Editable s) {
-                query = s.toString().trim().toLowerCase(Locale.ROOT);
-                if (tab == TAB_SETTINGS) applySearch();
+                String q = s.toString().trim().toLowerCase(Locale.ROOT);
+                if (q.equals(query)) return;
+                query = q;
+                if (tab == TAB_SETTINGS) buildSettings();
                 else bindFiles();
             }
         });
         sb.addView(searchBox, Ui.weight1());
+        searchBar = sb;
         FrameLayout.LayoutParams sl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(60), Gravity.BOTTOM);
         sl.leftMargin = sl.rightMargin = dp(16);
         sl.bottomMargin = dp(18);
-        pageRoot.addView(sb, sl);
-        pageRoot.setFocusableInTouchMode(true);
-        pageRoot.requestFocus();
-        return pageRoot;
+        root.addView(sb, sl);
+        root.setFocusableInTouchMode(true);
+        root.requestFocus();
+        return root;
     }
 
     private void showTab() {
-        query = "";
-        searchBox.setText("");
         if (tab == TAB_FILES) {
             searchBox.setHint("搜索这个文件夹");
+            pageBack.setEnabled(false);
             buildFiles();
         } else {
             searchBox.setHint("搜索设置");
             buildSettings();
-            String sec = getIntent().getStringExtra(EXTRA_SECTION);
-            if ("devtools".equals(sec) && toolkitHost != null) scroll.post(() -> scroll.smoothScrollTo(0, Math.max(0, topIn(toolkitHost) - dp(64))));
         }
     }
 
-    /** 视图在 ScrollView 内容里的纵坐标。 */
-    private int topIn(View v) {
-        int y = 0;
-        for (View x = v; x != null && x != content; x = (View) x.getParent()) y += x.getTop();
-        return y;
+    /** 设置的子页面（开发工具、技能与插件、通用……）。返回首页时回到原来滚动的位置。 */
+    private void openPage(String p) {
+        if (P_ROOT.equals(page)) rootScrollY = scroll.getScrollY();
+        page = p;
+        query = "";
+        if (searchBox.getText().length() > 0) searchBox.setText("");
+        buildSettings();
+        final int y = P_ROOT.equals(p) ? rootScrollY : 0;
+        scroll.scrollTo(0, 0);
+        scroll.post(() -> scroll.scrollTo(0, y));
     }
 
     private Group newGroup(String title) {
@@ -271,14 +326,12 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
             cl.leftMargin = dp(8);
             r.addView(ch, cl);
         }
-        r.setTag(R.id.tag_row_title, title);
         add(g, r, title + " " + (sub == null ? "" : sub) + " " + (value == null ? "" : value));
         return r;
     }
 
     private void applySearch() {
         boolean searching = !query.isEmpty();
-        if (profileBox != null) profileBox.setVisibility(searching ? View.GONE : View.VISIBLE);
         for (Group g : groups) {
             int shown = 0;
             for (int i = 0; i < g.rows.size(); i++) {
@@ -295,37 +348,122 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
     /* ---------------- 设置 ---------------- */
 
     private String settingsSignature() {
-        return rt.stage + "|" + rt.accountEmail + "|" + rt.accountPlan + "|" + rt.installedVersion + "|" + rt.models.size() + "|" + ModelPicker.summary(rt)
+        return page + "|" + rt.stage + "|" + rt.accountEmail + "|" + rt.accountPlan + "|" + rt.installedVersion + "|" + rt.models.size() + "|" + ModelPicker.summary(rt)
                 + "|" + rt.prefs.mode() + "|" + rt.prefs.workspace() + "|" + (rt.lastRateLimits == null ? 0 : rt.lastRateLimits.hashCode())
-                + "|" + rt.prefs.theme() + "|" + rt.prefs.accent() + "|" + rt.prefs.userCa() + "|" + rt.prefs.toolkitRepo();
+                + "|" + rt.prefs.theme() + "|" + rt.prefs.accent() + "|" + rt.prefs.userCa() + "|" + rt.prefs.toolkitRepo() + "|" + rt.catalog.size()
+                + "|" + rt.prefs.nickname() + "|" + rt.toolkitState;
+    }
+
+    private static String pageTitle(String p) {
+        switch (p) {
+            case P_DEV:
+                return "开发工具";
+            case P_SKILLS:
+                return "技能与插件";
+            case P_GENERAL:
+                return "通用";
+            case P_CLI:
+                return "Codex CLI";
+            case P_ABOUT:
+                return "关于";
+            default:
+                return "";
+        }
     }
 
     private void buildSettings() {
         if (tab != TAB_SETTINGS) return;
-        titleView.setText("设置");
+        boolean root = P_ROOT.equals(page);
+        boolean searching = !query.isEmpty();
+        titleView.setText(searching ? "搜索设置" : pageTitle(page));
         subtitleView.setVisibility(View.GONE);
         actionButton.setVisibility(View.GONE);
+        searchBar.setVisibility(root ? View.VISIBLE : View.GONE);
+        bottomFade.setVisibility(root ? View.VISIBLE : View.GONE);
+        scroll.setPadding(0, dp(84), 0, dp(root ? 120 : 36));
+        pageBack.setEnabled(!root);
         final int oldY = scroll.getScrollY();
         settingsSig = settingsSignature();
         content.removeAllViews();
         groups.clear();
+        toolkitHost = null;
+        if (searching) { // 搜索：所有页面的项都放出来再过滤
+            buildRootPage(false);
+            buildDevtoolsPage();
+            buildSkillsPage();
+            buildGeneralPage();
+            buildCliPage();
+            buildAboutPage();
+        } else {
+            switch (page) {
+                case P_DEV:
+                    buildDevtoolsPage();
+                    break;
+                case P_SKILLS:
+                    buildSkillsPage();
+                    break;
+                case P_GENERAL:
+                    buildGeneralPage();
+                    break;
+                case P_CLI:
+                    buildCliPage();
+                    break;
+                case P_ABOUT:
+                    buildAboutPage();
+                    break;
+                default:
+                    buildRootPage(true);
+            }
+        }
+        applySearch();
+        if (searching && content.getChildCount() > 0) {
+            boolean any = false;
+            for (Group g : groups) if (g.card.getVisibility() == View.VISIBLE) any = true;
+            if (!any) {
+                TextView none = Ui.text(this, "没有找到“" + query + "”", 15, R.color.text3);
+                none.setGravity(Gravity.CENTER);
+                none.setPadding(dp(24), dp(40), dp(24), dp(40));
+                content.addView(none, Ui.matchWrap());
+            }
+        }
+        if (oldY > 0) scroll.post(() -> scroll.scrollTo(0, oldY));
+    }
 
-        // 头像 + 账号
-        profileBox = Ui.vbox(this);
-        profileBox.setGravity(Gravity.CENTER_HORIZONTAL);
-        profileBox.setPadding(0, dp(4), 0, dp(14));
+    /** 首页：头像、账户、外观、我的口袋工坊（几个入口）、通用 / Codex CLI / 关于。 */
+    private void buildRootPage(boolean header) {
         String email = rt.accountEmail;
-        String name = email == null ? (rt.accountType == null ? "正在确认…" : "apiKey".equals(rt.accountType) ? "API 密钥" : rt.accountType) : email.replaceAll("@.*", "");
-        TextView avatar = Ui.text(this, initials(name), 32, R.color.text);
-        avatar.setTextColor(0xFFFFFFFF);
-        avatar.setGravity(Gravity.CENTER);
-        avatar.setBackground(Ui.circleColor(0xFFB08D57));
-        profileBox.addView(avatar, new LinearLayout.LayoutParams(dp(96), dp(96)));
-        TextView nm = Overlay.strong(this, name, 21);
-        nm.setPadding(0, dp(12), 0, 0);
-        profileBox.addView(nm, Ui.wrap());
-        if (rt.accountPlan != null) profileBox.addView(Ui.text(this, planName(rt.accountPlan) + " · ChatGPT 账号", 14, R.color.text3), Ui.wrap());
-        content.addView(profileBox, Ui.matchWrap());
+        String name = rt.prefs.nickname() != null ? rt.prefs.nickname()
+                : email == null ? (rt.accountType == null ? "正在确认…" : "apiKey".equals(rt.accountType) ? "API 密钥" : rt.accountType) : email.replaceAll("@.*", "");
+        if (header) {
+            LinearLayout profile = Ui.vbox(this);
+            profile.setGravity(Gravity.CENTER_HORIZONTAL);
+            profile.setPadding(0, 0, 0, dp(10));
+            FrameLayout av = new FrameLayout(this);
+            TextView avatar = Ui.text(this, initials(name), 34, R.color.text);
+            avatar.setTextColor(0xFFFFFFFF);
+            avatar.setGravity(Gravity.CENTER);
+            GradientDrawable ag = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0xFFE6D8F2, 0xFFC3A5DF});
+            ag.setShape(GradientDrawable.OVAL);
+            avatar.setBackground(ag);
+            av.addView(avatar, new FrameLayout.LayoutParams(dp(104), dp(104)));
+            ImageView pen = new ImageView(this);
+            pen.setImageResource(R.drawable.ic_pen);
+            pen.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.color(this, R.color.text2)));
+            GradientDrawable pb = Ui.circle(this, R.color.card);
+            pb.setStroke(Math.max(1, dp(1)), Ui.color(this, R.color.bg_low));
+            pen.setBackground(pb);
+            pen.setPadding(dp(8), dp(8), dp(8), dp(8));
+            pen.setContentDescription("改名字");
+            FrameLayout.LayoutParams pl = new FrameLayout.LayoutParams(dp(36), dp(36), Gravity.END | Gravity.BOTTOM);
+            av.addView(pen, pl);
+            Ui.ripple(av, true);
+            av.setOnClickListener(v -> editNickname());
+            profile.addView(av, new LinearLayout.LayoutParams(dp(110), dp(108)));
+            TextView nm = Overlay.strong(this, name, 21);
+            nm.setPadding(0, dp(12), 0, 0);
+            profile.addView(nm, Ui.wrap());
+            content.addView(profile, Ui.matchWrap());
+        }
 
         Group acct = newGroup("账户");
         row(acct, R.drawable.ic_user_line, "账号", null, email == null ? name : email, 0, null);
@@ -367,42 +505,66 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
             Overlay.dropdown(this, ar, o, true, (ImageView) ar.findViewWithTag("chevron"), this::buildSettings);
         });
 
-        Group codex = newGroup("Codex");
-        row(codex, R.drawable.ic_codex_line, "模型、推理与速度", null, rt.models.isEmpty() ? "启动后可选" : ModelPicker.summary(rt), 1,
-                v -> ModelPicker.show(this, rt, false, this::buildSettings));
+        Group mine = newGroup("我的口袋工坊");
         boolean auto = Prefs.MODE_AUTO.equals(rt.prefs.mode());
-        LinearLayout pr = row(codex, R.drawable.ic_shield_line, "权限", auto ? "命令和改文件不再逐项确认" : "运行命令、修改文件前先问你", auto ? "完全自动" : "每步确认", 2, null);
-        pr.setOnClickListener(v -> Overlay.dropdown(this, pr, Arrays.asList(
-                new Overlay.Opt("每步确认", "运行命令、修改文件前先问你", !Prefs.MODE_AUTO.equals(rt.prefs.mode()), () -> {
-                    rt.prefs.setMode(Prefs.MODE_CONFIRM);
-                    buildSettings();
-                }),
-                new Overlay.Opt("完全自动", "不再逐项确认，已发生的改动不会自动撤销", Prefs.MODE_AUTO.equals(rt.prefs.mode()), this::confirmAuto)),
-                true, (ImageView) pr.findViewWithTag("chevron"), null));
+        CodexRuntimeManager.ModelInfo mi = rt.currentModel();
+        String modelShort = mi == null ? "默认" : ModelPicker.shortModel(mi.displayName);
+        row(mine, R.drawable.ic_codex_line, "模型与权限", null, modelShort + " · " + (auto ? "完全自动" : "每步确认"), 1,
+                v -> ModelPicker.show(this, rt, false, this::buildSettings));
+        row(mine, R.drawable.ic_code_line, "开发工具", null, devtoolsSummary(), 1, v -> openPage(P_DEV));
+        int skills = 0, plugins = 0;
+        for (Catalog c : rt.catalog) if (c.skill) skills++;
+        else plugins++;
+        row(mine, R.drawable.ic_plugin, "技能与插件", null, rt.catalog.isEmpty() ? null : skills + " 个技能" + (plugins > 0 ? " · " + plugins + " 个插件" : ""), 1,
+                v -> openPage(P_SKILLS));
         String ws = rt.prefs.workspace();
-        row(codex, R.drawable.ic_box_line, "工作区", Workspaces.isShared(rt, ws) ? Format.prettyPath(rt, ws) : "应用内", Workspaces.name(ws), 1, v -> chooseWorkspace());
-        row(codex, R.drawable.ic_refresh_line, "重启 Codex", "加了 MCP 服务或技能后用", null, 1, v -> {
-            if (rt.restartCodex()) Toast.makeText(this, "正在重启 Codex…", Toast.LENGTH_SHORT).show();
-            else Toast.makeText(this, "有任务正在运行，结束后再重启", Toast.LENGTH_LONG).show();
-        });
+        row(mine, R.drawable.ic_box_line, "工作区", null, Workspaces.name(ws), 1, v -> chooseWorkspace());
 
-        // 开发工具
-        Group dev = newGroup("开发工具（Node.js · Git · Python）");
+        Group more = newGroup(null);
+        row(more, R.drawable.ic_gear_line, "通用", null, null, 1, v -> openPage(P_GENERAL));
+        row(more, R.drawable.ic_terminal_line, "Codex CLI", null, rt.installedVersion, 1, v -> openPage(P_CLI));
+        row(more, R.drawable.ic_info, "关于", null, BuildConfig.VERSION_NAME, 1, v -> openPage(P_ABOUT));
+    }
+
+    private String devtoolsSummary() {
+        switch (rt.toolkitState) {
+            case INSTALLING:
+                return "正在安装";
+            case READY:
+                int n = 0;
+                for (ToolBundles.Bundle b : ToolBundles.ALL) if (!b.id.equals("recommended") && rt.bundleInstalled(b.id)) n++;
+                return n == 0 ? "已就绪" : "已就绪 · " + n + " 组工具";
+            case BROKEN:
+                return "自检没通过";
+            case FAILED:
+                return "安装没完成";
+            default:
+                return "未安装";
+        }
+    }
+
+    /** 开发工具：状态卡片、工具集、终端和常用命令、软件源。 */
+    private void buildDevtoolsPage() {
+        Group dev = newGroup(query.isEmpty() ? null : "开发工具");
         toolkitHost = Ui.vbox(this);
         dev.card.addView(toolkitHost);
         dev.rows.add(toolkitHost);
-        dev.keys.add("开发工具 node git python 工具包 安装");
+        dev.keys.add("开发工具 node git python 工具包 安装 基础包");
         bindToolkitCard();
+
+        Group sets = newGroup("工具集（一组一组装）");
         for (ToolBundles.Bundle tb : ToolBundles.ALL) {
             final ToolBundles.Bundle fb = tb;
-            LinearLayout br = row(dev, bundleIcon(tb.id), tb.title, tb.summary + " · 下载约 " + tb.downloadMb + " MB", bundleState(tb), 0, v -> installBundle(fb));
+            LinearLayout br = row(sets, bundleIcon(tb.id), tb.title, tb.summary + " · 下载约 " + tb.downloadMb + " MB", bundleState(tb), 0, v -> installBundle(fb));
             br.setTag(R.id.tag_bundle, tb.id);
         }
         bindBundleRows();
-        row(dev, R.drawable.ic_terminal_line, "终端", "直接运行 node、npm、git、pkg；不经过模型，不消耗额度", null, 1, v -> startActivity(new Intent(this, TerminalActivity.class)));
-        row(dev, R.drawable.ic_code_line, "常用命令", "Node.js、npm、Git、Python、pkg 的常用写法", null, 1,
+
+        Group tools = newGroup("命令行");
+        row(tools, R.drawable.ic_terminal_line, "终端", "直接运行 node、npm、git、pkg；不经过模型，不消耗额度", null, 1, v -> startActivity(new Intent(this, TerminalActivity.class)));
+        row(tools, R.drawable.ic_code_line, "常用命令", "Node.js、npm、Git、Python、pkg 的常用写法", null, 1,
                 v -> startActivity(new Intent(this, TerminalActivity.class).putExtra(TerminalActivity.EXTRA_COMMANDS, true)));
-        LinearLayout repo = row(dev, R.drawable.ic_globe_line, "软件源", null, toolkitRepoLabel(), 2, null);
+        LinearLayout repo = row(tools, R.drawable.ic_globe_line, "软件源", null, toolkitRepoLabel(), 2, null);
         repo.setOnClickListener(v -> {
             List<Overlay.Opt> o = new ArrayList<>();
             o.add(new Overlay.Opt("自动", "官方和国内镜像，哪个能连上用哪个", rt.prefs.toolkitRepo() == null, () -> rt.prefs.setToolkitRepo(null)));
@@ -411,8 +573,51 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
             }
             Overlay.dropdown(this, repo, o, true, (ImageView) repo.findViewWithTag("chevron"), this::buildSettings);
         });
+    }
 
-        Group gen = newGroup("通用");
+    /** 技能与插件：Codex 能用的技能（内置的 pocket-* 在前）、已装的插件、MCP 怎么加、重启 Codex。 */
+    private void buildSkillsPage() {
+        Group sk = newGroup("技能（输入 @ 可以直接选）");
+        int n = 0;
+        List<Catalog> ordered = new ArrayList<>();
+        for (Catalog c : rt.catalog) if (c.skill && c.id.startsWith("pocket-")) ordered.add(c);
+        for (Catalog c : rt.catalog) if (c.skill && !c.id.startsWith("pocket-")) ordered.add(c);
+        for (Catalog c : ordered) {
+            LinearLayout r = row(sk, c.iconRes(), c.label(), c.description == null || c.description.isEmpty() ? null : c.description,
+                    c.id.startsWith("pocket-") ? "内置" : null, 0, null);
+            if (c.colored()) {
+                View ic = r.getChildAt(0);
+                if (ic instanceof ImageView) ((ImageView) ic).setImageTintList(null);
+            }
+            n++;
+        }
+        if (n == 0) row(sk, R.drawable.ic_info, rt.serverAlive() ? "还没有读到技能" : "Codex 启动后会列出技能", null, null, 0, null);
+        Group pl = newGroup("插件");
+        int p = 0;
+        for (Catalog c : rt.catalog) {
+            if (c.skill) continue;
+            row(pl, c.iconRes(), c.label(), c.description == null || c.description.isEmpty() ? null : c.description, "已启用", 0, null);
+            p++;
+        }
+        if (p == 0) row(pl, R.drawable.ic_plugin, "没有已启用的插件", "在 ChatGPT 账号里启用的 Codex 插件会出现在这里", null, 0, null);
+        Group mcp = newGroup("MCP 服务与第三方技能");
+        row(mcp, R.drawable.ic_book, "怎么加 MCP 服务", "例如 radare2 的 r2mcp、jadx-headless-mcp、REA", null, 1, v -> new AlertDialog.Builder(this).setTitle("加 MCP 服务")
+                .setMessage("在 Codex 的 config.toml（$CODEX_HOME/config.toml）末尾加一段，例如：\n\n[mcp_servers.r2]\ncommand = \"r2pm\"\nargs = [\"-r\", \"r2mcp\"]\n\n"
+                        + "口袋工坊不会改写这个文件。也可以直接让 Codex 帮你加（它知道路径，见内置技能“手机开发环境”）。加完点“重启 Codex”。\n\n"
+                        + "第三方技能放在 ~/.agents/skills/<名字>/SKILL.md，例如让 Codex 执行：git clone https://github.com/aicodeking/leanrea 后复制 leanrea 目录过去。")
+                .setPositiveButton("复制示例", (d, w) -> copy("MCP", "[mcp_servers.r2]\ncommand = \"r2pm\"\nargs = [\"-r\", \"r2mcp\"]\n"))
+                .setNegativeButton("关闭", null).show());
+        row(mcp, R.drawable.ic_refresh_line, "重启 Codex", "加了 MCP 服务或技能后用", null, 1, v -> restartCodex());
+    }
+
+    private void restartCodex() {
+        if (rt.restartCodex()) Toast.makeText(this, "正在重启 Codex…", Toast.LENGTH_SHORT).show();
+        else Toast.makeText(this, "有任务正在运行，结束后再重启", Toast.LENGTH_LONG).show();
+    }
+
+    /** 通用：通知、电池、存储权限、证书、自检。 */
+    private void buildGeneralPage() {
+        Group gen = newGroup(query.isEmpty() ? null : "通用");
         row(gen, R.drawable.ic_bell_line, "通知", "审批提醒、任务完成与失败提醒", null, 1, v -> {
             Intent i = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
             startActivity(i);
@@ -426,7 +631,8 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         });
         row(gen, R.drawable.ic_storage_line, "存储权限", "选手机存储里的文件夹做工作区时需要", null, 1,
                 v -> startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))));
-        LinearLayout ca = row(gen, R.drawable.ic_lock_line, "信任用户安装的证书", "公司网络或抓包工具需要时再打开", null, 0, null);
+        Group net = newGroup("网络");
+        LinearLayout ca = row(net, R.drawable.ic_lock_line, "信任用户安装的证书", "公司网络或抓包工具需要时再打开", null, 0, null);
         com.google.android.material.materialswitch.MaterialSwitch sw = Ui.toggle(this, rt.prefs.userCa(), (b, on) -> {
             if (on == rt.prefs.userCa()) return;
             rt.prefs.setUserCa(on);
@@ -436,9 +642,12 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         ca.addView(sw);
         ca.setOnClickListener(v -> sw.toggle());
         Ui.ripple(ca, false);
-        row(gen, R.drawable.ic_pulse_line, "自检与诊断", "检查网络、证书、本机执行和开发工具", null, 1, v -> startActivity(new Intent(this, DiagnosticsActivity.class)));
+        row(net, R.drawable.ic_pulse_line, "自检与诊断", "检查网络、证书、本机执行、开发工具和技能", null, 1, v -> startActivity(new Intent(this, DiagnosticsActivity.class)));
+    }
 
-        Group cli = newGroup("Codex CLI");
+    /** Codex CLI：版本、下载来源、检查更新、重新安装、重启。 */
+    private void buildCliPage() {
+        Group cli = newGroup(query.isEmpty() ? null : "Codex CLI");
         row(cli, R.drawable.ic_codex_line, "当前版本", Installer.TESTED_VERSION.equals(rt.installedVersion) ? "已验证版本" : "未验证版本",
                 rt.installedVersion == null ? "未安装" : rt.installedVersion, 0, null);
         LinearLayout src = row(cli, R.drawable.ic_download, "下载来源", null, "npmmirror".equals(rt.prefs.source()) ? "国内镜像" : "npm 官方", 2, null);
@@ -453,8 +662,11 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
                     rt.reinstall();
                     startActivity(new Intent(this, SetupActivity.class));
                 }).setNegativeButton("取消", null).show());
+        row(cli, R.drawable.ic_refresh_line, "重启 Codex", "重新读取配置、技能和 MCP 服务", null, 1, v -> restartCodex());
+    }
 
-        Group about = newGroup("关于");
+    private void buildAboutPage() {
+        Group about = newGroup(query.isEmpty() ? null : "关于");
         row(about, R.drawable.ic_shield_line, "本地执行与隐私", "文件和命令在本机运行；对话会发送给模型服务", null, 1, v -> new AlertDialog.Builder(this).setTitle("本地执行与隐私")
                 .setMessage("• Codex CLI 安装在本应用的私有目录，命令和文件改动都在这台手机上执行。\n"
                         + "• 模型请求需要联网，你的消息和 Agent 读取的文件内容会发送给 OpenAI 的模型服务。\n"
@@ -465,9 +677,21 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         row(about, R.drawable.ic_book, "开源许可", "Codex CLI、Termux 软件包、AndroidX、Material、Markwon", null, 1, v -> new AlertDialog.Builder(this).setTitle("开源许可")
                 .setMessage("Codex CLI（Apache-2.0）\nTermux 软件包（各包自己的许可证，用 pkg show 查看）\nAndroidX、Material Components（Apache-2.0）\nMarkwon、commonmark-java（Apache-2.0 / BSD）")
                 .setPositiveButton("好", null).show());
+    }
 
-        applySearch();
-        if (oldY > 0) scroll.post(() -> scroll.scrollTo(0, oldY));
+    private void editNickname() {
+        final EditText et = new EditText(this);
+        et.setSingleLine();
+        et.setText(rt.prefs.nickname() == null ? "" : rt.prefs.nickname());
+        et.setHint(rt.accountEmail == null ? "名字" : rt.accountEmail.replaceAll("@.*", ""));
+        LinearLayout box = Ui.vbox(this);
+        box.setPadding(dp(24), dp(8), dp(24), 0);
+        box.addView(et);
+        new AlertDialog.Builder(this).setTitle("显示的名字").setView(box)
+                .setPositiveButton("保存", (d, w) -> {
+                    rt.prefs.setNickname(et.getText().toString());
+                    buildSettings();
+                }).setNegativeButton("取消", null).show();
     }
 
     private static String initials(String s) {
@@ -496,15 +720,6 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         }
     }
 
-    private void confirmAuto() {
-        new AlertDialog.Builder(this).setTitle("开启完全自动？")
-                .setMessage("助手将直接运行命令和修改文件，不再逐项确认。它能访问本应用有权限访问的位置；工作区不是独立隔离区。\n你仍可随时停止，但已经发生的改动不会自动撤销。")
-                .setPositiveButton("开启完全自动", (d, w) -> {
-                    rt.prefs.setMode(Prefs.MODE_AUTO);
-                    buildSettings();
-                }).setNegativeButton("保持每步确认", null).show();
-    }
-
     private static int bundleIcon(String id) {
         switch (id) {
             case "recommended":
@@ -519,6 +734,8 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
                 return R.drawable.ic_film_line;
             case "cjk":
                 return R.drawable.ic_lang_line;
+            case "net":
+                return R.drawable.ic_pulse_line;
             case "native":
                 return R.drawable.ic_terminal_line;
             case "gradle":
@@ -533,20 +750,25 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         return rt.bundleInstalled(b.id) ? "已安装" : "安装";
     }
 
-    /** 工具集那几行右边的状态（安装中 / 已安装 / 安装）。 */
+    /** 工具集那几行右边的状态（安装中 / 已安装 / 安装），搜索用的关键字也一起更新。 */
     private void bindBundleRows() {
+        boolean changed = false;
         for (Group g : groups) {
-            for (View row : g.rows) {
+            for (int i = 0; i < g.rows.size(); i++) {
+                View row = g.rows.get(i);
                 Object id = row.getTag(R.id.tag_bundle);
                 if (!(id instanceof String)) continue;
                 TextView val = row.findViewWithTag("value");
                 ToolBundles.Bundle b = ToolBundles.find((String) id);
                 if (val == null || b == null) continue;
                 String st = bundleState(b);
+                if (!st.contentEquals(val.getText())) changed = true;
                 val.setText(st);
                 val.setTextColor(st.equals("安装") ? Ui.accent(this) : Ui.color(this, R.color.text3));
+                g.keys.set(i, (b.title + " " + b.summary + " " + st).toLowerCase(Locale.ROOT));
             }
         }
+        if (changed && !query.isEmpty()) applySearch();
     }
 
     private void installBundle(ToolBundles.Bundle b) {
@@ -571,6 +793,7 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
 
     /** 开发工具卡片：未安装 / 安装中（进度）/ 已就绪（版本）/ 自检失败 / 安装失败。 */
     private void bindToolkitCard() {
+        bindBundleRows();
         if (toolkitHost == null) return;
         toolkitHost.removeAllViews();
         LinearLayout card = Ui.vbox(this);
@@ -605,7 +828,7 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
                 break;
             case BROKEN:
                 head = "装好了，但在这台手机上自检没通过";
-                body = (rt.toolkitError == null ? "" : rt.toolkitError + "\n") + "可以重新安装，或到 自检与诊断 里查看详情。";
+                body = (rt.toolkitError == null ? "" : rt.toolkitError + "\n") + "可以重新安装，或到 通用 → 自检与诊断 里查看详情。";
                 icon = R.drawable.ic_warning;
                 tint = R.color.warning;
                 break;
@@ -664,7 +887,6 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
             card.addView(re, bl);
         }
         toolkitHost.addView(card, Ui.matchWrap());
-        bindBundleRows();
     }
 
     private String toolkitRepoLabel() {
@@ -742,9 +964,10 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         subtitleView.setText(Workspaces.name(ws) + " · " + (Workspaces.isShared(rt, ws) ? "手机存储" : "应用内"));
         actionButton.setVisibility(View.VISIBLE);
         actionButton.setOnClickListener(this::filesMenu);
+        searchBar.setVisibility(View.VISIBLE);
+        bottomFade.setVisibility(View.VISIBLE);
         content.removeAllViews();
         groups.clear();
-        profileBox = null;
         toolkitHost = null;
         HorizontalScrollView hs = new HorizontalScrollView(this);
         hs.setHorizontalScrollBarEnabled(false);
