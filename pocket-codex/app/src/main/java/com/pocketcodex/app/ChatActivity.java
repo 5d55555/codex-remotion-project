@@ -399,10 +399,19 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         FrameLayout.LayoutParams ml = new FrameLayout.LayoutParams(dp(46), dp(46), Gravity.START | Gravity.CENTER_VERTICAL);
         ml.leftMargin = dp(14);
         bar.addView(menu, ml);
-        ImageView more = Ui.roundButton(this, R.drawable.ic_dots, "更多", this::moreMenu);
-        FrameLayout.LayoutParams mr = new FrameLayout.LayoutParams(dp(46), dp(46), Gravity.END | Gravity.CENTER_VERTICAL);
+        // 右上角：白色胶囊里两个键（新对话的编辑图标、更多的三个点），和 ChatGPT 一样
+        LinearLayout pill = Ui.hbox(this);
+        pill.setBackground(Ui.round(this, R.color.card, R.color.border, 26));
+        Ui.elevate(pill, 4);
+        ImageView newChat = Ui.plainIcon(this, R.drawable.ic_compose, R.color.text, 46, "新对话", v -> newChat());
+        newChat.setPadding(dp(12), dp(12), dp(12), dp(12));
+        ImageView more = Ui.plainIcon(this, R.drawable.ic_dots, R.color.text, 46, "更多", this::moreMenu);
+        more.setPadding(dp(12), dp(12), dp(12), dp(12));
+        pill.addView(newChat, new LinearLayout.LayoutParams(dp(46), dp(46)));
+        pill.addView(more, new LinearLayout.LayoutParams(dp(46), dp(46)));
+        FrameLayout.LayoutParams mr = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(46), Gravity.END | Gravity.CENTER_VERTICAL);
         mr.rightMargin = dp(14);
-        bar.addView(more, mr);
+        bar.addView(pill, mr);
         // 新对话：“聊天 / 工作”
         segmented = Ui.hbox(this);
         segmented.setBackground(Ui.round(this, R.color.seg_track, 0, 26));
