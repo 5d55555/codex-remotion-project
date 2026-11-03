@@ -83,6 +83,37 @@ public final class Prefs {
         p.edit().putString("nickname", n == null || n.trim().isEmpty() ? null : n.trim()).apply();
     }
 
+    /* 上次成功拿到的账号信息和用量：只存在这台手机上，网慢或离线时先显示它，连上以后再更新。 */
+
+    public String accountEmail() {
+        return p.getString("acctEmail", null);
+    }
+
+    public String accountPlan() {
+        return p.getString("acctPlan", null);
+    }
+
+    public String accountType() {
+        return p.getString("acctType", null);
+    }
+
+    public String rateLimitsJson() {
+        return p.getString("rateLimits", null);
+    }
+
+    public void setAccount(String email, String plan, String type) {
+        p.edit().putString("acctEmail", email).putString("acctPlan", plan).putString("acctType", type).apply();
+    }
+
+    public void setRateLimitsJson(String json) {
+        p.edit().putString("rateLimits", json).apply();
+    }
+
+    /** 退出登录，或者凭据已经失效：缓存的账号信息和用量一起清掉。 */
+    public void clearAccount() {
+        p.edit().remove("acctEmail").remove("acctPlan").remove("acctType").remove("rateLimits").apply();
+    }
+
     /** 强调色（Ui.ACCENT_NAMES 的下标）。 */
     public int accent() {
         return p.getInt("accent", 0);

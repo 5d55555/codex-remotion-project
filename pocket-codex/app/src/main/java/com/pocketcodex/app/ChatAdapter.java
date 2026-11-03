@@ -112,6 +112,7 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
     public void onBindViewHolder(VH h, int pos) {
         Conversation.Item it = conv.items.get(pos);
         h.box.removeAllViews();
+        h.box.setVisibility(View.VISIBLE);
         h.box.setBackground(null);
         h.box.setPadding(0, 0, 0, 0);
         h.box.setOnClickListener(null);
@@ -352,24 +353,16 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
             title = "已停止";
             tint = R.color.text2;
         } else {
-            title = "命令已完成";
-            tint = R.color.success;
-            icon = R.drawable.ic_check;
+            title = "已运行命令"; // 成功的命令只写一句，退出码和耗时要展开才看得到
+            tint = R.color.text2;
         }
-        String status = null;
-        if (!running && !declined) {
-            StringBuilder s = new StringBuilder();
-            if (it.exitCode != null) s.append("退出码 ").append(it.exitCode);
-            else if ("completed".equals(st)) s.append("未提供退出码");
-            if (it.durationMs != null) s.append(s.length() > 0 ? " · " : "").append(Format.duration(it.durationMs));
-            status = s.toString();
-        }
+        String status = failed && !running && it.exitCode != null ? "退出码 " + it.exitCode : null;
         String key = "cmd:" + it.id;
         boolean open = expandedWithDefault(key, running || failed);
         cardShell(box, icon, tint, title, status, failed ? R.color.error : R.color.text2, key, true);
         String cmd = shortCommand(it.command);
         TextView c = Ui.mono(ctx, "$ " + cmd);
-        c.setMaxLines(open ? 12 : 3);
+        c.setMaxLines(open ? 12 : 1);
         c.setEllipsize(android.text.TextUtils.TruncateAt.END);
         box.addView(c, Ui.matchWrap(ctx, 4));
         if (open) {
@@ -553,13 +546,15 @@ final class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.VH> {
         String key = "rs:" + it.id;
         boolean open = expandedWithDefault(key, false);
         String txt = it.text.toString().trim();
+        if (txt.isEmpty() && !it.running()) {
+            box.setVisibility(View.GONE); // 模型没给摘要：不留一张空卡片
+            return;
+        }
         cardShell(box, R.drawable.ic_bulb, R.color.text2, "推理摘要", it.running() ? "思考中…" : null, R.color.text2, key, !txt.isEmpty());
         if (open && !txt.isEmpty()) {
             TextView t = Ui.caption(ctx, "");
             Markdown.setTo(t, markdown(it, txt));
             box.addView(t, Ui.matchWrap(ctx, 4));
-        } else if (txt.isEmpty() && !it.running()) {
-            box.addView(Ui.small(ctx, "未提供摘要"), Ui.matchWrap(ctx, 2));
         }
     }
 

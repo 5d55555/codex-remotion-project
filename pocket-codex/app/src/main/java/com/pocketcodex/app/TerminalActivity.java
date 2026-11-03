@@ -49,6 +49,8 @@ import java.util.concurrent.Executors;
  */
 public final class TerminalActivity extends AppCompatActivity implements CodexRuntimeManager.Listener {
     static final String EXTRA_CWD = "cwd", EXTRA_COMMANDS = "commands";
+    /** 打开时把这条命令填进输入框（不自动运行，由人按发送）。 */
+    static final String EXTRA_PREFILL = "prefill";
     private static final int MAX_CHARS = 300_000;
     private static final char MARK = '\u001e';
 
@@ -81,6 +83,11 @@ public final class TerminalActivity extends AppCompatActivity implements CodexRu
         for (String s : saved.split("\n")) if (!s.trim().isEmpty()) history.add(s);
         histPos = history.size();
         intro();
+        String prefill = getIntent().getStringExtra(EXTRA_PREFILL);
+        if (prefill != null) {
+            input.setText(prefill);
+            input.setSelection(prefill.length());
+        }
         if (getIntent().getBooleanExtra(EXTRA_COMMANDS, false)) h.post(this::commandsSheet);
     }
 

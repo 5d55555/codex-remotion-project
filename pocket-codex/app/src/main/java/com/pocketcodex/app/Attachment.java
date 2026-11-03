@@ -1,8 +1,13 @@
 package com.pocketcodex.app;
 
-/** 输入框里的附件：图片（localImage）、文件（以路径引用）、技能（skill）、插件（mention）。 */
+/** 输入框里的附件：图片（localImage）、文件（以路径引用）、技能（skill）、插件（mention）、网页搜索（只是一个开关，没有路径）。 */
 final class Attachment {
-    enum Kind { IMAGE, FILE, SKILL, PLUGIN }
+    enum Kind { IMAGE, FILE, SKILL, PLUGIN, WEB_SEARCH }
+
+    /** 网页搜索标签的文字，也是消息里显示的名字。 */
+    static final String WEB_NAME = "网页搜索";
+    /** 带了“网页搜索”标签时，发给 Codex 的这一轮前面加的提示（用户看不到）。 */
+    static final String WEB_HINT = "请先用网页搜索查找最新、可靠的资料再回答，回答末尾列出用到的来源链接。";
 
     final Kind kind;
     final String name;   // 显示名（技能/插件的显示名，文件名）

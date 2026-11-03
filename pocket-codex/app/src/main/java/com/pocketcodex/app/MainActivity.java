@@ -198,7 +198,9 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         scroll.addView(content);
         root.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         // 顶部：内容滚到顶栏下面时淡出（ChatGPT 的头像就是这样滑走的）
-        root.addView(Ui.fade(this, R.color.bg_low, true), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(104), Gravity.TOP));
+        View topFade = Ui.fade(this, R.color.bg_low, true);
+        root.addView(topFade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(104), Gravity.TOP));
+        Ui.followScroll(topFade, scroll, true);
         FrameLayout bar = new FrameLayout(this);
         ImageView back = Ui.roundButton(this, R.drawable.ic_back_line, "返回", v -> {
             if (!P_ROOT.equals(page) && tab == TAB_SETTINGS) openPage(P_ROOT);
@@ -228,6 +230,7 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
         // 底部：搜索框下面也淡出
         bottomFade = Ui.fade(this, R.color.bg_low, false);
         root.addView(bottomFade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(120), Gravity.BOTTOM));
+        Ui.followScroll(bottomFade, scroll, false);
         LinearLayout sb = Ui.hbox(this);
         GradientDrawable sbg = Ui.round(this, R.color.card, 0, 30);
         sbg.setStroke(Math.max(1, dp(1) / 2 + 1), Ui.color(this, R.color.border));
@@ -607,8 +610,13 @@ public final class MainActivity extends AppCompatActivity implements CodexRuntim
                         + "第三方技能放在 ~/.agents/skills/<名字>/SKILL.md，例如让 Codex 执行：git clone https://github.com/aicodeking/leanrea 后复制 leanrea 目录过去。")
                 .setPositiveButton("复制示例", (d, w) -> copy("MCP", "[mcp_servers.r2]\ncommand = \"r2pm\"\nargs = [\"-r\", \"r2mcp\"]\n"))
                 .setNegativeButton("关闭", null).show());
+        row(mcp, R.drawable.ic_book, "安装 REA（逆向，实验性）", "在终端里运行安装命令（已填好，按发送即可）；装完回来点“重启 Codex”", null, 1, v ->
+                startActivity(new Intent(this, TerminalActivity.class).putExtra(TerminalActivity.EXTRA_PREFILL, REA_SETUP)));
         row(mcp, R.drawable.ic_refresh_line, "重启 Codex", "加了 MCP 服务或技能后用", null, 1, v -> restartCodex());
     }
+
+    /** REA 注册到 Codex 的命令（版本固定，和内置技能里写的一致）。 */
+    static final String REA_SETUP = "npx --yes rea-agents@6.8.0 setup --client codex";
 
     private void restartCodex() {
         if (rt.restartCodex()) Toast.makeText(this, "正在重启 Codex…", Toast.LENGTH_SHORT).show();

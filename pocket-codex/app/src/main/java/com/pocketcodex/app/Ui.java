@@ -151,6 +151,33 @@ final class Ui {
         return v;
     }
 
+    /**
+     * 渐隐只在真的有内容藏在下面时才出现：顶部的渐隐在滚到最上面时隐藏，底部的在滚到最下面时隐藏。
+     * target 是 ScrollView 或 RecyclerView；内容变化（布局完成、滚动位置变化）都会重新判断。
+     */
+    static void followScroll(final View fade, final View target, final boolean top) {
+        fade.setAlpha(0f);
+        final Runnable update = () -> {
+            boolean show = top ? target.canScrollVertically(-1) : target.canScrollVertically(1);
+            if (Boolean.valueOf(show).equals(fade.getTag())) return;
+            fade.setTag(show);
+            fade.animate().cancel();
+            fade.animate().alpha(show ? 1f : 0f).setDuration(160).start();
+        };
+        if (target instanceof android.widget.ScrollView) {
+            ((android.widget.ScrollView) target).setOnScrollChangeListener((v, x, y, ox, oy) -> update.run());
+        } else if (target instanceof androidx.recyclerview.widget.RecyclerView) {
+            ((androidx.recyclerview.widget.RecyclerView) target).addOnScrollListener(new androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+                @Override
+                public void onScrolled(androidx.recyclerview.widget.RecyclerView rv, int dx, int dy) {
+                    update.run();
+                }
+            });
+        }
+        target.getViewTreeObserver().addOnGlobalLayoutListener(update::run);
+        update.run();
+    }
+
     /* ---------------- ChatGPT 风格的设置卡片 ---------------- */
 
     /** 强调色（设置 → 外观 → 强调色）：发送键、开关、链接。 */

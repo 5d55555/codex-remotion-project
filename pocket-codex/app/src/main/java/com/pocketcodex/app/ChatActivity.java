@@ -257,9 +257,12 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         fl.bottomMargin = dp(12);
         listHost.addView(toLatest, fl);
         // 底部：消息滑到输入框上方时淡出
-        listHost.addView(Ui.fade(this, R.color.bg_low, false), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(28), Gravity.BOTTOM));
+        View chatBottomFade = Ui.fade(this, R.color.bg_low, false);
+        listHost.addView(chatBottomFade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(28), Gravity.BOTTOM));
+        Ui.followScroll(chatBottomFade, list, false);
         topFade = Ui.fade(this, R.color.bg, true);
         listHost.addView(topFade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(96), Gravity.TOP));
+        Ui.followScroll(topFade, list, true);
         listHost.addView(header, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP));
         header.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
             int h = b - t;
@@ -603,11 +606,14 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         boolean running = conv != null && conv.running();
         boolean ready = rt.stage == CodexRuntimeManager.Stage.READY;
         if (running) {
-            voicePill.setBackground(Ui.round(this, R.color.primary, 0, 22));
+            // 运行中：强调色的圆形停止键（和 ChatGPT 一样只有一个方块，不写字）
+            GradientDrawable d = new GradientDrawable();
+            d.setColor(Ui.accent(this));
+            d.setCornerRadius(dp(22));
+            voicePill.setBackground(d);
             voiceIcon.setImageResource(R.drawable.ic_stop_square);
-            voiceIcon.setImageTintList(android.content.res.ColorStateList.valueOf(color(R.color.on_primary)));
-            voiceText.setText("停止");
-            voiceText.setTextColor(color(R.color.on_primary));
+            voiceIcon.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.onAccent(this)));
+            voiceText.setVisibility(View.GONE);
             voicePill.setContentDescription("停止");
             voicePill.setOnClickListener(stopping ? null : v -> stopTurn());
         } else {
@@ -618,6 +624,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
             int fg = ready ? Ui.onAccent(this) : color(R.color.text3);
             voiceIcon.setImageResource(R.drawable.ic_wave);
             voiceIcon.setImageTintList(android.content.res.ColorStateList.valueOf(fg));
+            voiceText.setVisibility(View.VISIBLE);
             voiceText.setText("语音");
             voiceText.setTextColor(fg);
             voicePill.setContentDescription("语音输入并发送");
@@ -842,6 +849,9 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         else state = "准备就绪";
         boolean auto = Prefs.MODE_AUTO.equals(rt.prefs.mode());
         subtitle.setText((chatMode ? "聊天" : Workspaces.name(cwd)) + " · " + state + (!chatMode && auto ? " · 完全自动" : ""));
+        // 副标题只在有事要说的时候出现（没运行、没出错、没等确认：和 ChatGPT 一样只剩标题）
+        boolean problem = rt.stage != CodexRuntimeManager.Stage.READY || retrying() || approvals > 0 || stopping;
+        subtitle.setVisibility(problem || (!chatMode && auto) ? View.VISIBLE : View.GONE);
         // 模型标签
         modelChip.setText(ModelPicker.chipLabel(rt));
         if (ModelPicker.fast(rt)) {
@@ -895,7 +905,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         if (!ready) hint = rt.stage == CodexRuntimeManager.Stage.ERROR ? "Codex 没有运行，到会话页重试" : "正在启动 Codex…";
         else if (otherRunning) hint = "另一个会话正在运行，结束后可以发送";
         else if (sending) hint = "正在提交…";
-        else if (running) hint = hasContent ? "追加的内容会加入正在进行的这一轮" : "点 ■ 可以随时停止";
+        else if (running) hint = hasContent ? "追加的内容会加入正在进行的这一轮" : "";
         else if (conv != null && "interrupted".equals(conv.turnStatus)) hint = "已发生的文件改动会保留";
         else hint = "";
         bindComposer();
@@ -1112,6 +1122,28 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         return outer;
     }
 
+    /** @ 面板里的“网页搜索”：和插件、技能的行一样，点了变成输入框里的蓝色标签。 */
+    private View webSearchRow() {
+        LinearLayout outer = Ui.vbox(this);
+        outer.setPadding(dp(10), 0, dp(10), 0);
+        LinearLayout row = Ui.hbox(this);
+        row.setMinimumHeight(dp(56));
+        row.setPadding(dp(14), dp(6), dp(14), dp(6));
+        ImageView ic = Ui.icon(this, R.drawable.ic_web_search, R.color.text2, 28);
+        ic.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.accent(this)));
+        row.addView(ic);
+        TextView t = Ui.text(this, Attachment.WEB_NAME, 17, R.color.text);
+        t.setSingleLine();
+        LinearLayout.LayoutParams tl = Ui.weight1();
+        tl.leftMargin = dp(16);
+        row.addView(t, tl);
+        Ui.ripple(row, false);
+        row.setOnClickListener(v -> pickMention(new Attachment(Attachment.Kind.WEB_SEARCH, Attachment.WEB_NAME, "web_search", null)));
+        row.setContentDescription(Attachment.WEB_NAME);
+        outer.addView(row, Ui.matchWrap());
+        return outer;
+    }
+
     private ImageView catalogIcon(Catalog c, int sizeDp) {
         String bmp = c.localBitmapIcon();
         if (bmp != null) {
@@ -1181,12 +1213,14 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
             if (q.isEmpty() || c.label().toLowerCase(Locale.ROOT).contains(q) || c.id.toLowerCase(Locale.ROOT).contains(q)
                     || (c.displayName != null && c.displayName.toLowerCase(Locale.ROOT).contains(q))) cats.add(c);
         }
-        if (cats.isEmpty() && mentionFiles.isEmpty() && !q.isEmpty()) return;
+        boolean webMatch = q.isEmpty() || Attachment.WEB_NAME.contains(q) || "web".contains(q) || "搜索".contains(q);
+        if (cats.isEmpty() && mentionFiles.isEmpty() && !q.isEmpty() && !webMatch) return;
         LinearLayout card = Overlay.card(this, 30);
         card.setPadding(0, dp(6), 0, dp(10));
         LinearLayout rows = Ui.vbox(this);
         rows.addView(Overlay.header(this, "插件与技能"));
-        if (cats.isEmpty()) {
+        if (webMatch) rows.addView(webSearchRow());
+        if (cats.isEmpty() && !webMatch) {
             TextView t = Ui.text(this, rt.serverAlive() ? "没有可用的插件或技能" : "Codex 启动后会列出可用的技能和插件", 15, R.color.text2);
             t.setPadding(dp(24), dp(4), dp(24), dp(10));
             rows.addView(t);
@@ -1313,8 +1347,12 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         chip.setPadding(dp(12), 0, dp(6), 0);
         chip.setMinimumHeight(dp(42));
         ImageView ic;
+        boolean web = a.kind == Attachment.Kind.WEB_SEARCH;
         if (a.kind == Attachment.Kind.FILE) {
             ic = Ui.icon(this, R.drawable.ic_file, R.color.text2, 18);
+        } else if (web) {
+            ic = Ui.icon(this, R.drawable.ic_web_search, R.color.text2, 20);
+            ic.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.accent(this)));
         } else {
             Catalog found = null;
             for (Catalog c : rt.catalog) if (c.id.equals(a.id)) found = c;
@@ -1322,6 +1360,7 @@ public final class ChatActivity extends AppCompatActivity implements CodexRuntim
         }
         chip.addView(ic);
         TextView t = Ui.text(this, a.name, 14, R.color.text);
+        if (web) t.setTextColor(Ui.accent(this));
         t.setSingleLine();
         t.setEllipsize(TextUtils.TruncateAt.MIDDLE);
         t.setMaxWidth(dp(170));

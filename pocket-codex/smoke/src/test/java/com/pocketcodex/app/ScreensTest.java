@@ -621,9 +621,11 @@ public class ScreensTest {
             bm.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, o);
         }
         a.addAttachment(new Attachment(Attachment.Kind.IMAGE, "cat.png", null, img.getAbsolutePath()));
+        a.addAttachment(new Attachment(Attachment.Kind.WEB_SEARCH, Attachment.WEB_NAME, "web_search", null));
         input.setText("画一只橘猫，放在这张图的风格里");
         idle();
         layout(a);
+        assertTrue(hasText(root, Attachment.WEB_NAME));
         assertTrue(hasText(root, "创建图像"));
         assertEquals("发送", ((View) field(a, "sendBtn")).getContentDescription());
         shot("27_composer_attachments", a);

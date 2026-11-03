@@ -112,7 +112,9 @@ final class SessionDrawer {
         // 列表滚到顶部标题下面时淡出，不是一刀切
         FrameLayout svHost = new FrameLayout(a);
         svHost.addView(sv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        svHost.addView(Ui.fade(a, R.color.bg, true), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(22), Gravity.TOP));
+        View listTop = Ui.fade(a, R.color.bg, true);
+        svHost.addView(listTop, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(22), Gravity.TOP));
+        Ui.followScroll(listTop, sv, true);
         col.addView(svHost, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         content.addView(navRow(R.drawable.ic_folder_line, "文件", v -> open(new Intent(a, MainActivity.class).putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_FILES))));
@@ -137,7 +139,9 @@ final class SessionDrawer {
         content.addView(list, Ui.matchWrap(a, 12));
 
         // 底部：新对话（强调色胶囊）+ 设置（圆形），后面的列表淡出
-        root.addView(Ui.fade(a, R.color.bg_low, false), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(130), Gravity.BOTTOM));
+        View listBottom = Ui.fade(a, R.color.bg_low, false);
+        root.addView(listBottom, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(130), Gravity.BOTTOM));
+        Ui.followScroll(listBottom, sv, false);
         FrameLayout bottom = new FrameLayout(a);
         LinearLayout pill = Ui.hbox(a);
         pill.setBackground(roundColor(Ui.accent(a), dp(30)));

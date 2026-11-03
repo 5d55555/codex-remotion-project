@@ -167,6 +167,20 @@ public final class CodexRuntimeManager {
         this.ctx = ctx;
         this.paths = new Paths(ctx);
         this.prefs = new Prefs(ctx);
+        // 上次拿到的账号和用量先用上（设置页不用等网络）；连上 Codex 以后再更新
+        this.accountEmail = prefs.accountEmail();
+        this.accountPlan = prefs.accountPlan();
+        this.accountType = prefs.accountType();
+        this.lastRateLimits = parseCache(prefs.rateLimitsJson());
+    }
+
+    private static Map<String, Object> parseCache(String json) {
+        if (json == null) return null;
+        try {
+            return Json.parseObject(json);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /* ---------------- 监听 ---------------- */
@@ -1048,6 +1062,8 @@ public final class CodexRuntimeManager {
             onMain(() -> {
                 stopServer();
                 accountEmail = accountPlan = accountType = null;
+                lastRateLimits = null;
+                prefs.clearAccount();
                 setStage(Stage.NEED_LOGIN);
             });
         });
@@ -1118,6 +1134,8 @@ public final class CodexRuntimeManager {
                     if (needsAuth) {
                         ok.close();
                         paths.authFile().delete();
+                        prefs.clearAccount();
+                        lastRateLimits = null;
                         setStage(Stage.NEED_LOGIN);
                         return;
                     }
@@ -1125,9 +1143,14 @@ public final class CodexRuntimeManager {
                     generation++;
                     initializeMs = ms;
                     serverVersion = ua.replaceAll(".*?/([0-9][0-9A-Za-z.\\-]*).*", "$1");
+                    if (email != null && !email.equals(prefs.accountEmail())) {
+                        lastRateLimits = null; // 换了账号：旧账号的用量不能留着
+                        prefs.setRateLimitsJson(null);
+                    }
                     accountEmail = email;
                     accountPlan = plan;
                     accountType = type;
+                    prefs.setAccount(email, plan, type);
                     setStage(Stage.READY);
                     maybeAutoInstallToolkit();
                     loadModels();
@@ -1439,6 +1462,7 @@ public final class CodexRuntimeManager {
             public void onResult(Map<String, Object> r) {
                 onMain(() -> {
                     lastRateLimits = r;
+                    if (r != null && accountEmail != null) prefs.setRateLimitsJson(Json.write(r));
                     for (Conversation c : conversations.values()) c.setRateLimits(r);
                     changed();
                 });
@@ -1720,9 +1744,14 @@ public final class CodexRuntimeManager {
         List<String> images = new ArrayList<>(), mentions = new ArrayList<>();
         StringBuilder full = new StringBuilder(text);
         List<Object> extra = new ArrayList<>();
+        boolean web = false;
         if (atts != null) {
             for (Attachment a : atts) {
                 switch (a.kind) {
+                    case WEB_SEARCH: // 网页搜索标签：这一轮要先联网查资料（提示只发给 Codex，消息里只显示标签）
+                        web = true;
+                        mentions.add(Attachment.WEB_NAME);
+                        break;
                     case IMAGE:
                         images.add(a.path);
                         extra.add(Json.map("type", "localImage", "path", a.path));
@@ -1751,6 +1780,7 @@ public final class CodexRuntimeManager {
         Conversation.Update u = new Conversation.Update();
         u.structure = true;
         notifyConversation(c, u);
+        if (web) full.insert(0, Attachment.WEB_HINT + (full.length() > 0 ? "\n\n" : ""));
         List<Object> input = new ArrayList<>();
         if (full.length() > 0) input.add(Json.map("type", "text", "text", full.toString()));
         input.addAll(extra);
